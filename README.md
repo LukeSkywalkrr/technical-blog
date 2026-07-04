@@ -2,18 +2,27 @@
 
 A plain HTML/CSS technical blog that can be deployed directly to Cloudflare Pages.
 
-## Pages
+## Files
 
-- `index.html` - blog homepage
-- `articles/rest-vs-grpc.html` - first article
-- `assets/styles.css` - shared site styles
+- `public/index.html` - blog homepage
+- `public/articles/rest-vs-grpc.html` - first article
+- `public/assets/styles.css` - shared site styles
+- `wrangler.toml` - Cloudflare Workers Static Assets configuration
+
+## Cloudflare Workers
+
+Use these settings if Cloudflare shows the newer Worker setup flow:
+
+- Project name: `technical-blog`
+- Build command: leave empty
+- Assets directory: configured in `wrangler.toml` as `./public`
+
+After pushing this repo to GitHub, connect the repository in Cloudflare and deploy from the `main` branch.
 
 ## Cloudflare Pages
 
-Use these settings when creating the Cloudflare Pages project:
+If you use the classic Pages flow instead:
 
 - Framework preset: `None`
-- Build command: leave empty
-- Build output directory: `/`
-
-After pushing this repo to GitHub, connect the repository in Cloudflare Pages and deploy from the default branch.
+- Build command: `exit 0`
+- Build output directory: `public`
