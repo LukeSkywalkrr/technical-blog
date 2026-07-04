@@ -1,0 +1,576 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>REST vs gRPC: Why the Protocol You Choose Defines the System You Build</title>
+    <meta name="description" content="A practical comparison of REST, HTTP/2, gRPC, Protocol Buffers, gRPC-Web, and Connect for modern API design.">
+    <style>
+:root {
+    --art-bg: var(--surface-0);
+    --art-card: var(--surface-2);
+    --art-border: var(--border);
+    --art-accent: #185FA5;
+    --art-accent-light: #E6F1FB;
+    --art-teal: #0F6E56;
+    --art-teal-light: #E1F5EE;
+    --art-coral: #993C1D;
+    --art-coral-light: #FAECE7;
+    --art-purple: #534AB7;
+    --art-purple-light: #EEEDFE;
+    --art-amber: #854F0B;
+    --art-amber-light: #FAEEDA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); color: var(--text-primary); line-height: 1.7; }
+
+  .article { max-width: 720px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+
+  .hero { padding: 3rem 0 2.5rem; border-bottom: 0.5px solid var(--border); margin-bottom: 2.5rem; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; }
+  .hero h1 { font-size: 36px; font-weight: 500; line-height: 1.2; margin-bottom: 1rem; color: var(--text-primary); }
+  .hero-sub { font-size: 18px; color: var(--text-secondary); line-height: 1.6; max-width: 600px; }
+  .meta { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; font-size: 13px; color: var(--text-muted); }
+  .meta-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border-strong); }
+
+  .toc { background: var(--surface-1); border-radius: 12px; border: 0.5px solid var(--border); padding: 1.25rem 1.5rem; margin-bottom: 2.5rem; }
+  .toc-title { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .toc ol { padding-left: 1.25rem; }
+  .toc li { font-size: 14px; color: var(--text-secondary); margin: 0.3rem 0; cursor: pointer; }
+  .toc li:hover { color: var(--text-accent); }
+
+  .section { margin-bottom: 3rem; }
+  .section-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .section h2 { font-size: 26px; font-weight: 500; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.3; }
+  .section p { font-size: 16px; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.75; }
+
+  .callout { border-left: 3px solid var(--art-accent); background: var(--art-accent-light); border-radius: 0 8px 8px 0; padding: 1rem 1.25rem; margin: 1.5rem 0; font-size: 15px; color: var(--text-primary); }
+  .callout.teal { border-color: var(--art-teal); background: var(--art-teal-light); }
+  .callout.coral { border-color: var(--art-coral); background: var(--art-coral-light); }
+  .callout.amber { border-color: var(--art-amber); background: var(--art-amber-light); }
+
+  .divider { height: 0.5px; background: var(--border); margin: 2.5rem 0; }
+
+  .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+  .cmp-card { background: var(--surface-1); border-radius: 12px; border: 0.5px solid var(--border); padding: 1.25rem; }
+  .cmp-card .cmp-head { font-size: 13px; font-weight: 500; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 0.5px solid var(--border); }
+  .cmp-card .cmp-head.rest { color: #185FA5; }
+  .cmp-card .cmp-head.grpc { color: #534AB7; }
+  .cmp-card ul { padding-left: 1.1rem; font-size: 14px; color: var(--text-secondary); }
+  .cmp-card ul li { margin: 0.4rem 0; }
+
+  .timeline { position: relative; padding-left: 2rem; margin: 1.5rem 0; }
+  .timeline::before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 1px; background: var(--border-strong); }
+  .tl-item { position: relative; margin-bottom: 1.5rem; }
+  .tl-dot { position: absolute; left: -2rem; top: 5px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--art-accent); background: var(--surface-2); }
+  .tl-dot.purple { border-color: var(--art-purple); }
+  .tl-dot.teal { border-color: var(--art-teal); }
+  .tl-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .tl-title { font-size: 15px; font-weight: 500; margin-bottom: 0.35rem; }
+  .tl-desc { font-size: 14px; color: var(--text-secondary); }
+
+  .diagram-box { background: var(--surface-1); border: 0.5px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; }
+  .diagram-box .diag-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 1rem; }
+
+  .flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin: 0.5rem 0; }
+  .flow-node { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .flow-node.blue { background: #E6F1FB; color: #185FA5; border-color: #B5D4F4; }
+  .flow-node.purple { background: #EEEDFE; color: #534AB7; border-color: #CECBF6; }
+  .flow-node.teal { background: #E1F5EE; color: #0F6E56; border-color: #9FE1CB; }
+  .flow-node.coral { background: #FAECE7; color: #993C1D; border-color: #F5C4B3; }
+  .flow-node.amber { background: #FAEEDA; color: #854F0B; border-color: #FAC775; }
+  .flow-arrow { font-size: 18px; color: var(--text-muted); padding: 0 0.4rem; }
+
+  .code-block { background: #1e1e2e; border-radius: 10px; padding: 1.25rem 1.5rem; margin: 1.25rem 0; overflow-x: auto; }
+  .code-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #7c7f9e; margin-bottom: 0.75rem; }
+  .code-block pre { font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: #cdd6f4; white-space: pre; }
+  .kw { color: #cba6f7; }
+  .str { color: #a6e3a1; }
+  .cm { color: #6c7086; }
+  .ann { color: #fab387; }
+  .tp { color: #89dceb; }
+  .fn { color: #89b4fa; }
+  .num { color: #f38ba8; }
+
+  .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 100px; font-weight: 500; }
+  .badge.new { background: var(--art-teal-light); color: var(--art-teal); }
+  .badge.tip { background: var(--art-amber-light); color: var(--art-amber); }
+  .badge.warn { background: var(--art-coral-light); color: var(--art-coral); }
+
+  .use-case-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 1.25rem 0; }
+  .uc-card { border: 0.5px solid var(--border); border-radius: 10px; padding: 1rem; }
+  .uc-icon { font-size: 20px; margin-bottom: 0.5rem; }
+  .uc-name { font-size: 14px; font-weight: 500; margin-bottom: 0.25rem; }
+  .uc-desc { font-size: 13px; color: var(--text-secondary); }
+  .uc-card.rest { border-color: #B5D4F4; background: #E6F1FB; }
+  .uc-card.rest .uc-name { color: #185FA5; }
+  .uc-card.grpc { border-color: #CECBF6; background: #EEEDFE; }
+  .uc-card.grpc .uc-name { color: #534AB7; }
+
+  .perf-row { display: grid; grid-template-columns: 140px 1fr 1fr; gap: 1rem; align-items: center; padding: 0.75rem 0; border-bottom: 0.5px solid var(--border); font-size: 14px; }
+  .perf-row:last-child { border-bottom: none; }
+  .perf-label { color: var(--text-secondary); }
+  .perf-bar-wrap { height: 8px; background: var(--surface-1); border-radius: 4px; overflow: hidden; }
+  .perf-bar { height: 100%; border-radius: 4px; }
+  .bar-rest { background: #378ADD; }
+  .bar-grpc { background: #7F77DD; }
+
+  .footnote { font-size: 13px; color: var(--text-muted); border-top: 0.5px solid var(--border); margin-top: 3rem; padding-top: 1.5rem; }
+
+  @media (max-width: 500px) {
+    .comparison-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 26px; }
+    .perf-row { grid-template-columns: 100px 1fr 1fr; }
+  }
+    </style>
+    <link rel="stylesheet" href="../assets/styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.26.0/dist/tabler-icons.min.css">
+  </head>
+  <body class="post-page">
+    <header class="site-header">
+      <a class="brand" href="../index.html" aria-label="Technical Blog home">
+        <span class="brand-mark">TB</span>
+        <span>Technical Blog</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="../index.html">Articles</a>
+        <a href="https://github.com/" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <div class="article-shell">
+        <a class="article-back" href="../index.html">Back to articles</a>
+      </div>
+<div class="article">
+
+  <div class="hero">
+    <div class="eyebrow">Engineering Deep Dive</div>
+    <h1>REST vs gRPC: Why the Protocol You Choose Defines the System You Build</h1>
+    <p class="hero-sub">From the birth of HTTP/2 to proto buffers, streaming, and where gRPC still can't reach — a practical guide for engineers choosing their service communication layer.</p>
+    <div class="meta">
+      <span>8 min read</span>
+      <span class="meta-dot"></span>
+      <span>Java examples included</span>
+      <span class="meta-dot"></span>
+      <span>gRPC-Web covered</span>
+    </div>
+  </div>
+
+  <div class="toc">
+    <div class="toc-title">In this article</div>
+    <ol>
+      <li>The origins of HTTP and why HTTP/1.1 hit a wall</li>
+      <li>HTTP/2 — what changed and why it matters</li>
+      <li>How gRPC works at a high level</li>
+      <li>Same service call: REST vs gRPC in Java</li>
+      <li>Why gRPC doesn't work natively on the web — and gRPC-Web</li>
+      <li>When to use each: real use cases and performance trade-offs</li>
+    </ol>
+  </div>
+
+  <div class="section" id="s1">
+    <div class="section-label">Part 1</div>
+    <h2>HTTP/1.1 was brilliant — and then the web outgrew it</h2>
+    <p>In 1991, Tim Berners-Lee created HTTP/0.9: one request, one response, connection closed. By 1997, HTTP/1.1 arrived with persistent connections and pipelining. For web pages of that era, it was more than enough.</p>
+    <p>But modern applications aren't 1997 web pages. A single load of a complex UI might trigger 50–100 parallel asset requests — scripts, styles, fonts, API calls. HTTP/1.1 had a structural problem that no amount of engineering could fully patch.</p>
+    <div class="callout coral">
+      <strong>Head-of-line blocking.</strong> In HTTP/1.1, each connection can only handle one request at a time. A slow response at the front of the queue blocks everything behind it — even requests that could have completed instantly.
+    </div>
+    <p>Engineers worked around this with hacks: domain sharding (open more connections), asset bundling (fewer requests), inlining CSS. These solutions added complexity without solving the root cause.</p>
+    <div class="diagram-box">
+      <div class="diag-title">HTTP/1.1 — the blocking model</div>
+      <div class="flow" style="margin-bottom:0.6rem">
+        <div class="flow-node blue">Request A</div><div class="flow-arrow">→</div>
+        <div class="flow-node">Waiting...</div><div class="flow-arrow">→</div>
+        <div class="flow-node teal">Response A</div>
+      </div>
+      <div class="flow" style="margin-bottom:0.6rem">
+        <div class="flow-node blue">Request B</div><div class="flow-arrow">→</div>
+        <div class="flow-node coral">Blocked on A</div><div class="flow-arrow">→</div>
+        <div class="flow-node teal">Response B</div>
+      </div>
+      <div class="flow">
+        <div class="flow-node blue">Request C</div><div class="flow-arrow">→</div>
+        <div class="flow-node coral">Blocked on B</div><div class="flow-arrow">→</div>
+        <div class="flow-node teal">Response C</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section" id="s2">
+    <div class="section-label">Part 2</div>
+    <h2>HTTP/2 — the protocol rewrite that enabled everything after it</h2>
+    <p>Google's internal SPDY project in 2009 proved the concept. By 2015, HTTP/2 was standardized. It didn't change the semantics of HTTP — your verbs, status codes, and headers still work the same way. What it changed was the wire format.</p>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-label">Feature 1</div>
+        <div class="tl-title">Multiplexing over a single connection</div>
+        <div class="tl-desc">Multiple requests and responses travel simultaneously over one TCP connection via independent "streams." No more blocking. Request C doesn't wait for Request A.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot purple"></div>
+        <div class="tl-label">Feature 2</div>
+        <div class="tl-title">Header compression (HPACK)</div>
+        <div class="tl-desc">HTTP headers are repetitive — the same Accept, Authorization, and Content-Type are sent on every request. HTTP/2 compresses headers using a shared lookup table, cutting overhead dramatically on chatty APIs.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot teal"></div>
+        <div class="tl-label">Feature 3</div>
+        <div class="tl-title">Binary framing layer</div>
+        <div class="tl-desc">HTTP/1.1 is text-based, parsed character by character. HTTP/2 speaks binary — structured frames that machines parse faster and with fewer errors. This is the foundation gRPC builds on.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-label">Feature 4</div>
+        <div class="tl-title">Server push</div>
+        <div class="tl-desc">Servers can proactively send resources a client will need before it asks. Less useful in practice than hoped, but it opened the mental model of bidirectional communication.</div>
+      </div>
+    </div>
+
+    <div class="callout teal">
+      <strong>The key insight:</strong> HTTP/2 didn't change what you request — it changed how those requests travel. This binary, multiplexed transport is exactly what gRPC needed to become practical.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section" id="s3">
+    <div class="section-label">Part 3</div>
+    <h2>How gRPC works — the big picture</h2>
+    <p>gRPC is Google's open-source RPC framework, released in 2016. RPC stands for Remote Procedure Call — the idea that calling a function on another service should feel as natural as calling a local function in your own code.</p>
+    <p>It sits on top of HTTP/2 and uses Protocol Buffers (protobuf) as its interface definition language and wire format. Here's the architecture:</p>
+
+    <div class="diagram-box">
+      <div class="diag-title">gRPC request lifecycle</div>
+      <div class="flow" style="margin-bottom: 1rem;">
+        <div class="flow-node purple">Client code</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node amber">Generated stub</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node blue">Protobuf encode</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">HTTP/2 stream</div>
+      </div>
+      <div class="flow">
+        <div class="flow-node">HTTP/2 stream</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node blue">Protobuf decode</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node teal">Server handler</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node teal">Your logic runs</div>
+      </div>
+    </div>
+
+    <p>The contract between client and server is defined in a <code style="font-family:var(--font-mono); font-size:13px; background:var(--surface-1); padding:1px 5px; border-radius:4px;">.proto</code> file. The gRPC toolchain generates client stubs and server skeletons in your language of choice — Java, Go, Python, and more. You never write serialization logic by hand.</p>
+
+    <div class="callout amber">
+      <strong>Why protobuf instead of JSON?</strong> Protobuf messages are typed, versioned, and binary-encoded. They're 3–5× smaller than equivalent JSON and significantly faster to serialize. The trade-off: you lose human readability and need tooling to inspect payloads.
+    </div>
+
+    <p>gRPC supports four communication patterns — a major advantage over REST's request-response model:</p>
+
+    <div class="comparison-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="cmp-card">
+        <div class="cmp-head grpc">Unary</div>
+        <ul>
+          <li>One request, one response</li>
+          <li>Same pattern as REST</li>
+          <li>Most common starting point</li>
+        </ul>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-head grpc">Server streaming</div>
+        <ul>
+          <li>One request, many responses</li>
+          <li>Live feeds, log tailing</li>
+          <li>Server pushes until done</li>
+        </ul>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-head grpc">Client streaming</div>
+        <ul>
+          <li>Many requests, one response</li>
+          <li>File uploads, batch sends</li>
+          <li>Server waits, then responds</li>
+        </ul>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-head grpc">Bidirectional streaming</div>
+        <ul>
+          <li>Many requests, many responses</li>
+          <li>Chat, real-time collaboration</li>
+          <li>Full duplex on one connection</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section" id="s4">
+    <div class="section-label">Part 4</div>
+    <h2>Same call, two protocols — in Java</h2>
+    <p>Let's make this concrete. Two microservices: <strong style="font-weight:500">OrderService</strong> calls <strong style="font-weight:500">ProductService</strong> to fetch a product by ID. Here's how each protocol handles it.</p>
+
+    <div class="callout" style="margin-bottom:0.75rem;">
+      <strong>Scenario:</strong> OrderService needs product details to complete an order. It calls ProductService with a product ID and expects name, price, and availability back.
+    </div>
+
+    <p style="font-size:14px; color:var(--text-muted); margin-bottom:0.5rem;">REST — ProductService (Spring Boot)</p>
+    <div class="code-block">
+      <div class="code-label">REST Controller</div>
+      <pre><span class="ann">@RestController</span>
+<span class="ann">@RequestMapping</span>(<span class="str">"/api/products"</span>)
+<span class="kw">public class</span> <span class="tp">ProductController</span> {
+
+    <span class="ann">@GetMapping</span>(<span class="str">"/{id}"</span>)
+    <span class="kw">public</span> <span class="tp">ResponseEntity</span>&lt;<span class="tp">ProductDto</span>&gt; <span class="fn">getProduct</span>(<span class="ann">@PathVariable</span> <span class="tp">Long</span> id) {
+        <span class="tp">Product</span> product = productService.<span class="fn">findById</span>(id);
+        <span class="kw">return</span> ResponseEntity.<span class="fn">ok</span>(<span class="tp">ProductDto</span>.<span class="fn">from</span>(product));
+    }
+}</pre>
+    </div>
+
+    <p style="font-size:14px; color:var(--text-muted); margin-bottom:0.5rem;">REST — OrderService calling ProductService</p>
+    <div class="code-block">
+      <div class="code-label">REST Client (WebClient)</div>
+      <pre><span class="kw">public</span> <span class="tp">ProductDto</span> <span class="fn">fetchProduct</span>(<span class="tp">Long</span> id) {
+    <span class="kw">return</span> webClient.<span class="fn">get</span>()
+        .<span class="fn">uri</span>(<span class="str">"/api/products/"</span> + id)
+        .<span class="fn">retrieve</span>()
+        .<span class="fn">bodyToMono</span>(<span class="tp">ProductDto</span>.<span class="kw">class</span>)
+        .<span class="fn">block</span>();
+    <span class="cm">// Serialization, HTTP verbs, URL construction — all manual</span>
+}</pre>
+    </div>
+
+    <p>Now the same thing in gRPC. First, define the contract in a <code style="font-family:var(--font-mono); font-size:13px; background:var(--surface-1); padding:1px 5px; border-radius:4px;">.proto</code> file:</p>
+
+    <div class="code-block">
+      <div class="code-label">product.proto</div>
+      <pre><span class="kw">syntax</span> = <span class="str">"proto3"</span>;
+
+<span class="kw">message</span> <span class="tp">ProductRequest</span> {
+    <span class="tp">int64</span> id = <span class="num">1</span>;
+}
+
+<span class="kw">message</span> <span class="tp">ProductResponse</span> {
+    <span class="tp">int64</span>  id           = <span class="num">1</span>;
+    <span class="tp">string</span> name         = <span class="num">2</span>;
+    <span class="tp">double</span> price        = <span class="num">3</span>;
+    <span class="tp">bool</span>   available    = <span class="num">4</span>;
+}
+
+<span class="kw">service</span> <span class="tp">ProductService</span> {
+    <span class="kw">rpc</span> <span class="fn">GetProduct</span> (<span class="tp">ProductRequest</span>) <span class="kw">returns</span> (<span class="tp">ProductResponse</span>);
+}</pre>
+    </div>
+
+    <p style="font-size:14px; color:var(--text-muted); margin-bottom:0.5rem;">gRPC — ProductService server implementation</p>
+    <div class="code-block">
+      <div class="code-label">gRPC Server</div>
+      <pre><span class="kw">public class</span> <span class="tp">ProductGrpcService</span>
+        <span class="kw">extends</span> <span class="tp">ProductServiceGrpc</span>.<span class="tp">ProductServiceImplBase</span> {
+
+    <span class="ann">@Override</span>
+    <span class="kw">public void</span> <span class="fn">getProduct</span>(<span class="tp">ProductRequest</span> req,
+        <span class="tp">StreamObserver</span>&lt;<span class="tp">ProductResponse</span>&gt; observer) {
+
+        <span class="tp">Product</span> p = productRepo.<span class="fn">findById</span>(req.<span class="fn">getId</span>());
+
+        observer.<span class="fn">onNext</span>(<span class="tp">ProductResponse</span>.<span class="fn">newBuilder</span>()
+            .<span class="fn">setId</span>(p.<span class="fn">getId</span>())
+            .<span class="fn">setName</span>(p.<span class="fn">getName</span>())
+            .<span class="fn">setPrice</span>(p.<span class="fn">getPrice</span>())
+            .<span class="fn">setAvailable</span>(p.<span class="fn">isAvailable</span>())
+            .<span class="fn">build</span>());
+
+        observer.<span class="fn">onCompleted</span>();
+    }
+}</pre>
+    </div>
+
+    <p style="font-size:14px; color:var(--text-muted); margin-bottom:0.5rem;">gRPC — OrderService calling ProductService</p>
+    <div class="code-block">
+      <div class="code-label">gRPC Client</div>
+      <pre><span class="tp">ManagedChannel</span> channel = <span class="tp">ManagedChannelBuilder</span>
+    .<span class="fn">forAddress</span>(<span class="str">"product-service"</span>, <span class="num">9090</span>)
+    .<span class="fn">usePlaintext</span>()
+    .<span class="fn">build</span>();
+
+<span class="tp">ProductServiceGrpc</span>.<span class="tp">ProductServiceBlockingStub</span> stub =
+    <span class="tp">ProductServiceGrpc</span>.<span class="fn">newBlockingStub</span>(channel);
+
+<span class="tp">ProductResponse</span> response = stub.<span class="fn">getProduct</span>(
+    <span class="tp">ProductRequest</span>.<span class="fn">newBuilder</span>().<span class="fn">setId</span>(<span class="num">42L</span>).<span class="fn">build</span>()
+);
+<span class="cm">// Type-safe, no JSON, no URL construction, no manual parsing</span></pre>
+    </div>
+
+    <div class="callout teal">
+      <strong>What you gain with gRPC:</strong> type safety enforced at compile time, generated client/server code, binary serialization, and automatic support for streaming — all from a single <code style="font-family:var(--font-mono); font-size:13px;">.proto</code> file.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section" id="s5">
+    <div class="section-label">Part 5</div>
+    <h2>Why gRPC doesn't work in the browser — and what gRPC-Web changes</h2>
+    <p>Here's the uncomfortable truth: despite running on HTTP/2, gRPC cannot be called directly from a browser. Not yet. This trips up many engineers who assume "HTTP/2 in the browser" means "gRPC in the browser."</p>
+    <p>The reason is precise: gRPC uses HTTP/2 <strong style="font-weight:500">trailers</strong> — headers sent after the response body — to communicate status codes and metadata. Browsers expose HTTP through the Fetch API and XMLHttpRequest, and neither gives JavaScript access to HTTP/2 trailers. The browser's network stack hides them.</p>
+
+    <div class="callout coral">
+      <strong>The gap:</strong> gRPC status (success, error code, error message) arrives in trailers. JavaScript in browsers cannot read trailers. The protocol physically cannot complete a gRPC handshake from a browser context.
+    </div>
+
+    <p>For years, the workaround was a proxy layer: Envoy or grpc-gateway sitting between the browser and the gRPC service, translating HTTP/1.1 JSON from the browser into gRPC on the backend. It works, but adds latency and operational complexity.</p>
+
+    <div class="diagram-box">
+      <div class="diag-title">gRPC-Web architecture</div>
+      <div class="flow">
+        <div class="flow-node blue">Browser (JS)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node amber">gRPC-Web protocol</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node amber">Envoy / proxy</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node purple">gRPC service</div>
+      </div>
+    </div>
+
+    <p>gRPC-Web is Google's official solution: a modified protocol that wraps gRPC frames into HTTP/1.1-compatible responses, moving trailers into the response body so browsers can read them. You still need a proxy, but the proxy speaks gRPC-Web natively, and your browser client uses a generated gRPC-Web stub.</p>
+
+    <div class="callout" style="background: var(--art-purple-light); border-color: var(--art-purple);">
+      <strong style="color: var(--art-purple);">The emerging update — Connect protocol:</strong> <span class="badge new">New</span><br>
+      <br>
+      Buf's Connect protocol (2022) takes this further. Connect services are compatible with gRPC, gRPC-Web, <em>and</em> plain HTTP/1.1 JSON — simultaneously, with no proxy required. A Connect server can be called from a browser with <code style="font-family:var(--font-mono); font-size:13px;">fetch()</code>, from a mobile app with gRPC, and from another service with standard gRPC. This is the direction the ecosystem is moving.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section" id="s6">
+    <div class="section-label">Part 6</div>
+    <h2>Where to use each — and the performance reality</h2>
+    <p>Neither REST nor gRPC wins universally. The right answer depends on who the clients are, how chatty the communication is, and how much you value developer ergonomics versus raw performance.</p>
+
+    <div class="use-case-grid">
+      <div class="uc-card rest">
+        <div class="uc-icon" aria-hidden="true"><i class="ti ti-world" style="font-size:20px"></i></div>
+        <div class="uc-name">Public APIs</div>
+        <div class="uc-desc">REST's JSON is universally readable, curl-testable, and requires no tooling.</div>
+      </div>
+      <div class="uc-card rest">
+        <div class="uc-icon" aria-hidden="true"><i class="ti ti-browser" style="font-size:20px"></i></div>
+        <div class="uc-name">Browser-first apps</div>
+        <div class="uc-desc">Until Connect is universal, REST is the path of least resistance for web UIs.</div>
+      </div>
+      <div class="uc-card rest">
+        <div class="uc-icon" aria-hidden="true"><i class="ti ti-file-text" style="font-size:20px"></i></div>
+        <div class="uc-name">CRUD services</div>
+        <div class="uc-desc">Simple resource operations map naturally to HTTP verbs. REST is the obvious fit.</div>
+      </div>
+      <div class="uc-card grpc">
+        <div class="uc-icon" aria-hidden="true"><i class="ti ti-topology-star" style="font-size:20px"></i></div>
+        <div class="uc-name">Internal microservices</div>
+        <div class="uc-desc">Service-to-service calls benefit from type safety, generated clients, and binary speed.</div>
+      </div>
+      <div class="uc-card grpc">
+        <div class="uc-icon" aria-hidden="true"><i class="ti ti-activity" style="font-size:20px"></i></div>
+        <div class="uc-name">Real-time streaming</div>
+        <div class="uc-desc">Bidirectional streaming is first-class in gRPC. No polling, no WebSocket workarounds.</div>
+      </div>
+      <div class="uc-card grpc">
+        <div class="uc-icon" aria-hidden="true"><i class="ti ti-device-mobile" style="font-size:20px"></i></div>
+        <div class="uc-name">Mobile backends</div>
+        <div class="uc-desc">Smaller payloads matter on constrained connections. Protobuf saves bandwidth.</div>
+      </div>
+    </div>
+
+    <p style="margin-top: 1.5rem;">The performance difference is measurable, not theoretical. On typical internal service calls:</p>
+
+    <div style="border: 0.5px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; margin: 1rem 0;">
+      <div class="perf-row" style="border-bottom: 0.5px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+        <div style="font-size: 12px; color: var(--text-muted);">Metric</div>
+        <div style="font-size: 12px; color: #185FA5; font-weight:500;">REST / JSON</div>
+        <div style="font-size: 12px; color: #534AB7; font-weight:500;">gRPC / Protobuf</div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-label">Payload size</div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-rest" style="width:80%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">~baseline</div>
+        </div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-grpc" style="width:25%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">3–5× smaller</div>
+        </div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-label">Serialization</div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-rest" style="width:70%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">JSON parse overhead</div>
+        </div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-grpc" style="width:20%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Binary, schema-driven</div>
+        </div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-label">Connection overhead</div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-rest" style="width:65%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Per-request on HTTP/1.1</div>
+        </div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-grpc" style="width:15%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Multiplexed, persistent</div>
+        </div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-label">Debug ease</div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-rest" style="width:90%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">curl, Postman, browser</div>
+        </div>
+        <div>
+          <div class="perf-bar-wrap"><div class="perf-bar bar-grpc" style="width:40%"></div></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Needs grpcurl / UI tools</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout amber">
+      <strong>The pragmatic answer:</strong> Use REST for anything public-facing or browser-driven. Use gRPC for internal service-to-service calls where you control both ends. As Connect matures, the browser limitation shrinks — watch that space.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2 style="font-size:20px;">The bottom line</h2>
+    <p>HTTP/1.1 gave us the web. HTTP/2 gave us the transport gRPC needed. gRPC gave us type-safe, high-performance, multi-pattern RPC. REST remained dominant at the edge because of human readability and browser compatibility. gRPC-Web closed some of that gap, and Connect is closing more.</p>
+    <p>Understanding the layers — transport protocol → serialization format → API style → client constraints — is what lets you make the right call on each boundary in your system, rather than applying one hammer everywhere.</p>
+  </div>
+
+  <div class="footnote">
+    This article covers HTTP/1.1, HTTP/2, gRPC, Protocol Buffers, gRPC-Web, and the Connect protocol. Java examples use Spring Boot + grpc-spring-boot-starter. Performance figures are approximate and workload-dependent.
+  </div>
+
+</div>
+    </main>
+
+    <footer class="site-footer">
+      <span>Technical Blog</span>
+      <span>Static site ready for Cloudflare Pages.</span>
+    </footer>
+  </body>
+</html>

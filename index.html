@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Technical Blog</title>
+    <meta name="description" content="Technical notes and practical engineering articles.">
+    <link rel="stylesheet" href="assets/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="index.html" aria-label="Technical Blog home">
+        <span class="brand-mark">TB</span>
+        <span>Technical Blog</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="index.html">Articles</a>
+        <a href="https://github.com/" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="kicker">Engineering notes</p>
+        <h1>Practical technical articles for backend and cloud engineers.</h1>
+        <p>
+          A small static blog for clear, useful writeups. Built as plain HTML and CSS so it can be hosted directly on Cloudflare Pages.
+        </p>
+      </section>
+
+      <section class="article-list" aria-labelledby="latest">
+        <div class="section-heading">
+          <p class="kicker">Latest</p>
+          <h2 id="latest">First article</h2>
+        </div>
+
+        <article class="article-card">
+          <div>
+            <p class="article-meta">Architecture · 12 min read</p>
+            <h3>
+              <a href="articles/rest-vs-grpc.html">REST vs gRPC: Why the Protocol You Choose Defines the System You Build</a>
+            </h3>
+            <p>
+              A practical comparison of REST, HTTP/2, gRPC, Protocol Buffers, gRPC-Web, and Connect for modern API design.
+            </p>
+          </div>
+          <a class="read-link" href="articles/rest-vs-grpc.html" aria-label="Read REST vs gRPC article">Read article</a>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Technical Blog</span>
+      <span>Static site ready for Cloudflare Pages.</span>
+    </footer>
+  </body>
+</html>
