@@ -134,7 +134,7 @@
       </a>
       <nav class="site-nav" aria-label="Primary navigation">
         <a href="../index.html">Articles</a>
-        <a href="https://github.com/" rel="noreferrer">GitHub</a>
+        <a href="https://github.com/LukeSkywalkrr/technical-blog" rel="noreferrer">GitHub</a>
       </nav>
     </header>
 
@@ -155,17 +155,31 @@
       <span class="meta-dot"></span>
       <span>gRPC-Web covered</span>
     </div>
+    <div class="quick-take" aria-label="Article summary">
+      <div>
+        <span class="quick-label">Best fit for REST</span>
+        <strong>Public APIs, browsers, human-debuggable integrations.</strong>
+      </div>
+      <div>
+        <span class="quick-label">Best fit for gRPC</span>
+        <strong>Internal service calls, streaming, typed contracts, low latency.</strong>
+      </div>
+      <div>
+        <span class="quick-label">Decision rule</span>
+        <strong>Choose by boundary: edge APIs favor REST; controlled service meshes favor gRPC.</strong>
+      </div>
+    </div>
   </div>
 
   <div class="toc">
     <div class="toc-title">In this article</div>
     <ol>
-      <li>The origins of HTTP and why HTTP/1.1 hit a wall</li>
-      <li>HTTP/2 — what changed and why it matters</li>
-      <li>How gRPC works at a high level</li>
-      <li>Same service call: REST vs gRPC in Java</li>
-      <li>Why gRPC doesn't work natively on the web — and gRPC-Web</li>
-      <li>When to use each: real use cases and performance trade-offs</li>
+      <li><a href="#s1">The origins of HTTP and why HTTP/1.1 hit a wall</a></li>
+      <li><a href="#s2">HTTP/2 — what changed and why it matters</a></li>
+      <li><a href="#s3">How gRPC works at a high level</a></li>
+      <li><a href="#s4">Same service call: REST vs gRPC in Java</a></li>
+      <li><a href="#s5">Why gRPC doesn't work natively on the web — and gRPC-Web</a></li>
+      <li><a href="#s6">When to use each: real use cases and performance trade-offs</a></li>
     </ol>
   </div>
 
@@ -570,7 +584,7 @@
 
     <footer class="site-footer">
       <span>Technical Blog</span>
-      <span>Static site ready for Cloudflare Pages.</span>
+      <span>Static site hosted on Cloudflare Workers.</span>
     </footer>
   </body>
 </html>
