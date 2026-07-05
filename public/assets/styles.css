@@ -218,6 +218,10 @@ main {
   box-shadow: var(--shadow);
 }
 
+.article-card + .article-card {
+  margin-top: 1rem;
+}
+
 .article-card h3 {
   margin: 0.25rem 0 0.75rem;
   max-width: 800px;
