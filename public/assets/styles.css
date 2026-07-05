@@ -111,9 +111,21 @@ main {
   margin: 0 auto;
 }
 
-.intro {
+.intro,
+.index-hero {
   padding: 3.7rem 0 3.2rem;
-  max-width: 820px;
+}
+
+.index-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: end;
+  gap: 3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.index-copy {
+  max-width: 780px;
 }
 
 .kicker {
@@ -125,7 +137,8 @@ main {
   text-transform: uppercase;
 }
 
-.intro h1 {
+.intro h1,
+.index-copy h1 {
   margin: 0;
   max-width: 820px;
   font-family: var(--font-display);
@@ -135,7 +148,8 @@ main {
   letter-spacing: 0;
 }
 
-.intro p:not(.kicker) {
+.intro p:not(.kicker),
+.index-copy p:not(.kicker) {
   margin: 1.45rem 0 0;
   max-width: 700px;
   color: var(--text-secondary);
@@ -143,8 +157,42 @@ main {
   line-height: 1.8;
 }
 
+.signal-panel {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #050505;
+  box-shadow: var(--shadow);
+}
+
+.signal-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.signal-row:last-child {
+  border-bottom: 0;
+}
+
+.signal-row span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.signal-row strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .article-list {
-  padding: 1rem 0 5rem;
+  padding: 3rem 0 5rem;
 }
 
 .section-heading {
@@ -161,10 +209,12 @@ main {
   grid-template-columns: 1fr auto;
   align-items: end;
   gap: 2rem;
-  padding: 1.5rem;
+  padding: 1.35rem;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: linear-gradient(180deg, #0b0c0d, #050505);
+  background:
+    linear-gradient(90deg, rgba(201, 164, 106, 0.08), transparent 32%),
+    linear-gradient(180deg, #0b0c0d, #050505);
   box-shadow: var(--shadow);
 }
 
@@ -665,6 +715,12 @@ code {
 
   .intro {
     padding: 3.4rem 0;
+  }
+
+  .index-hero {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 3rem 0;
   }
 
   .quick-take,

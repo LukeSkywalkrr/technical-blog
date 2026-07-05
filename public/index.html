@@ -1,36 +1,53 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Technical Blog</title>
-    <meta name="description" content="Technical notes and practical engineering articles.">
+    <title>Protocol Field Notes</title>
+    <meta name="description" content="Concise engineering field notes on protocols, backend systems, and cloud infrastructure.">
     <link rel="stylesheet" href="assets/styles.css">
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="index.html" aria-label="Technical Blog home">
-        <span class="brand-mark">TB</span>
-        <span>Technical Blog</span>
+      <a class="brand" href="index.html" aria-label="Protocol Field Notes home">
+        <span class="brand-mark">PF</span>
+        <span>Protocol Field Notes</span>
       </a>
       <nav class="site-nav" aria-label="Primary navigation">
-        <a href="index.html">Articles</a>
+        <a href="#articles">Articles</a>
       </nav>
     </header>
 
     <main>
-      <section class="intro">
-        <p class="kicker">Engineering notes</p>
-        <h1>Practical technical articles for backend and cloud engineers.</h1>
-        <p>
-          A small static blog for clear, useful writeups. Built as plain HTML and CSS so it can be hosted directly on Cloudflare Workers.
-        </p>
+      <section class="index-hero">
+        <div class="index-copy">
+          <p class="kicker">Backend systems, protocols, infrastructure</p>
+          <h1>Field notes for engineers who design the wire, not just the code.</h1>
+          <p>
+            Practical breakdowns of API design, service communication, runtime tradeoffs, and cloud deployment decisions.
+          </p>
+        </div>
+
+        <aside class="signal-panel" aria-label="Site signals">
+          <div class="signal-row">
+            <span>Mode</span>
+            <strong>Deep dive</strong>
+          </div>
+          <div class="signal-row">
+            <span>Stack</span>
+            <strong>HTTP, Java, Cloudflare</strong>
+          </div>
+          <div class="signal-row">
+            <span>Bias</span>
+            <strong>Clear tradeoffs</strong>
+          </div>
+        </aside>
       </section>
 
-      <section class="article-list" aria-labelledby="latest">
+      <section class="article-list" id="articles" aria-labelledby="latest">
         <div class="section-heading">
-          <p class="kicker">Latest</p>
-          <h2 id="latest">First article</h2>
+          <p class="kicker">Current note</p>
+          <h2 id="latest">Protocol architecture</h2>
         </div>
 
         <article class="article-card">
@@ -43,15 +60,14 @@
               A practical comparison of REST, HTTP/2, gRPC, Protocol Buffers, gRPC Web, and Connect for modern API design.
             </p>
           </div>
-          <a class="read-link" href="articles/rest-vs-grpc.html" aria-label="Read REST vs gRPC article">Read article</a>
+          <a class="read-link" href="articles/rest-vs-grpc.html" aria-label="Read REST vs gRPC article">Read note</a>
         </article>
       </section>
     </main>
 
     <footer class="site-footer">
-      <span>Technical Blog</span>
-      <span>Static site hosted on Cloudflare Workers.</span>
+      <span>Protocol Field Notes</span>
+      <span>Static engineering notes hosted on Cloudflare Workers.</span>
     </footer>
   </body>
 </html>
-

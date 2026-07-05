@@ -1,6 +1,6 @@
-# Technical Blog
+# Protocol Field Notes
 
-A plain HTML/CSS technical blog that can be deployed directly to Cloudflare Pages.
+A plain HTML/CSS field notes site for technical articles, deployed with Cloudflare Workers Static Assets.
 
 ## Files
 

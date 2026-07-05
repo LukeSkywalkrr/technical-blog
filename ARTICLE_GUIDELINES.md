@@ -1,6 +1,6 @@
 # Article Writing Guide
 
-Use this guide when adding a new article to the technical blog.
+Use this guide when adding a new article to Protocol Field Notes.
 
 1. Use clear sections with one main idea in each section.
 2. Keep paragraphs short. Aim for two to four sentences.
