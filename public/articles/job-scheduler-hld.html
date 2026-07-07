@@ -556,6 +556,169 @@
     color: rgba(255,255,255,0.32);
     font-size: 18px;
   }
+  .table-map {
+    background: #0a0e1a;
+    border-radius: var(--radius-sm);
+    padding: 28px;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .table-map::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .table-map-inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.1fr) auto minmax(0, 1fr);
+    gap: 14px;
+    align-items: stretch;
+  }
+  .table-box {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 14px;
+    background: rgba(255,255,255,0.045);
+  }
+  .table-box.primary {
+    background: rgba(37,99,235,0.13);
+    border-color: rgba(37,99,235,0.34);
+  }
+  .table-box.data {
+    background: rgba(5,150,105,0.12);
+    border-color: rgba(5,150,105,0.34);
+  }
+  .table-box.view {
+    background: rgba(217,119,6,0.12);
+    border-color: rgba(217,119,6,0.34);
+  }
+  .table-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #e2e8f0;
+    margin-bottom: 10px;
+  }
+  .table-fields {
+    display: grid;
+    gap: 5px;
+  }
+  .table-fields span {
+    color: rgba(255,255,255,0.58);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .map-link {
+    align-self: center;
+    text-align: center;
+    color: rgba(255,255,255,0.35);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    max-width: 92px;
+    line-height: 1.45;
+  }
+  .bucket-diagram {
+    background: linear-gradient(135deg, #0f1117 0%, #141a2a 100%);
+    border-radius: var(--radius-sm);
+    padding: 28px;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+  .bucket-axis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 10px;
+    min-width: 620px;
+  }
+  .bucket-slot {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.045);
+    padding: 12px;
+  }
+  .bucket-slot.active {
+    background: rgba(37,99,235,0.14);
+    border-color: rgba(96,165,250,0.35);
+  }
+  .bucket-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.54);
+    margin-bottom: 10px;
+  }
+  .bucket-shards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+  }
+  .bucket-shard {
+    height: 28px;
+    border-radius: 5px;
+    background: rgba(124,58,237,0.22);
+    border: 1px solid rgba(167,139,250,0.25);
+    color: #c4b5fd;
+    display: grid;
+    place-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+  }
+  .bucket-caption {
+    margin-top: 12px;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .queue-choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .queue-choice-card {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--white);
+  }
+  .queue-choice-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  .queue-choice-body {
+    padding: 16px;
+  }
+  .queue-choice-flow {
+    display: grid;
+    gap: 8px;
+  }
+  .queue-choice-node {
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 10px;
+    background: var(--surface);
+    color: var(--ink-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .queue-choice-arrow {
+    color: var(--ink-4);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding-left: 12px;
+  }
 
   .table-wrap {
     overflow-x: auto;
@@ -784,6 +947,10 @@
     .content-shell { padding: 0 16px; }
     .section-header, .section-body { padding: 20px; }
     .compare-grid { grid-template-columns: 1fr; }
+    .queue-choice { grid-template-columns: 1fr; }
+    .table-map-inner { grid-template-columns: 1fr; }
+    .map-link { max-width: none; transform: none; padding: 2px 0; }
+    .bucket-diagram { overflow-x: auto; }
     .hero-stats { gap: 24px; }
     .arch-diagram { padding: 22px; }
     .arch-row { align-items: stretch; }
@@ -830,7 +997,7 @@
             <div class="hero-stat-label">Target Load</div>
           </div>
           <div>
-            <div class="hero-stat-val">SQS</div>
+            <div class="hero-stat-val">Queue</div>
             <div class="hero-stat-label">Queue Option</div>
           </div>
         </div>
@@ -890,7 +1057,7 @@
         <li><a href="#section-duplicate">9 . Duplicate Enqueue</a></li>
         <li><a href="#section-retry">10 . Retry and DLQ</a></li>
         <li><a href="#section-recurring">11 . Recurring Jobs</a></li>
-        <li><a href="#section-redis">12 . Redis ZSET Alternative</a></li>
+        <li><a href="#section-redis">12 . Redis Sorted Set Deep Dive</a></li>
         <li><a href="#section-user">13 . User Monitoring</a></li>
         <li><a href="#section-flow">14 . End to End Flow</a></li>
         <li><a href="#section-summary">15 . Summary</a></li>
@@ -939,8 +1106,8 @@
                 <div class="arch-arrow-h">&rarr;</div>
                 <div class="arch-node primary">Job API</div>
                 <div class="arch-arrow-h">&rarr;</div>
-                <div class="arch-node data">TJob</div>
-                <div class="arch-node data">TJobExecution</div>
+                <div class="arch-node data">Job</div>
+                <div class="arch-node data">JobExecution</div>
               </div>
               <div class="arch-row">
                 <div class="arch-node primary">Scheduler Service<span class="node-label">time scan</span></div>
@@ -968,7 +1135,45 @@
           </div>
         </div>
         <div class="section-body prose">
-          <p><code>TJob</code> stores the stable definition. <code>TJobExecution</code> stores one actual run. Recurring jobs produce a new execution row for each occurrence.</p>
+          <p><code>Job</code> stores the stable definition. <code>JobExecution</code> stores one actual run. Recurring jobs produce a new execution row for each occurrence.</p>
+          <div class="table-map" aria-label="Job scheduler data model map">
+            <div class="table-map-inner">
+              <div class="table-box primary">
+                <div class="table-title">Job</div>
+                <div class="table-fields">
+                  <span>job_id</span>
+                  <span>user_id</span>
+                  <span>task_type</span>
+                  <span>schedule_expression</span>
+                  <span>status</span>
+                </div>
+              </div>
+              <div class="map-link">1 job creates many executions</div>
+              <div class="table-box data">
+                <div class="table-title">JobExecution</div>
+                <div class="table-fields">
+                  <span>execution_id</span>
+                  <span>job_id</span>
+                  <span>scheduled_at</span>
+                  <span>time_bucket</span>
+                  <span>shard_id</span>
+                  <span>status</span>
+                  <span>lock_until</span>
+                </div>
+              </div>
+              <div class="map-link">execution state feeds dashboard</div>
+              <div class="table-box view">
+                <div class="table-title">UserJobView</div>
+                <div class="table-fields">
+                  <span>user_id</span>
+                  <span>scheduled_at</span>
+                  <span>execution_id</span>
+                  <span>status</span>
+                  <span>last_error</span>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -980,12 +1185,12 @@
               </thead>
               <tbody>
                 <tr>
-                  <td>TJob</td>
+                  <td>Job</td>
                   <td>Definition of the job</td>
                   <td>job_id, user_id, task_type, schedule_type, schedule_expression, parameters, status</td>
                 </tr>
                 <tr>
-                  <td>TJobExecution</td>
+                  <td>JobExecution</td>
                   <td>One scheduled run</td>
                   <td>execution_id, job_id, scheduled_at, time_bucket, shard_id, status, attempt_count, locked_by, lock_until, version</td>
                 </tr>
@@ -1021,6 +1226,47 @@ execution_id = exec_3, scheduled_at = 2026-07-09 10:00</code></pre>
         </div>
         <div class="section-body prose">
           <p>The scheduler query is time based. It asks for executions due between now and a short lookahead window. That means the execution table should be organized around time.</p>
+          <div class="bucket-diagram" aria-label="Time bucket and shard layout">
+            <div class="bucket-axis">
+              <div class="bucket-slot">
+                <div class="bucket-time">10:00 bucket</div>
+                <div class="bucket-shards">
+                  <div class="bucket-shard">0</div>
+                  <div class="bucket-shard">1</div>
+                  <div class="bucket-shard">2</div>
+                  <div class="bucket-shard">3</div>
+                </div>
+              </div>
+              <div class="bucket-slot active">
+                <div class="bucket-time">10:05 bucket</div>
+                <div class="bucket-shards">
+                  <div class="bucket-shard">0</div>
+                  <div class="bucket-shard">1</div>
+                  <div class="bucket-shard">2</div>
+                  <div class="bucket-shard">3</div>
+                </div>
+              </div>
+              <div class="bucket-slot active">
+                <div class="bucket-time">10:10 bucket</div>
+                <div class="bucket-shards">
+                  <div class="bucket-shard">0</div>
+                  <div class="bucket-shard">1</div>
+                  <div class="bucket-shard">2</div>
+                  <div class="bucket-shard">3</div>
+                </div>
+              </div>
+              <div class="bucket-slot">
+                <div class="bucket-time">10:15 bucket</div>
+                <div class="bucket-shards">
+                  <div class="bucket-shard">0</div>
+                  <div class="bucket-shard">1</div>
+                  <div class="bucket-shard">2</div>
+                  <div class="bucket-shard">3</div>
+                </div>
+              </div>
+            </div>
+            <div class="bucket-caption">A scheduler with a 10 minute lookahead scans the active buckets, then scans only the shard ids it owns inside each bucket.</div>
+          </div>
           <div class="code-block">
             <div class="code-block-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
@@ -1042,7 +1288,7 @@ time_bucket = floor(scheduled_at_epoch_ms / bucket_size_ms) * bucket_size_ms</co
           </div>
         </div>
         <div class="section-body prose">
-          <p><code>TJob</code> can be partitioned by <code>job_id</code> because job lookup is identity based. <code>TJobExecution</code> should be partitioned by <code>time_bucket + shard_id</code> because scheduler lookup is due time based.</p>
+          <p><code>Job</code> can be partitioned by <code>job_id</code> because job lookup is identity based. <code>JobExecution</code> should be partitioned by <code>time_bucket + shard_id</code> because scheduler lookup is due time based.</p>
           <div class="compare-grid">
             <div class="compare-card a">
               <div class="compare-card-label">Good for job definition</div>
@@ -1075,6 +1321,17 @@ Example:
 PK = 1783400400#shard_17
 SK = 1783400525#exec_abc</code></pre>
           </div>
+          <div class="flow-diagram">
+            <div class="flow-steps">
+              <div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">scheduled_at maps to time_bucket</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">execution_id maps to shard_id using hash(execution_id) % N</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">partition key becomes time_bucket#shard_id</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">scheduler scans assigned shard ids inside due buckets</span></div>
+            </div>
+          </div>
           <div class="callout amber">
             <span class="callout-icon">WHY</span>
             <div>At 10k jobs per second, one hourly bucket can contain 36 million executions. Splitting the bucket into many shards prevents one partition from absorbing the whole write and scan load.</div>
@@ -1095,11 +1352,11 @@ SK = 1783400525#exec_abc</code></pre>
             <div class="flow-steps">
               <div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Client calls Job API with task type, schedule, and parameters</span></div>
               <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
-              <div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">API writes TJob definition</span></div>
+              <div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">API writes Job definition</span></div>
               <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
               <div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">API calculates first scheduled_at</span></div>
               <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
-              <div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">API writes first TJobExecution row</span></div>
+              <div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">API writes first JobExecution row</span></div>
               <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
               <div class="flow-step"><div class="flow-step-num">5</div><span class="flow-step-text">If due within lookahead, API also enqueues it</span></div>
             </div>
@@ -1148,11 +1405,42 @@ SK = 1783400525#exec_abc</code></pre>
           <span class="section-num">S 07</span>
           <div class="section-header-text">
             <h2>Delayed Queue</h2>
-            <p>SQS hides a message until its delay expires</p>
+            <p>Use SQS delay or Redis sorted sets for near time execution</p>
           </div>
         </div>
         <div class="section-body prose">
-          <p>When the scheduler pushes an execution into SQS, it sets <code>DelaySeconds = scheduled_at - now</code>. The message is not visible to workers until the delay expires.</p>
+          <p>The delayed queue is not the long term scheduler. It is the near time precision layer. The durable source of truth remains <code>JobExecution</code>.</p>
+          <div class="queue-choice">
+            <div class="queue-choice-card">
+              <div class="queue-choice-head">SQS delayed message</div>
+              <div class="queue-choice-body">
+                <div class="queue-choice-flow">
+                  <div class="queue-choice-node">delay = scheduled_at - now</div>
+                  <div class="queue-choice-arrow">then</div>
+                  <div class="queue-choice-node">SendMessage DelaySeconds</div>
+                  <div class="queue-choice-arrow">then</div>
+                  <div class="queue-choice-node">Worker long polls visible messages</div>
+                  <div class="queue-choice-arrow">then</div>
+                  <div class="queue-choice-node">Worker claims JobExecution</div>
+                </div>
+              </div>
+            </div>
+            <div class="queue-choice-card">
+              <div class="queue-choice-head">Redis sorted set</div>
+              <div class="queue-choice-body">
+                <div class="queue-choice-flow">
+                  <div class="queue-choice-node">score = scheduled_at_epoch_ms</div>
+                  <div class="queue-choice-arrow">then</div>
+                  <div class="queue-choice-node">ZADD scheduler:bucket:shard</div>
+                  <div class="queue-choice-arrow">then</div>
+                  <div class="queue-choice-node">Lua pops due execution ids</div>
+                  <div class="queue-choice-arrow">then</div>
+                  <div class="queue-choice-node">Worker claims JobExecution</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p>When using SQS, the scheduler sets <code>DelaySeconds = scheduled_at - now</code>. The message is not visible to workers until the delay expires.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -1185,7 +1473,11 @@ SK = 1783400525#exec_abc</code></pre>
             <span class="callout-icon">SQS</span>
             <div>Workers are not called back by SQS. They continuously long poll and receive messages when those messages become visible.</div>
           </div>
-          <p>SQS delay is capped at 15 minutes, so the scheduler should only enqueue near term executions. Long future scheduling still lives in the database.</p>
+          <div class="callout purple">
+            <span class="callout-icon">REDIS</span>
+            <div>With Redis, workers or queue consumers use a Lua script to atomically find due items with <code>ZRANGEBYSCORE</code>, remove them with <code>ZREM</code>, and then claim the execution in the database.</div>
+          </div>
+          <p>SQS delay is capped at 15 minutes, so the scheduler should only enqueue near term executions. Redis sorted sets also work best as near time queues because the database can rebuild them if Redis loses data.</p>
         </div>
       </div>
 
@@ -1292,16 +1584,16 @@ SK = 1783400525#exec_abc</code></pre>
           </div>
         </div>
         <div class="section-body prose">
-          <p>For recurring jobs, the system keeps one <code>TJob</code> definition and creates one <code>TJobExecution</code> row per run. The next execution is calculated from the cron or interval expression after the current run reaches a terminal state.</p>
+          <p>For recurring jobs, the system keeps one <code>Job</code> definition and creates one <code>JobExecution</code> row per run. The next execution is calculated from the cron or interval expression after the current run reaches a terminal state.</p>
           <div class="code-block">
             <div class="code-block-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
               <span class="code-label">Recurring completion</span>
             </div>
             <pre><code>complete(exec_1)
-if TJob.status == ACTIVE:
+if Job.status == ACTIVE:
     next_time = cron.next_after(exec_1.scheduled_at)
-    insert TJobExecution(job_id, scheduled_at = next_time)</code></pre>
+    insert JobExecution(job_id, scheduled_at = next_time)</code></pre>
           </div>
           <div class="callout amber">
             <span class="callout-icon">NOTE</span>
@@ -1314,8 +1606,8 @@ if TJob.status == ACTIVE:
         <div class="section-header">
           <span class="section-num">S 12</span>
           <div class="section-header-text">
-            <h2>Redis ZSET Alternative</h2>
-            <p>Redis can be the near time priority queue, not the source of truth</p>
+            <h2>Redis Sorted Set Deep Dive</h2>
+            <p>Sorted sets can power the near time queue, while DB remains the source of truth</p>
           </div>
         </div>
         <div class="section-body prose">
@@ -1375,7 +1667,7 @@ Postgres index:
 CREATE INDEX idx_user_execution
 ON t_job_execution (user_id, scheduled_at DESC);</code></pre>
           </div>
-          <p>At very large scale, this can become a separate read model such as <code>TUserJobExecutionView</code>. That keeps the scheduler write and scan path clean.</p>
+          <p>At very large scale, this can become a separate read model such as <code>UserJobExecutionView</code>. That keeps the scheduler write and scan path clean.</p>
         </div>
       </div>
 
@@ -1396,9 +1688,9 @@ ON t_job_execution (user_id, scheduled_at DESC);</code></pre>
             </div>
             <pre><code>Client -> Job API
   -> validate schedule and parameters
-  -> INSERT TJob
+  -> INSERT Job
   -> compute first scheduled_at
-  -> INSERT TJobExecution
+  -> INSERT JobExecution
   -> if inside lookahead, enqueue with delay
   -> return job_id</code></pre>
           </div>
@@ -1424,7 +1716,7 @@ ON t_job_execution (user_id, scheduled_at DESC);</code></pre>
             </div>
             <pre><code>Worker long polls queue
   -> receives visible execution_id
-  -> conditionally claims TJobExecution
+  -> conditionally claims JobExecution
   -> runs task with execution_id idempotency key
   -> marks COMPLETED or RETRYING or FAILED
   -> deletes queue message after successful handling
@@ -1435,8 +1727,8 @@ ON t_job_execution (user_id, scheduled_at DESC);</code></pre>
 
       <div class="summary-box" id="section-summary">
         <h2>Final Interview Summary</h2>
-        <p>A scalable job scheduler has two main durable entities: <strong><code>TJob</code></strong> for the job definition and <strong><code>TJobExecution</code></strong> for each actual run.</p>
-        <p><strong><code>TJob</code></strong> can be partitioned by <code>job_id</code>, but <strong><code>TJobExecution</code></strong> should be partitioned by <code>time_bucket + shard_id</code> because the scheduler query is due time based.</p>
+        <p>A scalable job scheduler has two main durable entities: <strong><code>Job</code></strong> for the job definition and <strong><code>JobExecution</code></strong> for each actual run.</p>
+        <p><strong><code>Job</code></strong> can be partitioned by <code>job_id</code>, but <strong><code>JobExecution</code></strong> should be partitioned by <code>time_bucket + shard_id</code> because the scheduler query is due time based.</p>
         <p>The scheduler scans its assigned time bucket shards for executions due in a short lookahead window and pushes them to a delayed queue such as SQS. Workers long poll the queue, then claim execution rows with an atomic conditional update before running.</p>
         <p>Duplicate enqueue is acceptable because the database claim is idempotent. If a worker crashes, SQS visibility timeout and the database lease allow another worker to retry. Every task receives <code>execution_id</code> as an idempotency key. For recurring jobs, the next execution is inserted only after the current execution completes.</p>
       </div>
