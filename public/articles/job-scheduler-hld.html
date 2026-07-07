@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Scheduler System Design: High Level Architecture</title>
+<meta name="description" content="A practical high level design for a scalable job scheduler using time bucket partitioning, delayed queues, worker leases, retries, and recurring executions.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0f1117;
+    --ink-2: #2d3142;
+    --ink-3: #5c6070;
+    --ink-4: #9299aa;
+    --surface: #f7f8fc;
+    --surface-2: #eef0f7;
+    --surface-3: #e3e6f0;
+    --white: #ffffff;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --accent-2: #7c3aed;
+    --accent-2-soft: #ede9fe;
+    --green: #059669;
+    --green-soft: #d1fae5;
+    --amber: #d97706;
+    --amber-soft: #fef3c7;
+    --red: #dc2626;
+    --red-soft: #fee2e2;
+    --border: rgba(0,0,0,0.08);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--surface);
+    color: var(--ink);
+    line-height: 1.65;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .site-header {
+    background: rgba(255,255,255,0.92);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .site-header-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .header-badge {
+    background: var(--ink);
+    color: var(--white);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .header-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toc-pill {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-3);
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--white);
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+  .toc-pill:hover { background: var(--surface); color: var(--ink); }
+
+  .hero {
+    background:
+      linear-gradient(135deg, #0f1117 0%, #161b2d 58%, #101726 100%);
+    color: var(--white);
+    padding: 80px 32px 72px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.35));
+  }
+  .hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 56px;
+    align-items: center;
+  }
+  .hero-copy { min-width: 0; }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 24px;
+    text-transform: uppercase;
+  }
+  .hero-eyebrow-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.86); }
+  }
+  .hero h1 {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0;
+    margin-bottom: 20px;
+    max-width: 780px;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: rgba(255,255,255,0.55);
+  }
+  .hero-lead {
+    font-size: 18px;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.68);
+    max-width: 650px;
+    margin-bottom: 40px;
+  }
+  .hero-lead code {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.86);
+    border-color: rgba(255,255,255,0.12);
+  }
+  .hero-stats {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .hero-stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--white);
+    letter-spacing: 0;
+  }
+  .hero-stat-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.44);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .scheduler-panel {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)),
+      rgba(5,8,15,0.72);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.34);
+    overflow: hidden;
+  }
+  .scheduler-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.09);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.54);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .scheduler-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #86efac;
+  }
+  .scheduler-live::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 16px rgba(34,197,94,0.8);
+  }
+  .scheduler-panel-body {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+  }
+  .queue-card {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.045);
+    padding: 13px;
+  }
+  .queue-card.primary {
+    background: rgba(37,99,235,0.16);
+    border-color: rgba(96,165,250,0.34);
+  }
+  .queue-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: rgba(255,255,255,0.48);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .queue-value {
+    color: rgba(255,255,255,0.92);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    line-height: 1.3;
+  }
+  .queue-small {
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    margin-top: 5px;
+  }
+  .queue-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .queue-path {
+    display: grid;
+    gap: 8px;
+  }
+  .queue-path-row {
+    display: grid;
+    grid-template-columns: 74px 1fr;
+    gap: 10px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.66);
+  }
+  .queue-chip {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 4px 8px;
+    text-align: center;
+    color: #bfdbfe;
+    background: rgba(37,99,235,0.12);
+  }
+  .queue-line {
+    position: relative;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(96,165,250,0.8), rgba(167,139,250,0.28));
+  }
+  .queue-line::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #a78bfa;
+  }
+
+  .content-shell {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 48px;
+    padding-top: 56px;
+    padding-bottom: 80px;
+    align-items: start;
+  }
+  .sidebar {
+    position: sticky;
+    top: 72px;
+  }
+  .toc-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: 12px;
+  }
+  .toc-list { list-style: none; }
+  .toc-list li { margin-bottom: 2px; }
+  .toc-list a {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    display: block;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .toc-list a:hover {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
+
+  .article { min-width: 0; }
+  .section {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 28px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
+  }
+  .section:hover { box-shadow: var(--shadow); }
+  .section-header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 3px 8px;
+    white-space: nowrap;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .section-header-text h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+    letter-spacing: 0;
+  }
+  .section-header-text p {
+    font-size: 14px;
+    color: var(--ink-3);
+    margin-top: 4px;
+  }
+  .section-body { padding: 28px 32px; }
+  .prose p {
+    font-size: 15px;
+    color: var(--ink-2);
+    margin-bottom: 16px;
+    line-height: 1.7;
+  }
+  .prose p:last-child { margin-bottom: 0; }
+  .prose strong { font-weight: 600; color: var(--ink); }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: var(--surface-2);
+    color: var(--accent-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--surface-3);
+  }
+
+  .flow-diagram {
+    background: linear-gradient(135deg, #0f1117 0%, #1a1f2e 100%);
+    border-radius: var(--radius-sm);
+    padding: 28px;
+    margin: 20px 0;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .flow-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    z-index: 1;
+  }
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .flow-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(37,99,235,0.2);
+    border: 1px solid rgba(37,99,235,0.4);
+    color: #60a5fa;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .flow-step-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: #c9d1d9;
+  }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 2px 0;
+  }
+  .flow-arrow-line {
+    width: 22px;
+    display: flex;
+    justify-content: center;
+    color: rgba(37,99,235,0.4);
+    font-size: 14px;
+  }
+
+  .arch-diagram {
+    background: #0a0e1a;
+    border-radius: var(--radius-sm);
+    padding: 32px;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .arch-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .arch-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .arch-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .arch-node {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #e2e8f0;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .arch-node.primary {
+    background: rgba(37,99,235,0.15);
+    border-color: rgba(37,99,235,0.4);
+    color: #93c5fd;
+  }
+  .arch-node.secondary {
+    background: rgba(124,58,237,0.12);
+    border-color: rgba(124,58,237,0.35);
+    color: #c4b5fd;
+  }
+  .arch-node.data {
+    background: rgba(5,150,105,0.12);
+    border-color: rgba(5,150,105,0.35);
+    color: #6ee7b7;
+  }
+  .arch-node.client {
+    background: rgba(217,119,6,0.12);
+    border-color: rgba(217,119,6,0.35);
+    color: #fcd34d;
+  }
+  .arch-node .node-label {
+    font-size: 9px;
+    color: rgba(255,255,255,0.35);
+    display: block;
+    margin-top: 2px;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .arch-arrow-h {
+    color: rgba(255,255,255,0.32);
+    font-size: 18px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    margin: 20px 0;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--surface-2); }
+  thead th {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface); }
+  tbody td {
+    padding: 10px 16px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody td:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-2);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .callout {
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    margin: 20px 0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .callout-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.45);
+  }
+  .callout.blue { background: var(--accent-soft); color: #1e40af; border-left: 3px solid var(--accent); }
+  .callout.purple { background: var(--accent-2-soft); color: #5b21b6; border-left: 3px solid var(--accent-2); }
+  .callout.green { background: var(--green-soft); color: #065f46; border-left: 3px solid var(--green); }
+  .callout.amber { background: var(--amber-soft); color: #92400e; border-left: 3px solid var(--amber); }
+  .callout strong { font-weight: 600; }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .compare-card {
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    border: 1px solid var(--border);
+  }
+  .compare-card.a { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-color: #bae6fd; }
+  .compare-card.b { background: linear-gradient(135deg, #f5f3ff, #ede9fe); border-color: #c4b5fd; }
+  .compare-card.c { background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-color: #a7f3d0; }
+  .compare-card.d { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fde68a; }
+  .compare-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .compare-card.a .compare-card-label { color: #0369a1; }
+  .compare-card.b .compare-card-label { color: #7c3aed; }
+  .compare-card.c .compare-card-label { color: #047857; }
+  .compare-card.d .compare-card-label { color: #92400e; }
+  .compare-card-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .compare-card p { font-size: 13px; color: var(--ink-3); line-height: 1.55; }
+  .compare-card ul { list-style: none; }
+  .compare-card ul li {
+    font-size: 13px;
+    color: var(--ink-3);
+    padding: 3px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .compare-card ul li::before {
+    content: '>';
+    font-family: monospace;
+    color: var(--ink-4);
+    flex-shrink: 0;
+  }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .pill {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .pill.blue { background: var(--accent-soft); color: #1e40af; border-color: #bfdbfe; }
+  .pill.purple { background: var(--accent-2-soft); color: #5b21b6; border-color: #c4b5fd; }
+  .pill.green { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
+  .pill.amber { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
+
+  .code-block {
+    background: #0f1117;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .code-block-header {
+    background: rgba(255,255,255,0.04);
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .code-dots { display: flex; gap: 5px; }
+  .code-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .code-dot:nth-child(1) { background: #ff5f57; }
+  .code-dot:nth-child(2) { background: #ffbd2e; }
+  .code-dot:nth-child(3) { background: #28ca41; }
+  .code-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.36);
+    margin-left: 4px;
+    letter-spacing: 0.06em;
+  }
+  .code-block pre {
+    padding: 20px;
+    overflow-x: auto;
+  }
+  .code-block code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #c9d1d9;
+    background: none;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    line-height: 1.65;
+    white-space: pre;
+  }
+  .code-kw { color: #ff7b72; }
+  .code-str { color: #a5d6ff; }
+  .code-num { color: #79c0ff; }
+  .code-comment { color: #8b949e; font-style: italic; }
+  .code-key { color: #7ee787; }
+
+  .summary-box {
+    background: linear-gradient(135deg, var(--ink) 0%, #1e2235 100%);
+    color: var(--white);
+    border-radius: var(--radius);
+    padding: 40px;
+    margin-top: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .summary-box::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .summary-box h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .summary-box p {
+    font-size: 15px;
+    line-height: 1.75;
+    color: rgba(255,255,255,0.72);
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .summary-box p:last-child { margin-bottom: 0; }
+  .summary-box strong { color: var(--white); }
+
+  .article-footer {
+    background: var(--ink);
+    color: rgba(255,255,255,0.42);
+    padding: 32px;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 768px) {
+    .site-header-inner { padding: 0 20px; }
+    .header-right { display: none; }
+    .two-col { grid-template-columns: 1fr; gap: 0; padding-top: 28px; }
+    .sidebar { display: none; }
+    .hero { padding: 48px 20px; }
+    .hero-layout { grid-template-columns: 1fr; gap: 30px; }
+    .scheduler-panel { max-width: 430px; }
+    .content-shell { padding: 0 16px; }
+    .section-header, .section-body { padding: 20px; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .hero-stats { gap: 24px; }
+    .arch-diagram { padding: 22px; }
+    .arch-row { align-items: stretch; }
+    .arch-node { white-space: normal; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <span class="header-badge">HLD</span>
+    <span class="header-title">Job Scheduler System Design</span>
+    <div class="header-right">
+      <a class="toc-pill" href="#section-arch">Architecture</a>
+      <a class="toc-pill" href="#section-data">Schema</a>
+      <a class="toc-pill" href="#section-flow">Flow</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="hero-layout">
+      <div class="hero-copy">
+        <div class="hero-eyebrow">
+          <span class="hero-eyebrow-dot"></span>
+          System Design . Article Version
+        </div>
+        <h1>Job Scheduler<br><em>High Level Design</em></h1>
+        <p class="hero-lead">A practical design for scheduling one time and recurring jobs at scale, using a durable execution table, a near time delayed queue, worker leases, retry control, and idempotent execution.</p>
+        <div class="hero-stats">
+          <div>
+            <div class="hero-stat-val">16</div>
+            <div class="hero-stat-label">Sections</div>
+          </div>
+          <div>
+            <div class="hero-stat-val">2</div>
+            <div class="hero-stat-label">Core Tables</div>
+          </div>
+          <div>
+            <div class="hero-stat-val">10k/s</div>
+            <div class="hero-stat-label">Target Load</div>
+          </div>
+          <div>
+            <div class="hero-stat-val">SQS</div>
+            <div class="hero-stat-label">Queue Option</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scheduler-panel" aria-label="Scheduler execution preview">
+        <div class="scheduler-panel-head">
+          <span>Execution Control</span>
+          <span class="scheduler-live">Live</span>
+        </div>
+        <div class="scheduler-panel-body">
+          <div class="queue-card primary">
+            <div class="queue-label"><span>Next due bucket</span><span>shard_17</span></div>
+            <div class="queue-value">10:03:20</div>
+            <div class="queue-small">time_bucket#shard_id scan window</div>
+          </div>
+          <div class="queue-grid">
+            <div class="queue-card">
+              <div class="queue-label"><span>Delay</span></div>
+              <div class="queue-value">200s</div>
+              <div class="queue-small">SQS visibility waits</div>
+            </div>
+            <div class="queue-card">
+              <div class="queue-label"><span>Lease</span></div>
+              <div class="queue-value">v42</div>
+              <div class="queue-small">worker claim token</div>
+            </div>
+          </div>
+          <div class="queue-card">
+            <div class="queue-path">
+              <div class="queue-path-row"><span class="queue-chip">DB</span><span class="queue-line"></span></div>
+              <div class="queue-path-row"><span class="queue-chip">Queue</span><span class="queue-line"></span></div>
+              <div class="queue-path-row"><span class="queue-chip">Worker</span><span class="queue-line"></span></div>
+              <div class="queue-path-row"><span class="queue-chip">Done</span><span class="queue-line"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="content-shell">
+  <div class="two-col">
+    <aside class="sidebar">
+      <div class="toc-label">In this design</div>
+      <ul class="toc-list">
+        <li><a href="#section-core">0 . Core Design Choice</a></li>
+        <li><a href="#section-arch">1 . High Level Architecture</a></li>
+        <li><a href="#section-data">2 . Data Model</a></li>
+        <li><a href="#section-time">3 . Time Buckets</a></li>
+        <li><a href="#section-partition">4 . Partition Strategy</a></li>
+        <li><a href="#section-create">5 . Job Creation Flow</a></li>
+        <li><a href="#section-scheduler">6 . Scheduler Service</a></li>
+        <li><a href="#section-queue">7 . Delayed Queue</a></li>
+        <li><a href="#section-worker">8 . Worker Lease</a></li>
+        <li><a href="#section-duplicate">9 . Duplicate Enqueue</a></li>
+        <li><a href="#section-retry">10 . Retry and DLQ</a></li>
+        <li><a href="#section-recurring">11 . Recurring Jobs</a></li>
+        <li><a href="#section-redis">12 . Redis ZSET Alternative</a></li>
+        <li><a href="#section-user">13 . User Monitoring</a></li>
+        <li><a href="#section-flow">14 . End to End Flow</a></li>
+        <li><a href="#section-summary">15 . Summary</a></li>
+      </ul>
+    </aside>
+
+    <article class="article">
+
+      <div class="section" id="section-core">
+        <div class="section-header">
+          <span class="section-num">S 00</span>
+          <div class="section-header-text">
+            <h2>Core Design Choice</h2>
+            <p>DB is durable, queue is precise, worker claim is the safety gate</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>The important split is between <strong>job definition</strong> and <strong>job execution</strong>. A job definition says what should run. A job execution is one concrete scheduled run of that job.</p>
+          <p>The durable database remains the source of truth. The queue is a near time delivery mechanism that wakes workers close to the scheduled time. A worker must still claim the execution in the database before running it.</p>
+          <div class="callout blue">
+            <span class="callout-icon">KEY</span>
+            <div><strong>Interview line:</strong> execution table by time, queue for precision, worker lease for safety, idempotency for duplicates.</div>
+          </div>
+          <div class="pill-row">
+            <span class="pill blue">Time bucket partitions</span>
+            <span class="pill purple">Delayed queue</span>
+            <span class="pill green">Atomic lease</span>
+            <span class="pill amber">Idempotent task</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="section-arch">
+        <div class="section-header">
+          <span class="section-num">S 01</span>
+          <div class="section-header-text">
+            <h2>High Level Architecture</h2>
+            <p>Separate API writes, scheduler scanning, queue timing, and worker execution</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <div class="arch-diagram">
+            <div class="arch-inner">
+              <div class="arch-row">
+                <div class="arch-node client">Client<span class="node-label">create job</span></div>
+                <div class="arch-arrow-h">&rarr;</div>
+                <div class="arch-node primary">Job API</div>
+                <div class="arch-arrow-h">&rarr;</div>
+                <div class="arch-node data">TJob</div>
+                <div class="arch-node data">TJobExecution</div>
+              </div>
+              <div class="arch-row">
+                <div class="arch-node primary">Scheduler Service<span class="node-label">time scan</span></div>
+                <div class="arch-arrow-h">&rarr;</div>
+                <div class="arch-node secondary">Delayed Queue<span class="node-label">SQS or Redis</span></div>
+                <div class="arch-arrow-h">&rarr;</div>
+                <div class="arch-node primary">Workers<span class="node-label">claim and run</span></div>
+              </div>
+              <div class="arch-row">
+                <div class="arch-node data">User View<span class="node-label">monitoring</span></div>
+                <div class="arch-node secondary">DLQ<span class="node-label">failed messages</span></div>
+              </div>
+            </div>
+          </div>
+          <p>The API writes the durable records. The scheduler scans future executions by time. The queue holds near term executions until they become visible. Workers long poll the queue and claim work with a conditional database update.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-data">
+        <div class="section-header">
+          <span class="section-num">S 02</span>
+          <div class="section-header-text">
+            <h2>Data Model</h2>
+            <p>One job definition can produce many execution rows</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p><code>TJob</code> stores the stable definition. <code>TJobExecution</code> stores one actual run. Recurring jobs produce a new execution row for each occurrence.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Table</th>
+                  <th>Purpose</th>
+                  <th>Important fields</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>TJob</td>
+                  <td>Definition of the job</td>
+                  <td>job_id, user_id, task_type, schedule_type, schedule_expression, parameters, status</td>
+                </tr>
+                <tr>
+                  <td>TJobExecution</td>
+                  <td>One scheduled run</td>
+                  <td>execution_id, job_id, scheduled_at, time_bucket, shard_id, status, attempt_count, locked_by, lock_until, version</td>
+                </tr>
+                <tr>
+                  <td>UserJobView</td>
+                  <td>User facing read path</td>
+                  <td>user_id, scheduled_at, execution_id, status, last_error</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Recurring example</span>
+            </div>
+            <pre><code>job_id = daily_report_123
+
+execution_id = exec_1, scheduled_at = 2026-07-07 10:00
+execution_id = exec_2, scheduled_at = 2026-07-08 10:00
+execution_id = exec_3, scheduled_at = 2026-07-09 10:00</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="section-time">
+        <div class="section-header">
+          <span class="section-num">S 03</span>
+          <div class="section-header-text">
+            <h2>Time Bucket Calculation</h2>
+            <p>Use epoch time directly, not calendar subtraction</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>The scheduler query is time based. It asks for executions due between now and a short lookahead window. That means the execution table should be organized around time.</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Bucket calculation</span>
+            </div>
+            <pre><code>bucket_size_ms = 5 * 60 * 1000
+time_bucket = floor(scheduled_at_epoch_ms / bucket_size_ms) * bucket_size_ms</code></pre>
+          </div>
+          <p>Epoch time already includes date, month, year, and time zone normalization. Today at 10 AM and tomorrow at 10 AM land in different buckets because their epoch timestamps are different.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-partition">
+        <div class="section-header">
+          <span class="section-num">S 04</span>
+          <div class="section-header-text">
+            <h2>Partition Strategy</h2>
+            <p>Do not shard the scheduler path by job id</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p><code>TJob</code> can be partitioned by <code>job_id</code> because job lookup is identity based. <code>TJobExecution</code> should be partitioned by <code>time_bucket + shard_id</code> because scheduler lookup is due time based.</p>
+          <div class="compare-grid">
+            <div class="compare-card a">
+              <div class="compare-card-label">Good for job definition</div>
+              <div class="compare-card-title">PK = job_id</div>
+              <ul>
+                <li>Fetch job details</li>
+                <li>Pause or delete job</li>
+                <li>Update schedule expression</li>
+              </ul>
+            </div>
+            <div class="compare-card b">
+              <div class="compare-card-label">Good for scheduler scan</div>
+              <div class="compare-card-title">PK = time_bucket#shard_id</div>
+              <ul>
+                <li>Find executions due soon</li>
+                <li>Avoid hot partitions</li>
+                <li>Assign shard ranges to schedulers</li>
+              </ul>
+            </div>
+          </div>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">DynamoDB or Cassandra style key</span>
+            </div>
+            <pre><code>PK = time_bucket#shard_id
+SK = scheduled_at#execution_id
+
+Example:
+PK = 1783400400#shard_17
+SK = 1783400525#exec_abc</code></pre>
+          </div>
+          <div class="callout amber">
+            <span class="callout-icon">WHY</span>
+            <div>At 10k jobs per second, one hourly bucket can contain 36 million executions. Splitting the bucket into many shards prevents one partition from absorbing the whole write and scan load.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="section-create">
+        <div class="section-header">
+          <span class="section-num">S 05</span>
+          <div class="section-header-text">
+            <h2>Job Creation Flow</h2>
+            <p>Write durable state first, enqueue only when the run is near</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <div class="flow-diagram">
+            <div class="flow-steps">
+              <div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Client calls Job API with task type, schedule, and parameters</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">API writes TJob definition</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">API calculates first scheduled_at</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">API writes first TJobExecution row</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">5</div><span class="flow-step-text">If due within lookahead, API also enqueues it</span></div>
+            </div>
+          </div>
+          <p>The direct enqueue path reduces latency for jobs that are due soon. It does not replace the scheduler scanner. The scanner is still the backstop that finds durable executions and pushes them into the queue later.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-scheduler">
+        <div class="section-header">
+          <span class="section-num">S 06</span>
+          <div class="section-header-text">
+            <h2>Scheduler Service</h2>
+            <p>Scheduler instances own time bucket shards, not job ids</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>Each scheduler instance is assigned a range of shard ids. Every few seconds, it scans the buckets that intersect the lookahead window, such as now to now plus 5 minutes.</p>
+          <div class="compare-grid">
+            <div class="compare-card c">
+              <div class="compare-card-label">Scheduler 1</div>
+              <div class="compare-card-title">shard_0 to shard_9</div>
+              <p>Scans due executions for its assigned shards and pushes them to the delayed queue.</p>
+            </div>
+            <div class="compare-card d">
+              <div class="compare-card-label">Scheduler 2</div>
+              <div class="compare-card-title">shard_10 to shard_19</div>
+              <p>Does the same scan for another shard range. Failover can rebalance ranges through service discovery or leases.</p>
+            </div>
+          </div>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Postgres index option</span>
+            </div>
+            <pre><code><span class="code-kw">CREATE INDEX</span> idx_execution_due
+<span class="code-kw">ON</span> t_job_execution (time_bucket, shard_id, scheduled_at)
+<span class="code-kw">WHERE</span> status = <span class="code-str">'SCHEDULED'</span>;</code></pre>
+          </div>
+          <p>For very large scale, a DynamoDB or Cassandra style model with <code>time_bucket#shard_id</code> as the partition key is more natural. For a Postgres answer, mention time based partitioning and sharding options such as Citus.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-queue">
+        <div class="section-header">
+          <span class="section-num">S 07</span>
+          <div class="section-header-text">
+            <h2>Delayed Queue</h2>
+            <p>SQS hides a message until its delay expires</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>When the scheduler pushes an execution into SQS, it sets <code>DelaySeconds = scheduled_at - now</code>. The message is not visible to workers until the delay expires.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Concept</th>
+                  <th>Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>DelaySeconds</td>
+                  <td>Hides a new message until the scheduled time</td>
+                </tr>
+                <tr>
+                  <td>VisibilityTimeout</td>
+                  <td>Hides a received message while a worker is processing it</td>
+                </tr>
+                <tr>
+                  <td>DeleteMessage</td>
+                  <td>Acknowledges success after the worker finishes</td>
+                </tr>
+                <tr>
+                  <td>DLQ</td>
+                  <td>Captures poison messages after too many receives</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout blue">
+            <span class="callout-icon">SQS</span>
+            <div>Workers are not called back by SQS. They continuously long poll and receive messages when those messages become visible.</div>
+          </div>
+          <p>SQS delay is capped at 15 minutes, so the scheduler should only enqueue near term executions. Long future scheduling still lives in the database.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-worker">
+        <div class="section-header">
+          <span class="section-num">S 08</span>
+          <div class="section-header-text">
+            <h2>Worker Lease</h2>
+            <p>The database decides who is allowed to run the execution</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>A worker receiving a queue message is not enough. It must atomically claim the execution row. Only the worker that wins the conditional update is allowed to execute the task.</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Atomic claim</span>
+            </div>
+            <pre><code><span class="code-kw">UPDATE</span> t_job_execution
+<span class="code-kw">SET</span> status = <span class="code-str">'IN_PROGRESS'</span>,
+    locked_by = :worker_id,
+    lock_until = :now_plus_5_minutes,
+    version = version + <span class="code-num">1</span>,
+    attempt_count = attempt_count + <span class="code-num">1</span>
+<span class="code-kw">WHERE</span> execution_id = :execution_id
+  <span class="code-kw">AND</span> status <span class="code-kw">IN</span> (<span class="code-str">'SCHEDULED'</span>, <span class="code-str">'QUEUED'</span>, <span class="code-str">'RETRYING'</span>)
+  <span class="code-kw">AND</span> (lock_until <span class="code-kw">IS NULL OR</span> lock_until &lt; :now)
+<span class="code-kw">RETURNING</span> version;</code></pre>
+          </div>
+          <p>If the update returns a row, the worker runs. If it returns nothing, another worker already owns the execution, or the execution is no longer runnable.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-duplicate">
+        <div class="section-header">
+          <span class="section-num">S 09</span>
+          <div class="section-header-text">
+            <h2>Duplicate Enqueue</h2>
+            <p>Duplicates are acceptable when claiming is idempotent</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>A near term execution can enter the queue from the API, the scheduler scanner, or a retry path. This means duplicate queue messages are normal.</p>
+          <div class="flow-diagram">
+            <div class="flow-steps">
+              <div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Two messages contain the same execution_id</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">Worker A claims row and moves it to IN_PROGRESS</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">Worker B claim returns no row</span></div>
+              <div class="flow-arrow"><div class="flow-arrow-line">|</div></div>
+              <div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">Worker B deletes or ignores the duplicate queue message</span></div>
+            </div>
+          </div>
+          <div class="callout green">
+            <span class="callout-icon">OK</span>
+            <div><strong>Clean answer:</strong> duplicate enqueue is acceptable because execution claim is idempotent and conditional.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="section-retry">
+        <div class="section-header">
+          <span class="section-num">S 10</span>
+          <div class="section-header-text">
+            <h2>Retry and Failure Handling</h2>
+            <p>Retries create a later runnable execution state</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>When a task fails, the worker updates the execution with failure metadata and computes the next retry time. The retry can reuse the same execution row with status <code>RETRYING</code>, or create a separate attempt row if audit history is required.</p>
+          <div class="compare-grid">
+            <div class="compare-card a">
+              <div class="compare-card-label">Transient failure</div>
+              <div class="compare-card-title">Retry later</div>
+              <ul>
+                <li>Increment attempt_count</li>
+                <li>Store last_error</li>
+                <li>Set next scheduled_at with backoff</li>
+                <li>Enqueue when inside lookahead</li>
+              </ul>
+            </div>
+            <div class="compare-card b">
+              <div class="compare-card-label">Permanent failure</div>
+              <div class="compare-card-title">Move to failed</div>
+              <ul>
+                <li>Mark FAILED</li>
+                <li>Stop retrying after max attempts</li>
+                <li>Send queue message to DLQ</li>
+                <li>Expose error in user view</li>
+              </ul>
+            </div>
+          </div>
+          <p>The task itself should receive <code>execution_id</code> as an idempotency key. If a worker crashes after doing external work but before saving completion, a retry should not duplicate the side effect.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-recurring">
+        <div class="section-header">
+          <span class="section-num">S 11</span>
+          <div class="section-header-text">
+            <h2>Recurring Jobs</h2>
+            <p>Generate the next execution after the current one completes</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>For recurring jobs, the system keeps one <code>TJob</code> definition and creates one <code>TJobExecution</code> row per run. The next execution is calculated from the cron or interval expression after the current run reaches a terminal state.</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Recurring completion</span>
+            </div>
+            <pre><code>complete(exec_1)
+if TJob.status == ACTIVE:
+    next_time = cron.next_after(exec_1.scheduled_at)
+    insert TJobExecution(job_id, scheduled_at = next_time)</code></pre>
+          </div>
+          <div class="callout amber">
+            <span class="callout-icon">NOTE</span>
+            <div>Use a transaction or unique key around <code>job_id + scheduled_at</code> so a duplicate completion path cannot create the same next execution twice.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="section-redis">
+        <div class="section-header">
+          <span class="section-num">S 12</span>
+          <div class="section-header-text">
+            <h2>Redis ZSET Alternative</h2>
+            <p>Redis can be the near time priority queue, not the source of truth</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>A Redis sorted set works well as a near time priority queue. The score is <code>scheduled_at_epoch_ms</code>, and the value is <code>execution_id</code>.</p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Redis key model</span>
+            </div>
+            <pre><code>key   = scheduler:{time_bucket}:{shard_id}
+score = scheduled_at_epoch_ms
+value = execution_id
+
+ZRANGEBYSCORE key -inf now LIMIT 0 N
+ZREM key execution_id</code></pre>
+          </div>
+          <p>Use a Lua script to read and remove due items atomically. Then the worker still claims the execution in the database before running it.</p>
+          <div class="callout purple">
+            <span class="callout-icon">RULE</span>
+            <div>If Redis loses data, the scheduler can rebuild the near time queue by scanning due executions from the database again.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="section-user">
+        <div class="section-header">
+          <span class="section-num">S 13</span>
+          <div class="section-header-text">
+            <h2>User Monitoring</h2>
+            <p>Do not compromise scheduler partitioning for user reads</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p>Scheduler reads and user reads are different access patterns. The scheduler needs executions due soon. A user dashboard needs executions for one user.</p>
+          <div class="compare-grid">
+            <div class="compare-card a">
+              <div class="compare-card-label">Scheduler path</div>
+              <div class="compare-card-title">time_bucket#shard_id</div>
+              <p>Optimized for scanning near future executions across the system.</p>
+            </div>
+            <div class="compare-card c">
+              <div class="compare-card-label">User path</div>
+              <div class="compare-card-title">user_id</div>
+              <p>Optimized for listing jobs, execution history, status, and error details for one account.</p>
+            </div>
+          </div>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Read model options</span>
+            </div>
+            <pre><code>DynamoDB GSI:
+PK = user_id
+SK = scheduled_at#execution_id
+
+Postgres index:
+CREATE INDEX idx_user_execution
+ON t_job_execution (user_id, scheduled_at DESC);</code></pre>
+          </div>
+          <p>At very large scale, this can become a separate read model such as <code>TUserJobExecutionView</code>. That keeps the scheduler write and scan path clean.</p>
+        </div>
+      </div>
+
+      <div class="section" id="section-flow">
+        <div class="section-header">
+          <span class="section-num">S 14</span>
+          <div class="section-header-text">
+            <h2>Final End to End Flow</h2>
+            <p>All paths unified</p>
+          </div>
+        </div>
+        <div class="section-body prose">
+          <p><strong>Create path</strong></p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Create</span>
+            </div>
+            <pre><code>Client -> Job API
+  -> validate schedule and parameters
+  -> INSERT TJob
+  -> compute first scheduled_at
+  -> INSERT TJobExecution
+  -> if inside lookahead, enqueue with delay
+  -> return job_id</code></pre>
+          </div>
+
+          <p><strong>Scheduler path</strong></p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Schedule</span>
+            </div>
+            <pre><code>Scheduler instance
+  -> scans assigned time_bucket + shard_id ranges
+  -> finds SCHEDULED executions due within lookahead
+  -> marks QUEUED or records enqueue marker
+  -> sends message to delayed queue</code></pre>
+          </div>
+
+          <p><strong>Worker path</strong></p>
+          <div class="code-block">
+            <div class="code-block-header">
+              <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+              <span class="code-label">Run</span>
+            </div>
+            <pre><code>Worker long polls queue
+  -> receives visible execution_id
+  -> conditionally claims TJobExecution
+  -> runs task with execution_id idempotency key
+  -> marks COMPLETED or RETRYING or FAILED
+  -> deletes queue message after successful handling
+  -> creates next execution for recurring jobs</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-box" id="section-summary">
+        <h2>Final Interview Summary</h2>
+        <p>A scalable job scheduler has two main durable entities: <strong><code>TJob</code></strong> for the job definition and <strong><code>TJobExecution</code></strong> for each actual run.</p>
+        <p><strong><code>TJob</code></strong> can be partitioned by <code>job_id</code>, but <strong><code>TJobExecution</code></strong> should be partitioned by <code>time_bucket + shard_id</code> because the scheduler query is due time based.</p>
+        <p>The scheduler scans its assigned time bucket shards for executions due in a short lookahead window and pushes them to a delayed queue such as SQS. Workers long poll the queue, then claim execution rows with an atomic conditional update before running.</p>
+        <p>Duplicate enqueue is acceptable because the database claim is idempotent. If a worker crashes, SQS visibility timeout and the database lease allow another worker to retry. Every task receives <code>execution_id</code> as an idempotency key. For recurring jobs, the next execution is inserted only after the current execution completes.</p>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<footer class="article-footer">
+  Job Scheduler High Level Design . Article Version . System Design Reference
+</footer>
+
+</body>
+</html>
