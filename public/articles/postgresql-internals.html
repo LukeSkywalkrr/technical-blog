@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL Internals: From Disk Pages to Replication</title>
+<meta name="description" content="A visual PostgreSQL internals article covering heap pages, indexes, shared buffers, WAL, dirty pages, MVCC, checkpoints, vacuum, recovery, and replication.">
+<style>
+:root{--bg:#f7f4ee;--paper:#fffdfa;--ink:#101827;--muted:#5f6575;--line:#ded6c9;--blue:#2563eb;--green:#10b981;--amber:#f59e0b;--purple:#8b5cf6;--red:#ef4444;--dark:#080d19;--soft:#eef4ff;--shadow:0 22px 70px rgba(15,23,42,.12);--radius:28px;--max:1180px}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 8% 0%,rgba(37,99,235,.12),transparent 34rem),radial-gradient(circle at 96% 4%,rgba(245,158,11,.13),transparent 30rem),linear-gradient(180deg,#fffdf9,#f4f0e8);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.65;letter-spacing:-.01em}
+.progress{position:fixed;z-index:99;top:0;left:0;height:4px;width:100%;background:linear-gradient(90deg,var(--blue),var(--green),var(--amber));transform-origin:left;transform:scaleX(0)}
+.home-link{position:fixed;z-index:98;left:18px;bottom:18px;display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#111827;background:#fff;border:1px solid var(--line);border-radius:999px;padding:10px 14px;font-size:13px;font-weight:900;box-shadow:0 10px 30px rgba(15,23,42,.12)}
+.shell{width:min(var(--max),calc(100vw - 44px));margin:auto}
+.hero{padding:78px 0 52px;display:grid;grid-template-columns:1.02fr .98fr;gap:44px;align-items:center;min-height:76vh}
+.badge{display:inline-flex;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;text-transform:uppercase;font-size:13px;letter-spacing:.08em}
+h1{font-family:Georgia,serif;font-size:clamp(46px,7vw,88px);line-height:.94;letter-spacing:-.06em;margin:22px 0 16px}
+.lead{font-size:clamp(19px,2vw,25px);color:#4b5563;line-height:1.48;margin:0;max-width:820px}
+.actions{display:flex;flex-wrap:wrap;gap:13px;margin-top:28px}.btn{display:inline-flex;text-decoration:none;color:var(--ink);font-weight:900;border:1px solid var(--line);background:#fff;border-radius:999px;padding:12px 17px;box-shadow:0 8px 25px rgba(15,23,42,.08)}.btn.primary{background:linear-gradient(135deg,#2563eb,#111827);color:#fff;border:0}
+.dark-card{background:var(--dark);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);color:white;position:relative;overflow:hidden}.dark-card:before,.diagram:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:38px 38px}.dark-card>*{position:relative}
+.terminal{border:1px solid rgba(148,163,184,.22);background:#0f172ad9;border-radius:18px;overflow:hidden}.bar{height:40px;border-bottom:1px solid rgba(148,163,184,.18);display:flex;gap:8px;align-items:center;padding:0 14px}.dot{width:10px;height:10px;border-radius:50%;background:#ef4444}.dot:nth-child(2){background:#f59e0b}.dot:nth-child(3){background:#22c55e}.term{padding:18px;font:13px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dbeafe;white-space:pre-wrap}.term .g{color:#86efac}.term .b{color:#93c5fd}.term .a{color:#fcd34d}.term .p{color:#c4b5fd}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.tile{border:1px solid rgba(148,163,184,.22);background:rgba(255,255,255,.045);border-radius:16px;padding:15px}.tile strong{display:block}.tile span{display:block;color:#cbd5e1a8;font-size:12px;margin-top:6px;line-height:1.45}
+.layout{display:grid;grid-template-columns:270px 1fr;gap:34px;padding-bottom:80px}.toc{position:sticky;top:22px;border:1px solid var(--line);border-radius:22px;background:rgba(255,253,248,.78);backdrop-filter:blur(14px);box-shadow:0 12px 35px rgba(15,23,42,.08);overflow:hidden;max-height:calc(100vh - 44px)}.toc-head{padding:18px;border-bottom:1px solid var(--line)}.toc-head strong{font:700 22px/1.15 Georgia,serif;display:block}.toc-head small{color:var(--muted)}.toc nav{display:grid;gap:2px;padding:10px}.toc a{text-decoration:none;color:#4b5563;font-weight:850;font-size:13px;padding:9px 11px;border-radius:12px;display:flex;justify-content:space-between}.toc a.active,.toc a:hover{background:#dbeafe;color:#1d4ed8}
+article{display:grid;gap:32px}.section{border:1px solid var(--line);border-radius:var(--radius);background:rgba(255,253,248,.9);box-shadow:0 12px 35px rgba(15,23,42,.08);overflow:hidden;scroll-margin-top:28px}.head{padding:30px 34px 22px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(255,255,255,.76),rgba(255,255,255,.42)),radial-gradient(circle at 100% 0%,rgba(37,99,235,.08),transparent 24rem)}.kicker{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12px;font-weight:950;letter-spacing:.13em;text-transform:uppercase}.tag{min-width:58px;height:42px;border-radius:11px;background:#dbeafe;color:#2563eb;display:inline-grid;place-items:center;font:900 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.section h2{font-family:Georgia,serif;font-size:clamp(32px,4vw,50px);line-height:1.04;letter-spacing:-.045em;margin:14px 0 8px}.sub{margin:0;color:var(--muted);font-size:19px;max-width:880px}.content{padding:30px 34px 36px}p{font-size:17px;margin:0 0 18px;color:#283041}h3{font-size:24px;letter-spacing:-.035em;line-height:1.2;margin:30px 0 12px}h4{font-size:15px;text-transform:uppercase;letter-spacing:.1em;margin:0 0 8px;color:#374151}.mini{color:var(--muted);font-size:14px;line-height:1.55}
+.callout{border:1px solid var(--line);border-left:6px solid var(--blue);background:linear-gradient(135deg,#dbeafeaa,#ffffffd9);border-radius:16px;padding:18px 20px;margin:22px 0;font-weight:720;color:#1f2937}.callout.green{border-left-color:var(--green);background:linear-gradient(135deg,#d1fae5aa,#fff)}.callout.amber{border-left-color:var(--amber);background:linear-gradient(135deg,#fef3c7dd,#fff)}.callout.red{border-left-color:var(--red);background:linear-gradient(135deg,#fee2e2dd,#fff)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:22px 0}.card{border:1px solid var(--line);background:#ffffffe0;border-radius:18px;padding:20px;box-shadow:0 8px 22px rgba(15,23,42,.04)}.card h3{margin-top:0}
+.diagram{position:relative;margin:24px 0;padding:28px;border-radius:24px;overflow:hidden;background:var(--dark);color:#fff}.diagram>*{position:relative}.nodes{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.node{min-height:92px;border:1px solid rgba(147,197,253,.32);background:rgba(37,99,235,.14);border-radius:16px;display:grid;place-items:center;text-align:center;padding:16px}.node strong{font:900 18px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#93c5fd}.node span{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#cbd5e199}.node.green{border-color:#34d39955;background:#10b98122}.node.green strong{color:#6ee7b7}.node.amber{border-color:#f59e0b66;background:#f59e0b22}.node.amber strong{color:#fcd34d}.node.purple{border-color:#8b5cf666;background:#8b5cf622}.node.purple strong{color:#c4b5fd}
+.flow{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:center;margin:18px 0}.box{min-height:76px;border:1px solid rgba(147,197,253,.28);background:rgba(37,99,235,.13);border-radius:15px;display:grid;place-items:center;text-align:center;padding:12px;color:#bfdbfe;font:850 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.arrow{text-align:center;color:#ffffff70;font-size:24px;font-weight:900}
+.stack{display:grid;gap:12px;margin:24px 0}.row{display:grid;grid-template-columns:190px 1fr;gap:14px}.label{border-radius:16px;background:#111827;color:white;font-weight:950;display:grid;place-items:center;text-align:center;padding:16px}.items{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:16px;padding:14px}.chip{border:1px solid var(--line);border-radius:999px;background:white;padding:8px 12px;font-size:13px;font-weight:850;color:#334155}.chip:before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:8px}.chip.green:before{background:var(--green)}.chip.amber:before{background:var(--amber)}.chip.purple:before{background:var(--purple)}.chip.red:before{background:var(--red)}
+pre{position:relative;background:#0b1020;color:#dbeafe;border:1px solid rgba(148,163,184,.22);border-radius:18px;padding:18px;margin:20px 0;overflow:auto;box-shadow:0 10px 28px rgba(15,23,42,.1)}code{font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.copy{position:absolute;right:10px;top:10px;border:1px solid rgba(148,163,184,.34);background:rgba(255,255,255,.07);color:#cbd5e1;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:850;cursor:pointer}
+.page{display:grid;grid-template-columns:1fr .95fr;gap:22px;align-items:center;margin:24px 0}.pagebox{border-radius:22px;background:#0b1020;color:white;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,.1)}.part{padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.1);font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;display:flex;justify-content:space-between;gap:12px}.part small{color:#cbd5e199}.header{background:#2563eb33}.lp{background:#10b98125}.free{min-height:140px;align-items:center;justify-content:center;color:#94a3b8;background:#ffffff08}.tuple{background:#f59e0b25}
+.btree{border:1px solid var(--line);background:linear-gradient(180deg,#fff,#f8fafc);border-radius:22px;padding:24px;margin:24px 0}.level{display:flex;justify-content:center;gap:18px;margin:16px 0}.treebox{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:14px;padding:12px 16px;min-width:130px;text-align:center;font:900 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.leaf{background:#ecfdf5;color:#047857;border-color:#a7f3d0}.tid{display:inline-flex;background:#d1fae5;color:#047857;border-radius:8px;padding:2px 7px}
+.tabs{margin:24px 0 0}.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}.tab{border:1px solid var(--line);background:white;border-radius:999px;padding:10px 14px;font-weight:950;cursor:pointer;color:#4b5563}.tab.active{background:#111827;color:white;border-color:#111827}.panel{display:none;border:1px solid var(--line);background:#ffffffe0;border-radius:18px;overflow:hidden}.panel.active{display:block}.steps{display:grid;counter-reset:s}.step{display:grid;grid-template-columns:54px 1fr;gap:16px;padding:18px;border-bottom:1px solid var(--line);counter-increment:s}.step:last-child{border-bottom:0}.step:before{content:counter(s,decimal-leading-zero);width:42px;height:42px;border-radius:14px;background:#dbeafe;color:#2563eb;display:grid;place-items:center;font:950 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.step strong{display:block;margin-bottom:3px}.step span{display:block;color:var(--muted);font-size:14px;line-height:1.55}
+.mvcc{display:grid;gap:10px;margin:24px 0}.vrow{display:grid;grid-template-columns:130px 1fr 1fr 1fr 1.5fr;gap:10px}.cell{border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px;font-size:13px}.cell.head{background:#111827;color:white;font-weight:950}.cell.dead{background:#fff1f2;color:#9f1239}.cell.live{background:#ecfdf5;color:#047857;font-weight:950}
+.rep{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0}.server{border:1px solid var(--line);background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,.08)}.server-title{padding:16px 18px;background:#111827;color:white;font-weight:950;display:flex;justify-content:space-between}.server-body{display:grid;gap:12px;padding:18px}.wal{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:14px;background:#f8fafc;padding:12px;font-size:13px;font-weight:850;color:#334155}.wal:before{content:"";width:30px;height:10px;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--green))}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}.metric{border:1px solid var(--line);background:white;border-radius:18px;padding:18px}.metric strong{display:block;font-size:25px;letter-spacing:-.04em}.metric span{display:block;color:var(--muted);font-size:13px;margin-top:6px;line-height:1.45}
+details{border:1px solid var(--line);border-radius:16px;background:#ffffffb3;margin:14px 0;overflow:hidden}summary{cursor:pointer;padding:16px 18px;font-weight:950}.details-body{padding:0 18px 18px;color:var(--muted)}
+.truths{display:grid;gap:12px;margin-top:22px;counter-reset:t}.truth{display:grid;grid-template-columns:54px 1fr;gap:14px;align-items:center;border:1px solid var(--line);border-radius:18px;background:white;padding:14px;counter-increment:t}.truth:before{content:counter(t);width:40px;height:40px;border-radius:14px;background:#111827;color:white;font:950 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;display:grid;place-items:center}
+.footer{padding:44px 0 70px;color:var(--muted)}.refs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.refs a{display:block;text-decoration:none;color:#1d4ed8;font-weight:850;font-size:13px;border:1px solid var(--line);border-radius:14px;background:#ffffffaa;padding:14px}
+.path-lab{margin:24px 0;border-radius:24px;background:#07101f;color:white;overflow:hidden;position:relative;box-shadow:0 18px 55px rgba(15,23,42,.18)}.path-lab:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:34px 34px}.path-lab>*{position:relative}.lab-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.1)}.lab-top strong{font:900 17px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.lab-controls{display:flex;gap:10px;flex-wrap:wrap}.lab-btn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#e5edff;border-radius:999px;padding:9px 13px;font-weight:900;cursor:pointer}.lab-btn.active{background:#dbeafe;color:#1d4ed8}.lab-canvas{position:relative;padding:24px;min-height:360px}.lab-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"client backend wal" "index memory disk";gap:16px}.lab-node{min-height:116px;border:1px solid rgba(147,197,253,.25);background:rgba(37,99,235,.12);border-radius:18px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;transition:.3s ease}.lab-node strong{font:900 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#bfdbfe}.lab-node span{font-size:12px;color:#cbd5e1c9;line-height:1.45}.lab-node.hot{border-color:#fcd34d;background:rgba(245,158,11,.24);box-shadow:0 0 34px rgba(245,158,11,.2)}.lab-node.good{border-color:#6ee7b7;background:rgba(16,185,129,.2)}.lab-node[data-node=client]{grid-area:client}.lab-node[data-node=backend]{grid-area:backend}.lab-node[data-node=wal]{grid-area:wal}.lab-node[data-node=index]{grid-area:index}.lab-node[data-node=memory]{grid-area:memory}.lab-node[data-node=disk]{grid-area:disk}.lab-packet{position:absolute;left:0;top:0;transform:translate(var(--x,34px),var(--y,78px));width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#34d399);box-shadow:0 0 0 8px rgba(96,165,250,.14),0 12px 28px rgba(0,0,0,.28);display:grid;place-items:center;font:900 11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#06101d;transition:transform .62s cubic-bezier(.2,.8,.2,1),background .3s}.lab-status{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;padding:0 24px 24px}.lab-log,.page-state{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);border-radius:16px;padding:14px}.lab-log{font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dbeafe;min-height:86px}.page-state{display:grid;gap:10px}.state-line{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#dbeafe}.state-pill{border-radius:999px;padding:3px 9px;background:#1f2937;font-weight:900}.state-pill.dirty{background:#fef3c7;color:#92400e}.state-pill.clean{background:#d1fae5;color:#047857}.state-pill.skip{background:#e0e7ff;color:#3730a3}.lab-note{margin:0 24px 24px;color:#cbd5e1;font-size:14px;line-height:1.6}.lab-note strong{color:#fff}@media(prefers-reduced-motion:reduce){.lab-packet,.lab-node{transition:none}}
+@media(max-width:980px){.hero,.layout,.page,.rep{grid-template-columns:1fr}.toc{position:static;max-height:none}.nodes,.grid3,.metrics{grid-template-columns:1fr 1fr}.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}}@media(max-width:720px){.lab-grid{grid-template-columns:1fr;grid-template-areas:"client" "backend" "wal" "index" "memory" "disk"}.lab-canvas{min-height:810px}.lab-status{grid-template-columns:1fr}.home-link{position:static;margin:12px 0 0 12px}.lab-packet{display:none}}@media(max-width:640px){.shell{width:calc(100vw - 24px)}.hero{padding-top:42px}.head,.content{padding-left:20px;padding-right:20px}.quick,.nodes,.grid2,.grid3,.metrics,.refs{grid-template-columns:1fr}.row,.vrow{grid-template-columns:1fr}}
+@media print{.progress,.toc,.actions,.copy{display:none}.layout,.hero{display:block}.section{break-inside:avoid;box-shadow:none}.dark-card,.diagram,pre{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<a class="home-link" href="../index.html">Back to articles</a>
+
+<header class="hero shell">
+  <div>
+    <span class="badge">Database Internals / PostgreSQL</span>
+    <h1>PostgreSQL Internals, From Disk Pages to Replication</h1>
+    <p class="lead">A complete visual article on how PostgreSQL stores rows, caches pages, writes WAL, maintains indexes, handles reads/writes, updates/deletes using MVCC, recovers after crashes, and replicates data to standby servers.</p>
+    <div class="actions">
+      <a class="btn primary" href="#write-path">Start with the write path</a>
+      <a class="btn" href="#storage">Understand storage first</a>
+      <a class="btn" href="#replication">Jump to replication</a>
+    </div>
+  </div>
+  <div class="dark-card">
+    <div class="terminal"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="term"><span class="b">INSERT / UPDATE / DELETE</span>
+  -> backend process
+  -> heap page in <span class="g">shared_buffers</span>
+  -> index page in <span class="g">shared_buffers</span>
+  -> WAL record in <span class="a">wal_buffers</span>
+  -> COMMIT flushes <span class="a">WAL to disk</span>
+  -> dirty data pages flushed later
+
+<span class="p">SELECT</span>
+  -> planner chooses scan
+  -> read heap/index page from cache or disk
+  -> check MVCC visibility
+  -> return visible rows
+  -> usually no WAL is written</div>
+    </div>
+    <div class="quick">
+      <div class="tile"><strong>Storage</strong><span>Heap files, 8 KB pages, line pointers, tuples, TOAST, FSM, VM.</span></div>
+      <div class="tile"><strong>Memory</strong><span>Shared buffers, WAL buffers, work_mem, locks, transaction state.</span></div>
+      <div class="tile"><strong>Durability</strong><span>WAL first, dirty table/index pages later, crash recovery by redo.</span></div>
+      <div class="tile"><strong>Replication</strong><span>Primary streams WAL to standby; async/sync changes commit behavior.</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="shell layout">
+<aside class="toc">
+  <div class="toc-head"><strong>Article Map</strong><small>Start from storage, then writes, reads, MVCC, recovery and replication.</small></div>
+  <nav>
+    <a href="#mental-model">S01 <span>Mental model</span></a>
+    <a href="#storage">S02 <span>Disk & files</span></a>
+    <a href="#pages">S03 <span>Pages & heap</span></a>
+    <a href="#indexes">S04 <span>Indexes</span></a>
+    <a href="#memory">S05 <span>Memory</span></a>
+    <a href="#write-path">S06 <span>Write commit</span></a>
+    <a href="#update-delete">S07 <span>Update/Delete</span></a>
+    <a href="#read-path">S08 <span>Reads</span></a>
+    <a href="#checkpoint">S09 <span>Recovery</span></a>
+    <a href="#vacuum">S10 <span>Vacuum</span></a>
+    <a href="#replication">S11 <span>Replication</span></a>
+    <a href="#production">S12 <span>Production lens</span></a>
+  </nav>
+</aside>
+
+<article>
+<section class="section" id="mental-model">
+  <div class="head"><div class="kicker"><span class="tag">S01</span> The mental model</div><h2>PostgreSQL is a page-based MVCC storage engine.</h2><p class="sub">The database is not a single magical file. It is a system of backend processes, shared memory, heap pages, index pages, WAL logs, background writers, checkpoints, vacuum, and replication streams.</p></div>
+  <div class="content">
+    <p>When you run a query, PostgreSQL does not directly think in terms of “one object” or “one Java class”. It thinks in terms of relations, blocks, pages, tuples, indexes, transaction IDs, snapshots, and WAL records.</p>
+    <div class="diagram"><div class="nodes">
+      <div class="node amber"><strong>Client</strong><span>SQL request</span></div><div class="node"><strong>Backend</strong><span>parse / plan / execute</span></div><div class="node green"><strong>Shared Memory</strong><span>cached pages + WAL buffers</span></div><div class="node purple"><strong>Disk</strong><span>heap / index / WAL files</span></div>
+    </div></div>
+    <div class="callout">The core sentence: PostgreSQL changes heap and index pages in memory, writes WAL for durability, acknowledges commit after WAL is durable, and flushes dirty data pages later.</div>
+    <p>This article builds from the bottom up. First we understand disk, pages, heap tables and indexes. Then we walk through insert, update, delete, read, checkpoint, crash recovery, vacuum and replication.</p>
+  </div>
+</section>
+
+<section class="section" id="storage">
+  <div class="head"><div class="kicker"><span class="tag">S02</span> Storage layer</div><h2>What is actually stored on disk?</h2><p class="sub">A PostgreSQL database cluster contains many files. Your table, indexes, WAL, free space maps, visibility maps and TOAST data are separate physical structures.</p></div>
+  <div class="content">
+    <p>A table is called a relation. The table’s main data file is the heap. Indexes are separate relation files. PostgreSQL also maintains metadata files that help it find free space and skip visibility checks.</p>
+    <div class="stack">
+      <div class="row"><div class="label">Heap table files</div><div class="items"><span class="chip">actual row versions</span><span class="chip green">8 KB heap pages</span><span class="chip amber">unordered storage</span><span class="chip purple">CTID points into heap</span></div></div>
+      <div class="row"><div class="label">Index files</div><div class="items"><span class="chip">B-tree / Hash / GiST / GIN</span><span class="chip green">key → TID</span><span class="chip amber">separate disk files</span><span class="chip purple">cached in shared_buffers</span></div></div>
+      <div class="row"><div class="label">WAL files</div><div class="items"><span class="chip amber">change records</span><span class="chip">commit records</span><span class="chip red">crash recovery</span><span class="chip green">replication stream</span></div></div>
+      <div class="row"><div class="label">Helper files</div><div class="items"><span class="chip">FSM: free space map</span><span class="chip green">VM: visibility map</span><span class="chip purple">TOAST: large values</span><span class="chip amber">temp spill files</span></div></div>
+    </div>
+    <h3>Important correction: heap is not a heap tree</h3>
+    <p>In PostgreSQL, “heap table” means an unordered collection of heap pages. It does not mean the binary heap data structure from DSA. The tree-like structures are generally indexes, especially B-tree indexes.</p>
+    <pre><button class="copy">copy</button><code>users table
+├── main heap relation file       -- row versions
+├── users_pkey index file         -- id -> heap location
+├── users_email_idx index file    -- email -> heap location
+├── users_fsm                     -- free space map
+├── users_vm                      -- visibility map
+└── possible TOAST table          -- large out-of-line values</code></pre>
+    <div class="callout green">Mental anchor: the table stores row versions; the index stores navigation keys that point to row locations in the heap.</div>
+  </div>
+</section>
+
+<section class="section" id="pages">
+  <div class="head"><div class="kicker"><span class="tag">S03</span> Pages and heap tuples</div><h2>A table is made of pages. A page contains line pointers and tuples.</h2><p class="sub">PostgreSQL reads and writes fixed-size pages, commonly 8 KB. Rows live as tuples inside those pages.</p></div>
+  <div class="content">
+    <p>You may think PostgreSQL stores a table like a spreadsheet. Internally, it stores a relation as pages. Each page contains a header, item identifiers, free space and tuple data.</p>
+    <div class="page">
+      <div class="pagebox">
+        <div class="part header"><strong>PageHeaderData</strong><small>LSN, checksum, free space offsets</small></div>
+        <div class="part lp"><strong>Line pointer array</strong><small>offset + length for each tuple</small></div>
+        <div class="part lp"><strong>Line pointer #1</strong><small>points to tuple A</small></div>
+        <div class="part lp"><strong>Line pointer #2</strong><small>points to tuple B</small></div>
+        <div class="part free">Free space grows/shrinks here</div>
+        <div class="part tuple"><strong>Tuple B</strong><small>xmin, xmax, t_ctid, row data</small></div>
+        <div class="part tuple"><strong>Tuple A</strong><small>xmin, xmax, t_ctid, row data</small></div>
+      </div>
+      <div>
+        <h3>How to read this page</h3>
+        <p>The front of the page contains the page header and line pointers. The tuple data normally grows from the end of the page backward. The middle is free space.</p>
+        <p>A tuple is found using a physical pointer called a CTID.</p>
+        <pre><button class="copy">copy</button><code>CTID = (block_number, line_pointer_number)
+
+Example:
+(42, 7)
+
+Meaning:
+Go to heap page/block 42.
+Use line pointer 7.
+That pointer tells where the tuple body is.</code></pre>
+      </div>
+    </div>
+    <h3>What is inside a tuple?</h3>
+    <p>A tuple is not only your columns. It also carries MVCC metadata. That metadata lets PostgreSQL decide whether your transaction should see this tuple version.</p>
+    <div class="grid2">
+      <div class="card"><h4>User columns</h4><pre><button class="copy">copy</button><code>id = 101
+email = "a@x.com"
+name = "Amit"</code></pre></div>
+      <div class="card"><h4>Hidden metadata</h4><pre><button class="copy">copy</button><code>xmin   -- transaction that inserted this version
+xmax   -- transaction that deleted/invalidated it
+t_ctid -- points to this or newer tuple version
+flags  -- tuple state and null bitmap</code></pre></div>
+    </div>
+    <div class="callout amber">This hidden tuple metadata is the reason PostgreSQL can have concurrent readers and writers without every read blocking every write.</div>
+    <h3>What about very large values?</h3>
+    <p>Huge values like large text, JSON, byte arrays or documents cannot always fit neatly inside one heap page. PostgreSQL uses TOAST to compress and/or store large values out-of-line in a secondary TOAST table.</p>
+    <pre><button class="copy">copy</button><code>articles heap tuple
+├── id
+├── title
+└── body pointer --------------+
+                               |
+                               v
+                    articles TOAST table
+                    ├── body chunk 1
+                    ├── body chunk 2
+                    └── body chunk 3</code></pre>
+  </div>
+</section>
+
+<section class="section" id="indexes">
+  <div class="head"><div class="kicker"><span class="tag">S04</span> Indexes</div><h2>Indexes are separate structures that point back to heap tuples.</h2><p class="sub">A B-tree index is not the table. It is a navigation structure: key → heap tuple location. It speeds reads but adds write cost.</p></div>
+  <div class="content">
+    <p>When you create an index, PostgreSQL creates another physical relation. Its pages are stored on disk and cached in shared buffers like table pages.</p>
+    <pre><button class="copy">copy</button><code>CREATE TABLE users (
+  id BIGINT PRIMARY KEY,
+  email TEXT,
+  name TEXT
+);
+
+CREATE INDEX users_email_idx ON users(email);</code></pre>
+    <div class="btree">
+      <div class="level"><div class="treebox">Root Page</div></div>
+      <div class="level"><div class="treebox">Internal<br>a..m</div><div class="treebox">Internal<br>n..z</div></div>
+      <div class="level"><div class="treebox leaf">Leaf<br>a@x → <span class="tid">(42,7)</span></div><div class="treebox leaf">Leaf<br>b@x → <span class="tid">(51,2)</span></div><div class="treebox leaf">Leaf<br>r@x → <span class="tid">(88,4)</span></div></div>
+    </div>
+    <h3>Index scan flow</h3>
+    <div class="diagram"><div class="flow"><div class="box">B-tree root</div><div class="arrow">→</div><div class="box">internal page</div><div class="arrow">→</div><div class="box">leaf entry</div><div class="arrow">→</div><div class="box">heap CTID</div></div></div>
+    <p>The index finds candidate tuple locations. PostgreSQL often still visits the heap because tuple visibility is not generally stored inside the index.</p>
+    <div class="grid3">
+      <div class="card"><h4>Good</h4><p class="mini">Faster lookups, range scans, ordering, uniqueness checks, joins and filtering.</p></div>
+      <div class="card"><h4>Cost</h4><p class="mini">Every insert/update/delete may need to maintain index pages and generate more WAL.</p></div>
+      <div class="card"><h4>Special case</h4><p class="mini">Index-only scans can skip heap fetches when the visibility map proves the page is all-visible.</p></div>
+    </div>
+    <div class="callout">Interview line: indexes improve a specific read path, but they increase write amplification, memory pressure, disk usage and vacuum work.</div>
+  </div>
+</section>
+
+<section class="section" id="memory">
+  <div class="head"><div class="kicker"><span class="tag">S05</span> Memory and processes</div><h2>PostgreSQL uses backend processes plus shared memory.</h2><p class="sub">A backend process executes your query. Shared memory holds cached heap/index pages, WAL buffers, lock tables and transaction state.</p></div>
+  <div class="content">
+    <div class="grid2">
+      <div class="card"><h3>Per-backend memory</h3><p>Each connection is handled by a backend process. That process uses memory for executor state, expression evaluation, sorting, hashing, joining and temporary query work.</p><div class="items"><span class="chip">work_mem</span><span class="chip">temp_buffers</span><span class="chip">sort/hash memory</span><span class="chip">executor state</span></div></div>
+      <div class="card"><h3>Shared memory</h3><p>Shared memory is visible to multiple backend/background processes. This is where PostgreSQL caches heap/index pages and stages WAL records before writing them.</p><div class="items"><span class="chip green">shared_buffers</span><span class="chip amber">wal_buffers</span><span class="chip purple">lock table</span><span class="chip">transaction state</span></div></div>
+    </div>
+    <div class="diagram"><div class="nodes"><div class="node"><strong>Backend #1</strong><span>client A query</span></div><div class="node"><strong>Backend #2</strong><span>client B query</span></div><div class="node green"><strong>shared_buffers</strong><span>heap + index pages</span></div><div class="node amber"><strong>wal_buffers</strong><span>WAL records</span></div></div></div>
+    <h3>Background processes</h3>
+    <div class="grid3">
+      <div class="card"><h4>WAL writer</h4><p class="mini">Helps write WAL buffers to WAL segment files. Commit durability depends on WAL reaching stable storage.</p></div>
+      <div class="card"><h4>Background writer</h4><p class="mini">Writes dirty shared buffer pages gradually so user backends are less likely to be forced to do sudden writes.</p></div>
+      <div class="card"><h4>Checkpointer</h4><p class="mini">Creates recovery restart points by making dirty page state durable enough to reduce crash recovery work.</p></div>
+      <div class="card"><h4>Autovacuum</h4><p class="mini">Cleans dead tuples, updates visibility/free-space metadata and prevents transaction ID wraparound.</p></div>
+      <div class="card"><h4>Archiver</h4><p class="mini">Archives completed WAL files when archive mode is enabled, commonly used for PITR and backup setups.</p></div>
+      <div class="card"><h4>WAL sender/receiver</h4><p class="mini">Streams WAL from primary to standby in physical replication.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="write-path">
+  <div class="head"><div class="kicker"><span class="tag">S06</span> Write path</div><h2>What happens when an INSERT commits?</h2><p class="sub">This is the most important flow. The table page does not need to be flushed at commit. WAL does.</p></div>
+  <div class="content">
+    <pre><button class="copy">copy</button><code>BEGIN;
+
+INSERT INTO users(id, email, name)
+VALUES (101, 'a@x.com', 'Amit');
+
+COMMIT;</code></pre>
+    <div class="path-lab" data-path-lab>
+      <div class="lab-top">
+        <strong>Interactive path lab</strong>
+        <div class="lab-controls" aria-label="Choose a query path animation">
+          <button class="lab-btn active" type="button" data-run-path="write">Run INSERT / COMMIT</button>
+          <button class="lab-btn" type="button" data-run-path="read">Run SELECT</button>
+        </div>
+      </div>
+      <div class="lab-canvas">
+        <div class="lab-grid">
+          <div class="lab-node" data-node="client"><strong>Client</strong><span>SQL is sent and waits for a result.</span></div>
+          <div class="lab-node" data-node="backend"><strong>Backend</strong><span>Parse, plan, execute, and hold transaction state.</span></div>
+          <div class="lab-node" data-node="wal"><strong>WAL buffers</strong><span>Write changes are described before commit is acknowledged.</span></div>
+          <div class="lab-node" data-node="index"><strong>Index pages</strong><span>B-tree entries point to heap tuple locations.</span></div>
+          <div class="lab-node" data-node="memory"><strong>Shared buffers</strong><span>Heap and index pages live here while they are read or changed.</span></div>
+          <div class="lab-node" data-node="disk"><strong>Data files</strong><span>Dirty pages are flushed later and become clean again.</span></div>
+        </div>
+        <div class="lab-packet" data-packet>SQL</div>
+      </div>
+      <div class="lab-status">
+        <div class="lab-log" data-lab-log>Press a path to watch how PostgreSQL moves work across backend, memory, WAL, indexes, and disk.</div>
+        <div class="page-state" aria-label="Page state">
+          <div class="state-line"><span>Heap page</span><span class="state-pill clean" data-state="heap">clean</span></div>
+          <div class="state-line"><span>Index page</span><span class="state-pill clean" data-state="index">clean</span></div>
+          <div class="state-line"><span>WAL record</span><span class="state-pill skip" data-state="wal">idle</span></div>
+          <div class="state-line"><span>Client result</span><span class="state-pill skip" data-state="client">waiting</span></div>
+        </div>
+      </div>
+      <p class="lab-note"><strong>Read this carefully:</strong> SELECT usually does not write WAL. It may read an index page, then a heap page, then return visible rows. INSERT, UPDATE, and DELETE generate WAL, leave heap and index pages dirty in memory, and those pages become clean after they are flushed to data files.</p>
+    </div>
+    <div class="tabs">
+      <div class="buttons"><button class="tab active" data-tab="insert">INSERT commit</button><button class="tab" data-tab="commit">Durability boundary</button><button class="tab" data-tab="crash">If crash happens</button></div>
+      <div class="panel active" data-panel="insert"><div class="steps">
+        <div class="step"><div><strong>SQL reaches backend</strong><span>The backend parses, plans and executes the insert.</span></div></div>
+        <div class="step"><div><strong>Find a heap page</strong><span>PostgreSQL uses free-space information or extends the table to find room for the tuple.</span></div></div>
+        <div class="step"><div><strong>Load page into shared_buffers</strong><span>If the heap page is not cached, it is read from disk into shared buffers.</span></div></div>
+        <div class="step"><div><strong>Modify heap page in memory</strong><span>The tuple is inserted into the heap page. That page becomes dirty.</span></div></div>
+        <div class="step"><div><strong>Modify index pages</strong><span>Primary key and secondary index entries are inserted/changed in their own index pages.</span></div></div>
+        <div class="step"><div><strong>Generate WAL records</strong><span>PostgreSQL writes a description of the page changes into WAL buffers.</span></div></div>
+        <div class="step"><div><strong>COMMIT flushes WAL</strong><span>The commit record and previous WAL records must reach durable storage.</span></div></div>
+        <div class="step"><div><strong>Client gets success</strong><span>The heap/index pages can still be dirty in memory. That is safe because WAL can replay them.</span></div></div>
+      </div></div>
+      <div class="panel" data-panel="commit"><div class="steps">
+        <div class="step"><div><strong>Changed data pages are dirty</strong><span>Dirty means memory has newer content than the table/index file on disk.</span></div></div>
+        <div class="step"><div><strong>WAL describes those changes</strong><span>WAL is append-oriented and can be fsynced more efficiently than random data page writes.</span></div></div>
+        <div class="step"><div><strong>Commit is durable after WAL flush</strong><span>PostgreSQL does not need to write every touched heap/index page before acknowledging commit.</span></div></div>
+        <div class="step"><div><strong>Dirty pages flush later</strong><span>Background writer, checkpointer, or backend processes eventually write them to data files.</span></div></div>
+      </div></div>
+      <div class="panel" data-panel="crash"><div class="steps">
+        <div class="step"><div><strong>Server crashes</strong><span>Some committed heap/index page changes may not have reached table/index files.</span></div></div>
+        <div class="step"><div><strong>Restart finds latest checkpoint</strong><span>The checkpoint tells PostgreSQL where redo should start.</span></div></div>
+        <div class="step"><div><strong>Replay WAL forward</strong><span>WAL records are replayed to re-apply changes missing from data files.</span></div></div>
+        <div class="step"><div><strong>Database becomes consistent</strong><span>Committed changes survive; incomplete transactions are not made visible.</span></div></div>
+      </div></div>
+    </div>
+    <div class="callout red">The mistake to avoid: “Commit means the row was written into the table file.” Correct: commit means WAL for that transaction is durable. The table/index pages may be written later.</div>
+    <h3>The full write flow in one diagram</h3>
+    <div class="diagram"><div class="flow"><div class="box">SQL</div><div class="arrow">→</div><div class="box">heap page dirty</div><div class="arrow">→</div><div class="box">index pages dirty</div><div class="arrow">→</div><div class="box">WAL flushed</div></div><div class="flow"><div class="box">commit ACK</div><div class="arrow">→</div><div class="box">dirty pages later</div><div class="arrow">→</div><div class="box">checkpoint</div><div class="arrow">→</div><div class="box">less WAL replay</div></div></div>
+  </div>
+</section>
+
+<section class="section" id="update-delete">
+  <div class="head"><div class="kicker"><span class="tag">S07</span> Update, delete and MVCC</div><h2>UPDATE usually creates a new tuple version.</h2><p class="sub">PostgreSQL does not simply overwrite the old row. MVCC keeps multiple row versions so old readers and new writers can coexist.</p></div>
+  <div class="content">
+    <pre><button class="copy">copy</button><code>UPDATE users
+SET email = 'new@x.com'
+WHERE id = 101;</code></pre>
+    <p>An update normally creates a new version of the tuple and marks the old version as no longer current for future transactions.</p>
+    <div class="mvcc">
+      <div class="vrow"><div class="cell head">Version</div><div class="cell head">id</div><div class="cell head">email</div><div class="cell head">MVCC</div><div class="cell head">Visibility</div></div>
+      <div class="vrow"><div class="cell dead">Old tuple</div><div class="cell">101</div><div class="cell">old@x.com</div><div class="cell">xmin=10, xmax=20</div><div class="cell">Visible to older snapshots; dead for newer ones</div></div>
+      <div class="vrow"><div class="cell live">New tuple</div><div class="cell">101</div><div class="cell">new@x.com</div><div class="cell">xmin=20, xmax=null</div><div class="cell">Visible to transactions after T20 commits</div></div>
+    </div>
+    <h3>What about indexes during UPDATE?</h3>
+    <p>If an indexed column changes, PostgreSQL usually needs new index entries pointing to the new tuple version. If no indexed column changes and the new tuple can fit on the same page, PostgreSQL may use HOT, a heap-only tuple update, which avoids extra index entries.</p>
+    <div class="grid2"><div class="card"><h3>DELETE</h3><p>A delete marks the tuple as deleted using transaction metadata. It is not physically removed immediately because older transactions may still need it.</p></div><div class="card"><h3>VACUUM later</h3><p>Once no active transaction can see the dead tuple, vacuum can reclaim the space for future reuse and update visibility metadata.</p></div></div>
+    <div class="callout">Interview line: updates and deletes are logical visibility changes first; physical cleanup is a later maintenance process.</div>
+  </div>
+</section>
+
+<section class="section" id="read-path">
+  <div class="head"><div class="kicker"><span class="tag">S08</span> Read path</div><h2>SELECT reads pages, checks visibility, then returns rows.</h2><p class="sub">A read may use a sequential scan, index scan, bitmap heap scan or index-only scan. The final answer must respect the transaction snapshot.</p></div>
+  <div class="content">
+    <pre><button class="copy">copy</button><code>SELECT id, email
+FROM users
+WHERE email = 'a@x.com';</code></pre>
+    <div class="tabs">
+      <div class="buttons"><button class="tab active" data-tab="seq">Sequential scan</button><button class="tab" data-tab="idx">Index scan</button><button class="tab" data-tab="ios">Index-only scan</button></div>
+      <div class="panel active" data-panel="seq"><div class="steps"><div class="step"><div><strong>Planner chooses seq scan</strong><span>Common when no useful index exists or most of the table will be read anyway.</span></div></div><div class="step"><div><strong>Read heap pages</strong><span>Each needed page is read from shared buffers or loaded from disk.</span></div></div><div class="step"><div><strong>Check every tuple</strong><span>The executor evaluates filters and checks MVCC visibility.</span></div></div><div class="step"><div><strong>Return visible matching rows</strong><span>Rows invisible to the snapshot are skipped.</span></div></div></div></div>
+      <div class="panel" data-panel="idx"><div class="steps"><div class="step"><div><strong>Planner chooses index scan</strong><span>Common when the predicate is selective and matches an index.</span></div></div><div class="step"><div><strong>Traverse B-tree pages</strong><span>Root → internal → leaf, using shared buffers or disk reads.</span></div></div><div class="step"><div><strong>Get TID from leaf entry</strong><span>The TID points to a heap page and line pointer.</span></div></div><div class="step"><div><strong>Fetch heap tuple</strong><span>PostgreSQL checks whether that tuple version is visible to this snapshot.</span></div></div></div></div>
+      <div class="panel" data-panel="ios"><div class="steps"><div class="step"><div><strong>Index contains needed columns</strong><span>The query can be answered from index data alone.</span></div></div><div class="step"><div><strong>Check visibility map</strong><span>If the heap page is all-visible, the heap fetch can be skipped.</span></div></div><div class="step"><div><strong>Return from index</strong><span>This is faster only when heap visibility checks can really be avoided.</span></div></div></div></div>
+    </div>
+    <div class="callout amber">Index scan does not always mean “no table read.” Often it means “use index to find heap locations, then visit heap to confirm visibility.”</div>
+    <h3>Where does work_mem matter?</h3>
+    <p>Reads can allocate memory for sorting, hash joins, hash aggregation and other executor operations. If the operation does not fit in memory, PostgreSQL can spill to temporary disk files.</p>
+  </div>
+</section>
+
+<section class="section" id="checkpoint">
+  <div class="head"><div class="kicker"><span class="tag">S09</span> Checkpoint and crash recovery</div><h2>WAL lets PostgreSQL recover without flushing every data page at commit.</h2><p class="sub">A checkpoint creates a restart point. After a crash, PostgreSQL replays WAL from that point to rebuild a consistent database state.</p></div>
+  <div class="content">
+    <div class="diagram"><div class="flow"><div class="box">dirty pages</div><div class="arrow">→</div><div class="box">checkpoint starts</div><div class="arrow">→</div><div class="box">flush required pages</div><div class="arrow">→</div><div class="box">record checkpoint</div></div></div>
+    <p>Checkpointing reduces crash recovery time. If there were no checkpoints, PostgreSQL would need to replay a massive amount of WAL. A checkpoint says, in simplified terms: from this point, enough dirty data page state has been written out that recovery can start redo here.</p>
+    <div class="grid2"><div class="card"><h3>Without WAL</h3><p>PostgreSQL would need to force all modified heap/index pages to disk before every commit. That would make commits much slower and more random-I/O heavy.</p></div><div class="card"><h3>With WAL</h3><p>PostgreSQL appends WAL records, flushes WAL on commit, and later writes dirty data pages in a controlled background flow.</p></div></div>
+    <details><summary>Full-page writes: why PostgreSQL may log the whole page</summary><div class="details-body">After a checkpoint, the first modification to a data page can include a full page image in WAL. This protects against torn-page writes, where a crash leaves the on-disk page half old and half new.</div></details>
+    <details><summary>Why checkpoints can affect latency</summary><div class="details-body">A checkpoint can cause a wave of dirty page writes. If poorly tuned or if storage is weak, this can create I/O spikes. The general idea is to spread writes smoothly, not force huge bursts.</div></details>
+  </div>
+</section>
+
+<section class="section" id="vacuum">
+  <div class="head"><div class="kicker"><span class="tag">S10</span> Vacuum and bloat</div><h2>MVCC creates old row versions. Vacuum cleans them.</h2><p class="sub">Updates and deletes do not immediately erase old tuples. Autovacuum later reclaims space, maintains visibility information and prevents transaction ID wraparound.</p></div>
+  <div class="content">
+    <p>PostgreSQL keeps old tuple versions so readers can use stable snapshots. This is great for concurrency, but it creates dead tuples that must eventually be cleaned.</p>
+    <pre><button class="copy">copy</button><code>UPDATE users SET name = 'A' WHERE id = 101;
+UPDATE users SET name = 'B' WHERE id = 101;
+UPDATE users SET name = 'C' WHERE id = 101;
+
+Possible heap versions:
+old version  -> dead
+name = A     -> dead
+name = B     -> dead
+name = C     -> live</code></pre>
+    <div class="grid3"><div class="card"><h4>Dead tuple cleanup</h4><p class="mini">Vacuum marks space reusable after old snapshots no longer need those tuple versions.</p></div><div class="card"><h4>Visibility map</h4><p class="mini">Tracks pages where all tuples are visible to all transactions; helps vacuum and index-only scans.</p></div><div class="card"><h4>Free space map</h4><p class="mini">Helps PostgreSQL find pages with reusable space for future inserts/updates.</p></div></div>
+    <div class="callout red">If vacuum cannot keep up, bloat grows. Bloat means more pages to read, larger indexes, worse cache efficiency, slower scans and higher storage pressure.</div>
+  </div>
+</section>
+
+<section class="section" id="replication">
+  <div class="head"><div class="kicker"><span class="tag">S11</span> Primary / standby replication</div><h2>Replication is mostly WAL shipping and replay.</h2><p class="sub">The old word “master” is now usually called primary. The standby follows the primary by receiving and replaying WAL.</p></div>
+  <div class="content">
+    <p>In physical streaming replication, the primary generates WAL for changes. Standby servers receive those WAL records and replay them to maintain a physical copy of the primary database cluster.</p>
+    <div class="rep">
+      <div class="server"><div class="server-title"><span>Primary</span><span>read/write</span></div><div class="server-body"><div class="wal">Backend writes heap/index pages in memory</div><div class="wal">WAL records generated</div><div class="wal">WAL sender streams WAL</div><div class="wal">Client writes accepted here</div></div></div>
+      <div class="server"><div class="server-title"><span>Standby</span><span>usually read-only</span></div><div class="server-body"><div class="wal">WAL receiver receives records</div><div class="wal">Startup/replay process applies WAL</div><div class="wal">Data files converge with primary</div><div class="wal">Can serve read queries if hot standby enabled</div></div></div>
+    </div>
+    <h3>Asynchronous vs synchronous replication</h3>
+    <div class="grid2"><div class="card"><h3>Asynchronous</h3><p>The primary can acknowledge commit before standby confirms receipt/replay. This is faster, but a primary crash can lose recent committed changes that had not reached the standby.</p></div><div class="card"><h3>Synchronous</h3><p>The primary waits for configured standby acknowledgement before commit returns. This improves durability across machines but increases write latency and can reduce availability if standbys are unhealthy.</p></div></div>
+    <h3>Replication lag</h3>
+    <p>Lag means the standby is behind the primary. It may have received WAL but not replayed it yet, or it may not have received it at all. Applications reading from replicas must handle stale reads.</p>
+    <pre><button class="copy">copy</button><code>Primary commit order:
+A, B, C, D, E
+
+Standby applied:
+A, B, C
+
+Replica read may not see D and E yet.</code></pre>
+    <h3>Replication slots</h3>
+    <p>A replication slot tells the primary to retain WAL needed by a standby or consumer. This prevents the primary from deleting WAL that the receiver still needs. But if a slot is abandoned or the standby is down for too long, WAL can pile up and consume disk.</p>
+    <div class="callout amber">Production line: read replicas help read scaling, but they introduce lag. Do not send read-after-write sensitive traffic to a lagging replica unless you have a consistency strategy.</div>
+  </div>
+</section>
+
+<section class="section" id="production">
+  <div class="head"><div class="kicker"><span class="tag">S12</span> Production and interview lens</div><h2>How to reason about PostgreSQL bottlenecks.</h2><p class="sub">When PostgreSQL is slow, map the symptom to CPU, memory, lock contention, disk I/O, WAL pressure, vacuum lag, index design, query plan or replication lag.</p></div>
+  <div class="content">
+    <div class="metrics"><div class="metric"><strong>CPU</strong><span>bad plans, too many connections, heavy joins, expression evaluation</span></div><div class="metric"><strong>Memory</strong><span>low cache hit, work_mem spills, too many active backends</span></div><div class="metric"><strong>I/O</strong><span>random heap reads, checkpoint spikes, temp files, WAL fsync</span></div><div class="metric"><strong>Locks</strong><span>hot rows, DDL blocking, long transactions, deadlocks</span></div></div>
+    <h3>Common production questions</h3>
+    <details><summary>Why is my insert slow?</summary><div class="details-body">Check WAL fsync latency, number of indexes, foreign key checks, triggers, lock waits, checkpoint pressure and storage throughput.</div></details>
+    <details><summary>Why is my update slow?</summary><div class="details-body">Check whether indexed columns are changing, whether HOT updates are possible, row lock contention, dead tuple bloat, autovacuum lag and index bloat.</div></details>
+    <details><summary>Why is my read slow even with an index?</summary><div class="details-body">The index may not match the predicate, selectivity may be poor, heap fetches may be expensive, visibility map may not allow index-only scan, or the planner may choose a different path due to statistics.</div></details>
+    <details><summary>Why is replica read inconsistent?</summary><div class="details-body">The standby is behind. WAL may not have been received or replayed. Use primary reads for read-after-write, wait for replay position, or design with eventual consistency.</div></details>
+    <h3>The final truths</h3>
+    <div class="truths">
+      <div class="truth">Tables are heap files made of fixed-size pages, commonly 8 KB.</div><div class="truth">A heap tuple contains both user columns and MVCC metadata.</div><div class="truth">Indexes are separate disk-backed structures, usually B-trees.</div><div class="truth">Index leaf entries point to heap tuple locations.</div><div class="truth">Both heap and index pages are cached in shared_buffers.</div><div class="truth">Writes modify memory pages first and mark them dirty.</div><div class="truth">WAL is flushed at commit; dirty data pages can be flushed later.</div><div class="truth">Crash recovery starts from a checkpoint and replays WAL forward.</div><div class="truth">UPDATE usually creates a new tuple version under MVCC.</div><div class="truth">Autovacuum is essential to clean dead tuples and prevent bloat.</div><div class="truth">Replication streams WAL from primary to standby and can be async or sync.</div><div class="truth">Read replicas scale reads but introduce replica lag and stale-read risk.</div>
+    </div>
+    <div class="callout green">One-line holy grail: PostgreSQL is a page-based MVCC engine where heap and index pages are cached and modified in memory, WAL is flushed first for durability, dirty pages are written later, and recovery/replication both depend on replaying WAL.</div>
+  </div>
+</section>
+</article>
+</main>
+
+<footer class="footer shell">
+  <h2>References used for accuracy</h2>
+  <p>This article is written as a study guide, with terminology aligned to official PostgreSQL documentation.</p>
+  <div class="refs">
+    <a href="https://www.postgresql.org/docs/current/storage-page-layout.html" target="_blank" rel="noreferrer">PostgreSQL Docs — Database Page Layout</a>
+    <a href="https://www.postgresql.org/docs/current/wal-intro.html" target="_blank" rel="noreferrer">PostgreSQL Docs — Write-Ahead Logging</a>
+    <a href="https://www.postgresql.org/docs/current/wal-configuration.html" target="_blank" rel="noreferrer">PostgreSQL Docs — WAL Configuration and Checkpoints</a>
+    <a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" target="_blank" rel="noreferrer">PostgreSQL Docs — Index-Only Scans and Visibility Map</a>
+    <a href="https://www.postgresql.org/docs/current/storage-hot.html" target="_blank" rel="noreferrer">PostgreSQL Docs — Heap-Only Tuples / HOT Updates</a>
+    <a href="https://www.postgresql.org/docs/current/storage-toast.html" target="_blank" rel="noreferrer">PostgreSQL Docs — TOAST Storage</a>
+    <a href="https://www.postgresql.org/docs/current/storage-vm.html" target="_blank" rel="noreferrer">PostgreSQL Docs — Visibility Map</a>
+    <a href="https://www.postgresql.org/docs/current/different-replication-solutions.html" target="_blank" rel="noreferrer">PostgreSQL Docs — Replication Solutions</a>
+  </div>
+</footer>
+
+<script>
+const progress=document.getElementById('progress');
+function updateProgress(){const d=document.documentElement;const total=d.scrollHeight-d.clientHeight;progress.style.transform=`scaleX(${total?d.scrollTop/total:0})`}
+document.addEventListener('scroll',updateProgress,{passive:true});updateProgress();
+
+const links=[...document.querySelectorAll('.toc a')];
+const sections=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(!e.isIntersecting)return;links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id))})},{rootMargin:'-20% 0px -70% 0px',threshold:.01});
+sections.forEach(s=>obs.observe(s));
+
+document.querySelectorAll('.copy').forEach(btn=>btn.addEventListener('click',async()=>{const code=btn.parentElement.querySelector('code')?.innerText||'';try{await navigator.clipboard.writeText(code);const old=btn.textContent;btn.textContent='copied';setTimeout(()=>btn.textContent=old,1000)}catch(e){btn.textContent='select'}}));
+
+document.querySelectorAll('.tabs').forEach(group=>{const buttons=[...group.querySelectorAll('.tab')];const panels=[...group.querySelectorAll('.panel')];buttons.forEach(button=>button.addEventListener('click',()=>{const tab=button.dataset.tab;buttons.forEach(b=>b.classList.toggle('active',b===button));panels.forEach(p=>p.classList.toggle('active',p.dataset.panel===tab))}))});
+
+document.querySelectorAll('[data-path-lab]').forEach(lab=>{
+  const packet=lab.querySelector('[data-packet]');
+  const log=lab.querySelector('[data-lab-log]');
+  const buttons=[...lab.querySelectorAll('[data-run-path]')];
+  const nodes=Object.fromEntries([...lab.querySelectorAll('[data-node]')].map(node=>[node.dataset.node,node]));
+  const state=Object.fromEntries([...lab.querySelectorAll('[data-state]')].map(item=>[item.dataset.state,item]));
+  let runId=0;
+  const slow=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wait=ms=>new Promise(resolve=>setTimeout(resolve,slow?ms:60));
+  function setState(name,text,kind){
+    const item=state[name];
+    if(!item)return;
+    item.textContent=text;
+    item.className='state-pill '+kind;
+  }
+  function reset(){
+    Object.values(nodes).forEach(node=>node.classList.remove('hot','good'));
+    setState('heap','clean','clean');
+    setState('index','clean','clean');
+    setState('wal','idle','skip');
+    setState('client','waiting','skip');
+  }
+  function moveTo(name,label){
+    const canvas=lab.querySelector('.lab-canvas').getBoundingClientRect();
+    const target=nodes[name].getBoundingClientRect();
+    packet.textContent=label;
+    packet.style.setProperty('--x',`${target.left-canvas.left+target.width/2-21}px`);
+    packet.style.setProperty('--y',`${target.top-canvas.top+target.height/2-21}px`);
+  }
+  async function step(id,name,label,message,after){
+    if(id!==runId)return;
+    Object.values(nodes).forEach(node=>node.classList.remove('hot'));
+    nodes[name]?.classList.add('hot');
+    moveTo(name,label);
+    log.textContent=message;
+    after?.();
+    await wait(780);
+  }
+  async function run(path){
+    const id=++runId;
+    reset();
+    buttons.forEach(button=>button.classList.toggle('active',button.dataset.runPath===path));
+    if(path==='read'){
+      await step(id,'client','SQL','Client sends SELECT id, email FROM users WHERE email = a@x.com.');
+      await step(id,'backend','PLAN','Backend parses, plans, and chooses a scan path.');
+      await step(id,'index','IDX','For a selective predicate, PostgreSQL can traverse the B-tree index.',()=>nodes.index.classList.add('good'));
+      await step(id,'memory','HEAP','The heap page is read from shared buffers, or loaded from disk first.',()=>setState('heap','read','skip'));
+      await step(id,'backend','MVCC','The executor checks tuple visibility against the transaction snapshot.');
+      await step(id,'client','ROWS','Visible rows return to the client. WAL is not part of this normal read path.',()=>setState('client','rows returned','clean'));
+      setState('wal','not used','skip');
+      return;
+    }
+    await step(id,'client','SQL','Client sends INSERT and waits for COMMIT to complete.');
+    await step(id,'backend','EXEC','Backend inserts the tuple and updates transaction state.');
+    await step(id,'memory','HEAP','The heap page is changed inside shared buffers and becomes dirty.',()=>setState('heap','dirty','dirty'));
+    await step(id,'index','IDX','Index pages are changed too, so they also become dirty.',()=>setState('index','dirty','dirty'));
+    await step(id,'wal','WAL','WAL records describe the heap and index page changes.',()=>setState('wal','generated','dirty'));
+    await step(id,'disk','FSYNC','COMMIT flushes WAL to durable storage before success is returned.',()=>setState('wal','flushed','clean'));
+    await step(id,'client','ACK','Client receives commit success while data pages may still be dirty.',()=>setState('client','commit ack','clean'));
+    await step(id,'disk','CLEAN','Background writer or checkpoint later flushes dirty heap and index pages.',()=>{setState('heap','clean','clean');setState('index','clean','clean');nodes.memory.classList.add('good');nodes.disk.classList.add('good')});
+  }
+  buttons.forEach(button=>button.addEventListener('click',()=>run(button.dataset.runPath)));
+  run('write');
+});
+</script>
+</body>
+</html>
