@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="A complete senior level high level design of a Stripe like payment system, covering idempotency, auditability, tokenization, reconciliation, Kafka, webhooks, and 10k TPS scaling." name="description"/>
+<title>Payment System Design: Stripe Like Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&amp;display=swap" rel="stylesheet"/>
+<link href="../assets/styles.css" rel="stylesheet"/><style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0f1117;
+    --ink-2: #2d3142;
+    --ink-3: #5c6070;
+    --ink-4: #9299aa;
+    --surface: #f7f8fc;
+    --surface-2: #eef0f7;
+    --surface-3: #e3e6f0;
+    --white: #ffffff;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --accent-2: #7c3aed;
+    --accent-2-soft: #ede9fe;
+    --green: #059669;
+    --green-soft: #d1fae5;
+    --amber: #d97706;
+    --amber-soft: #fef3c7;
+    --red: #dc2626;
+    --red-soft: #fee2e2;
+    --border: rgba(0,0,0,0.08);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--surface);
+    color: var(--ink);
+    line-height: 1.65;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── HEADER ─── */
+  .site-header {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .site-header-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .header-badge {
+    background: var(--ink);
+    color: var(--white);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .header-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .header-home { display:flex; align-items:center; gap:16px; text-decoration:none; }
+  .header-home:hover .header-title { color: var(--ink); }
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toc-pill {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-3);
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    background: var(--white);
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+  .toc-pill:hover { background: var(--surface); color: var(--ink); }
+
+  /* ─── HERO ─── */
+  .hero {
+    background: var(--ink);
+    color: var(--white);
+    padding: 80px 32px 72px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 80% at 70% 50%, rgba(37,99,235,0.3) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 60% at 20% 80%, rgba(124,58,237,0.2) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 24px;
+    text-transform: uppercase;
+  }
+  .hero-eyebrow-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
+  }
+  .hero h1 {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    max-width: 700px;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: rgba(255,255,255,0.55);
+  }
+  .hero-lead {
+    font-size: 18px;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.65);
+    max-width: 560px;
+    margin-bottom: 40px;
+  }
+  .hero-stats {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .hero-stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--white);
+    letter-spacing: -0.02em;
+  }
+  .hero-stat-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ─── LAYOUT ─── */
+  .content-shell {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 48px;
+    padding-top: 56px;
+    padding-bottom: 80px;
+    align-items: start;
+  }
+
+  /* ─── SIDEBAR TOC ─── */
+  .sidebar {
+    position: sticky;
+    top: 72px;
+  }
+  .toc-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: 12px;
+  }
+  .toc-list { list-style: none; }
+  .toc-list li { margin-bottom: 2px; }
+  .toc-list a {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    display: block;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .toc-list a:hover {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
+
+  /* ─── ARTICLE ─── */
+  .article { min-width: 0; }
+
+  .section {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 28px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
+  }
+  .section:hover { box-shadow: var(--shadow); }
+
+  .section-header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 3px 8px;
+    white-space: nowrap;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .section-header-text h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .section-header-text p {
+    font-size: 14px;
+    color: var(--ink-3);
+    margin-top: 4px;
+  }
+  .section-body { padding: 28px 32px; }
+
+  /* ─── PROSE ─── */
+  .prose p { font-size: 15px; color: var(--ink-2); margin-bottom: 16px; line-height: 1.7; }
+  .prose p:last-child { margin-bottom: 0; }
+  .prose strong { font-weight: 600; color: var(--ink); }
+  .prose code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: var(--surface-2);
+    color: var(--accent-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--surface-3);
+  }
+
+  /* ─── CODE BLOCK ─── */
+  .code-block {
+    background: #0f1117;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    max-width: 100%;
+  }
+  .code-block-header {
+    background: rgba(255,255,255,0.04);
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .code-dots { display: flex; gap: 5px; }
+  .code-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .code-dot:nth-child(1) { background: #ff5f57; }
+  .code-dot:nth-child(2) { background: #ffbd2e; }
+  .code-dot:nth-child(3) { background: #28ca41; }
+  .code-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    margin-left: 4px;
+    letter-spacing: 0.06em;
+  }
+  .code-block pre {
+    padding: 20px;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .code-block code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #c9d1d9;
+    background: none;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    line-height: 1.65;
+    white-space: pre;
+  }
+  .code-kw { color: #ff7b72; }
+  .code-str { color: #a5d6ff; }
+  .code-num { color: #79c0ff; }
+  .code-comment { color: #8b949e; font-style: italic; }
+  .code-key { color: #7ee787; }
+  .code-val { color: #ffa657; }
+
+  /* ─── FLOW DIAGRAM ─── */
+  .flow-diagram {
+    background: linear-gradient(135deg, #0f1117 0%, #1a1f2e 100%);
+    border-radius: var(--radius-sm);
+    padding: 28px;
+    margin: 20px 0;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .flow-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 50%, rgba(37,99,235,0.08) 0%, transparent 70%);
+  }
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    z-index: 1;
+  }
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .flow-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(37,99,235,0.2);
+    border: 1px solid rgba(37,99,235,0.4);
+    color: #60a5fa;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .flow-step-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: #c9d1d9;
+  }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 2px 0;
+  }
+  .flow-arrow-line {
+    width: 22px;
+    display: flex;
+    justify-content: center;
+    color: rgba(37,99,235,0.4);
+    font-size: 14px;
+  }
+  .flow-arrow-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+  }
+
+  /* ─── TABLE ─── */
+  .table-wrap { overflow-x: auto; margin: 20px 0; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--surface-2); }
+  thead th {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface); }
+  tbody td {
+    padding: 10px 16px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody td:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-2);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* ─── CALLOUT ─── */
+  .callout {
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    margin: 20px 0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .callout.blue { background: var(--accent-soft); color: #1e40af; border-left: 3px solid var(--accent); }
+  .callout.purple { background: var(--accent-2-soft); color: #5b21b6; border-left: 3px solid var(--accent-2); }
+  .callout.green { background: var(--green-soft); color: #065f46; border-left: 3px solid var(--green); }
+  .callout.amber { background: var(--amber-soft); color: #92400e; border-left: 3px solid var(--amber); }
+  .callout strong { font-weight: 600; }
+
+  /* ─── COMPARISON CARDS ─── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .compare-card {
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    border: 1px solid var(--border);
+  }
+  .compare-card.a { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-color: #bae6fd; }
+  .compare-card.b { background: linear-gradient(135deg, #f5f3ff, #ede9fe); border-color: #c4b5fd; }
+  .compare-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .compare-card.a .compare-card-label { color: #0369a1; }
+  .compare-card.b .compare-card-label { color: #7c3aed; }
+  .compare-card-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .compare-card p { font-size: 13px; color: var(--ink-3); line-height: 1.55; }
+  .compare-card ul { list-style: none; }
+  .compare-card ul li {
+    font-size: 13px;
+    color: var(--ink-3);
+    padding: 3px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .compare-card ul li::before { content: '→'; font-family: monospace; color: var(--ink-4); flex-shrink: 0; }
+
+  /* ─── PILL TAGS ─── */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .pill {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .pill.blue { background: var(--accent-soft); color: #1e40af; border-color: #bfdbfe; }
+  .pill.purple { background: var(--accent-2-soft); color: #5b21b6; border-color: #c4b5fd; }
+  .pill.green { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
+  .pill.amber { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
+
+  /* ─── ARCH DIAGRAM (SVG-style HTML) ─── */
+  .arch-diagram {
+    background: #0a0e1a;
+    border-radius: var(--radius-sm);
+    padding: 32px;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .arch-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .arch-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .arch-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .arch-node {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #e2e8f0;
+    text-align: center;
+    white-space: nowrap;
+    position: relative;
+  }
+  .arch-node.primary {
+    background: rgba(37,99,235,0.15);
+    border-color: rgba(37,99,235,0.4);
+    color: #93c5fd;
+  }
+  .arch-node.secondary {
+    background: rgba(124,58,237,0.12);
+    border-color: rgba(124,58,237,0.35);
+    color: #c4b5fd;
+  }
+  .arch-node.data {
+    background: rgba(5,150,105,0.12);
+    border-color: rgba(5,150,105,0.35);
+    color: #6ee7b7;
+  }
+  .arch-node.client {
+    background: rgba(217,119,6,0.12);
+    border-color: rgba(217,119,6,0.35);
+    color: #fcd34d;
+  }
+  .arch-node .node-label {
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    display: block;
+    margin-top: 2px;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .arch-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.2);
+    font-size: 18px;
+  }
+  .arch-arrow-h { transform: rotate(0deg); }
+
+  /* ─── JSON BLOCK ─── */
+  .json-block {
+    background: #161b22;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin: 16px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .json-block-header {
+    padding: 7px 14px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.06em;
+  }
+  .json-block pre {
+    padding: 16px;
+    overflow-x: auto;
+  }
+  .json-block code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: #c9d1d9;
+    background: none;
+    border: none;
+    padding: 0;
+    line-height: 1.65;
+  }
+
+  /* ─── SUMMARY BOX ─── */
+  .summary-box {
+    background: linear-gradient(135deg, var(--ink) 0%, #1e2235 100%);
+    color: var(--white);
+    border-radius: var(--radius);
+    padding: 40px;
+    margin-top: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .summary-box::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(37,99,235,0.2) 0%, transparent 70%);
+  }
+  .summary-box h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .summary-box p {
+    font-size: 15px;
+    line-height: 1.75;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .summary-box p:last-child { margin-bottom: 0; }
+  .summary-box strong { color: var(--white); }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 8px 0;
+  }
+
+  /* ─── FOOTER ─── */
+  .article-footer {
+    background: var(--ink);
+    color: rgba(255,255,255,0.4);
+    padding: 32px;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  .article-footer a { color: rgba(255,255,255,0.6); text-decoration: none; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; gap: 0; }
+    .sidebar { display: none; }
+    .hero { padding: 48px 20px; }
+    .content-shell { padding: 0 16px; }
+    .two-col { padding-top: 28px; }
+    .section-header, .section-body { padding: 20px; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .hero-stats { gap: 24px; }
+  }
+
+
+  /* ─── PAYMENT ARTICLE ENHANCEMENTS ─── */
+  .scroll-progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--green));
+    z-index: 9999; transition: width 0.08s linear;
+  }
+  .status-track {
+    display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr));
+    gap: 10px; margin: 20px 0;
+  }
+  .status-node {
+    position: relative; padding: 14px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--ink-2); text-align: center;
+  }
+  .status-node:not(:last-child)::after {
+    content: '→'; position: absolute; right: -10px; top: 50%; transform: translateY(-50%);
+    color: var(--ink-4); z-index: 2;
+  }
+  .status-node.active { background: var(--accent-soft); color: #1e40af; border-color: #bfdbfe; }
+  .status-node.good { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
+  .status-node.bad { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
+  .status-node.warn { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
+  .metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:20px 0; }
+  .metric-card { padding:18px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+  .metric-value { font-family:'JetBrains Mono',monospace; font-size:22px; color:var(--ink); }
+  .metric-label { font-size:11px; color:var(--ink-4); text-transform:uppercase; letter-spacing:.08em; margin-top:4px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:14px; }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:11px; color:rgba(255,255,255,.48); }
+  .legend-dot { width:8px; height:8px; border-radius:50%; }
+  .legend-dot.client { background:#fcd34d; }
+  .legend-dot.service { background:#93c5fd; }
+  .legend-dot.data { background:#6ee7b7; }
+  .legend-dot.async { background:#c4b5fd; }
+  .decision-row { display:grid; grid-template-columns: 190px 1fr; gap:16px; padding:12px 0; border-bottom:1px solid var(--border); }
+  .decision-row:last-child { border-bottom:none; }
+  .decision-key { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent-2); }
+  .decision-val { font-size:14px; color:var(--ink-2); }
+  .toc-list a.active { color: var(--accent); background: var(--accent-soft); border-left-color: var(--accent); }
+  @media (max-width: 900px) {
+    .status-track { grid-template-columns:1fr; }
+    .status-node:not(:last-child)::after { content:'↓'; right:auto; left:50%; top:auto; bottom:-13px; transform:translateX(-50%); }
+    .metric-grid { grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width: 520px) {
+    .site-header-inner { height:auto; min-height:56px; padding:10px 16px; flex-wrap:wrap; }
+    .header-home { gap:10px; }
+    .header-right { width:100%; margin-left:0; overflow-x:auto; padding-bottom:2px; }
+    .metric-grid { grid-template-columns:1fr; }
+    .decision-row { grid-template-columns:1fr; gap:4px; }
+    .code-block pre, .json-block pre { padding:16px; }
+  }
+</style>
+</head>
+<body>
+<div class="scroll-progress" id="scrollProgress"></div>
+<header class="site-header">
+<div class="site-header-inner"><a aria-label="Protocol Field Notes home" class="header-home" href="../index.html"><span class="header-badge">HLD</span><span class="header-title">Payment System Design</span></a>
+
+
+<div class="header-right">
+<a class="toc-pill" href="#section-arch">Architecture</a>
+<a class="toc-pill" href="#section-safety">Safety</a>
+<a class="toc-pill" href="#section-scale">Scale</a>
+</div>
+</div>
+</header>
+<section class="hero">
+<div class="hero-grid"></div>
+<div class="hero-inner">
+<div class="hero-eyebrow"><span class="hero-eyebrow-dot"></span>System Design · Interview Article</div>
+<h1>Payment System<br/><em>Stripe like Architecture</em></h1>
+<p class="hero-lead">A complete design for creating payment intents, securely tokenizing cards, processing asynchronous transactions, preventing double charges, preserving an immutable audit trail, delivering reliable webhooks, and scaling beyond 10,000 TPS.</p>
+<div class="hero-stats">
+<div><div class="hero-stat-val">10K+</div><div class="hero-stat-label">Peak TPS</div></div>
+<div><div class="hero-stat-val">5</div><div class="hero-stat-label">Core Deep Dives</div></div>
+<div><div class="hero-stat-val">0</div><div class="hero-stat-label">Blind Retries</div></div>
+<div><div class="hero-stat-val">∞</div><div class="hero-stat-label">Audit History</div></div>
+</div>
+</div>
+</section>
+<div class="content-shell"><div class="two-col">
+<aside class="sidebar">
+<div class="toc-label">On this page</div>
+<ul class="toc-list">
+<li><a href="#section-scope">0 · Scope and Requirements</a></li>
+<li><a href="#section-core">1 · Core Mental Model</a></li>
+<li><a href="#section-entities">2 · Entities and State</a></li>
+<li><a href="#section-api">3 · APIs</a></li>
+<li><a href="#section-arch">4 · High Level Architecture</a></li>
+<li><a href="#section-auth">5 · Merchant Authentication</a></li>
+<li><a href="#section-card">6 · Secure Card Collection</a></li>
+<li><a href="#section-intent">7 · Create PaymentIntent</a></li>
+<li><a href="#section-transaction">8 · Transaction Processing</a></li>
+<li><a href="#section-safety">9 · Idempotency and Safety</a></li>
+<li><a href="#section-unknown">10 · Unknown State and Reconciliation</a></li>
+<li><a href="#section-audit">11 · Durability and Auditability</a></li>
+<li><a href="#section-webhook">12 · Webhooks</a></li>
+<li><a href="#section-tables">13 · Database Schema</a></li>
+<li><a href="#section-kafka">14 · Kafka and Ordering</a></li>
+<li><a href="#section-scale">15 · Scaling to 10K+ TPS</a></li>
+<li><a href="#section-failures">16 · Failure Matrix</a></li>
+<li><a href="#section-e2e">17 · End to End Flow</a></li>
+<li><a href="#section-summary">18 · Interview Summary</a></li>
+</ul>
+</aside>
+<article class="article">
+<div class="section" id="section-scope">
+<div class="section-header"><span class="section-num">§ 00</span><div class="section-header-text"><h2>Scope and Requirements</h2><p>What we are building, and what we deliberately leave out</p></div></div>
+<div class="section-body prose">
+<p>We are designing a <strong>Stripe like payment processor</strong>. Merchants integrate with our APIs, customers pay using credit or debit cards, and merchants receive reliable status updates. The difficult part is not creating a row in a database; it is preserving correctness while the external payment network is asynchronous, slow, or uncertain.</p>
+<div class="compare-grid">
+<div class="compare-card a"><div class="compare-card-label">Functional</div><div class="compare-card-title">Core requirements</div><ul><li>Merchant creates a PaymentIntent</li><li>Customer pays using a card token</li><li>Merchant reads current payment status</li><li>Merchant receives status webhooks</li></ul></div>
+<div class="compare-card b"><div class="compare-card-label">Non functional</div><div class="compare-card-title">System guarantees</div><ul><li>Highly secure card handling</li><li>Durable and auditable records</li><li>No double charging on retries</li><li>Scales beyond 10,000 TPS</li></ul></div>
+</div>
+<div class="callout amber"><span class="callout-icon">⚠️</span><div><strong>Out of scope:</strong> saved payment methods, refunds, disputes, recurring subscriptions, merchant payouts, and full ledger accounting. The architecture leaves room to add them later.</div></div>
+</div>
+</div>
+<div class="section" id="section-core">
+<div class="section-header"><span class="section-num">§ 01</span><div class="section-header-text"><h2>Core Mental Model</h2><p>Separate merchant intent from money movement attempts</p></div></div>
+<div class="section-body prose">
+<p>The cleanest way to reason about a payment system is to separate the <strong>business level payment</strong> from the <strong>individual attempts to move money</strong>.</p>
+<div class="arch-diagram"><div class="arch-inner">
+<div class="arch-row"><div class="arch-node client">Merchant Order<span class="node-label">order_123</span></div><div class="arch-arrow-h" style="color:rgba(255,255,255,.3);font-size:18px">→</div><div class="arch-node primary">PaymentIntent<span class="node-label">pay_intent_789</span></div></div>
+<div class="arch-arrow">↓ one to many</div>
+<div class="arch-row"><div class="arch-node secondary">Transaction 1<span class="node-label">declined</span></div><div class="arch-node secondary">Transaction 2<span class="node-label">processing</span></div><div class="arch-node secondary">Transaction 3<span class="node-label">succeeded</span></div></div>
+</div></div>
+<div class="decision-row"><div class="decision-key">PaymentIntent</div><div class="decision-val">The merchant's intention to collect a fixed amount and currency. It is the simplified object shown to the merchant.</div></div>
+<div class="decision-row"><div class="decision-key">Transaction</div><div class="decision-val">One charge attempt associated with the intent. A PaymentIntent can have multiple transactions.</div></div>
+<div class="decision-row"><div class="decision-key">TransactionAttempt</div><div class="decision-val">One network request/retry for the same transaction. It preserves attempt level audit detail without creating a new charge identity.</div></div>
+<div class="callout green"><span class="callout-icon">✅</span><div><strong>Key distinction:</strong> a retry after a timeout is usually another <em>attempt</em> for the same Transaction, not a brand new Transaction.</div></div>
+</div>
+</div>
+<div class="section" id="section-entities">
+<div class="section-header"><span class="section-num">§ 02</span><div class="section-header-text"><h2>Core Entities and State Machines</h2><p>Fast current state plus append only history</p></div></div>
+<div class="section-body prose">
+<div class="table-wrap"><table><thead><tr><th>Entity</th><th>Responsibility</th></tr></thead><tbody>
+<tr><td>merchant</td><td>Business identity, webhook configuration, status, settlement configuration</td></tr>
+<tr><td>merchant_api_key</td><td>Key metadata, hashed secret, scopes, expiry, revocation and rotation</td></tr>
+<tr><td>payment_intent</td><td>Amount, currency, merchant/order metadata, overall payment lifecycle</td></tr>
+<tr><td>transaction</td><td>One charge operation, external reference, idempotency key, current status</td></tr>
+<tr><td>transaction_attempt</td><td>Attempt number, request time, response, timeout/error, external correlation ID</td></tr>
+<tr><td>payment_event_log</td><td>Immutable audit history of all important state transitions</td></tr>
+<tr><td>outbox</td><td>Committed events waiting to be published to Kafka</td></tr>
+<tr><td>webhook_delivery</td><td>Per endpoint delivery attempts, response codes, retry schedule and status</td></tr>
+</tbody></table></div>
+<p><strong>PaymentIntent state:</strong></p>
+<div class="status-track">
+<div class="status-node">CREATED</div><div class="status-node active">PROCESSING</div><div class="status-node warn">REQUIRES_ACTION</div><div class="status-node good">SUCCEEDED</div><div class="status-node bad">FAILED / CANCELED</div>
+</div>
+<p><strong>Transaction state:</strong></p>
+<div class="status-track">
+<div class="status-node">PENDING</div><div class="status-node active">SENT</div><div class="status-node good">AUTHORIZED / SUCCEEDED</div><div class="status-node bad">DECLINED / FAILED</div><div class="status-node warn">UNKNOWN</div>
+</div>
+<div class="callout blue"><span class="callout-icon">💡</span><div><strong>UNKNOWN is a first class state.</strong> A timeout does not prove failure. The network may have charged the customer and lost only the response.</div></div>
+</div>
+</div>
+<div class="section" id="section-api">
+<div class="section-header"><span class="section-num">§ 03</span><div class="section-header-text"><h2>API Surface</h2><p>Small external contract, complex internal guarantees</p></div></div>
+<div class="section-body prose">
+<p><strong>Create PaymentIntent</strong></p>
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">HTTP</span></div><pre><code><span class="code-kw">POST</span> /v1/payment-intents
+Authorization: Bearer sk_live_...
+Idempotency-Key: order_123_create
+
+{
+  <span class="code-key">"amountInCents"</span>: <span class="code-num">2499</span>,
+  <span class="code-key">"currency"</span>: <span class="code-str">"USD"</span>,
+  <span class="code-key">"merchantOrderId"</span>: <span class="code-str">"order_123"</span>
+}</code></pre></div>
+<p><strong>Confirm / charge using a card token</strong></p>
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">HTTP</span></div><pre><code><span class="code-kw">POST</span> /v1/payment-intents/{paymentIntentId}/transactions
+Authorization: Bearer sk_live_...
+Idempotency-Key: order_123_charge_1
+
+{
+  <span class="code-key">"type"</span>: <span class="code-str">"CHARGE"</span>,
+  <span class="code-key">"cardToken"</span>: <span class="code-str">"card_tok_abc123"</span>
+}</code></pre></div>
+<p><strong>Read payment status</strong></p>
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">HTTP</span></div><pre><code><span class="code-kw">GET</span> /v1/payment-intents/{paymentIntentId}
+Authorization: Bearer sk_live_...</code></pre></div>
+<div class="callout amber"><span class="callout-icon">📌</span><div>Use a merchant supplied <strong>Idempotency Key</strong> on mutating APIs. A unique constraint on <code>(merchant_id, idempotency_key, operation)</code> turns network retries into safe replays of the original result.</div></div>
+</div>
+</div>
+<div class="section" id="section-arch">
+<div class="section-header"><span class="section-num">§ 04</span><div class="section-header-text"><h2>High Level Architecture</h2><p>Secure synchronous APIs around an event driven payment core</p></div></div>
+<div class="section-body prose">
+<div class="arch-diagram"><div class="arch-inner">
+<div class="arch-row"><div class="arch-node client">Merchant Backend<span class="node-label">API key</span></div><div class="arch-node client">Customer Browser<span class="node-label">secure iframe</span></div></div>
+<div class="arch-arrow">↓ HTTPS/TLS</div>
+<div class="arch-row"><div class="arch-node">Load Balancer</div><div class="arch-node primary">API Gateway<span class="node-label">auth · rate limit</span></div><div class="arch-node primary">Tokenization Service<span class="node-label">PCI boundary</span></div></div>
+<div class="arch-arrow">↓</div>
+<div class="arch-row"><div class="arch-node primary">PaymentIntent Service</div><div class="arch-node primary">Transaction Service</div><div class="arch-node primary">Transaction Workers</div></div>
+<div class="arch-arrow">↓ state + outbox</div>
+<div class="arch-row"><div class="arch-node data">Sharded SQL DB<span class="node-label">source of truth</span></div><div class="arch-node secondary">CDC / Outbox Publisher</div><div class="arch-node secondary">Kafka<span class="node-label">ordered events</span></div></div>
+<div class="arch-arrow">↓</div>
+<div class="arch-row"><div class="arch-node secondary">Webhook Service</div><div class="arch-node secondary">Reconciliation Service</div><div class="arch-node secondary">Fraud / Analytics</div><div class="arch-node client">Card Network / Bank<span class="node-label">external</span></div></div>
+<div class="legend"><div class="legend-item"><span class="legend-dot client"></span>External/client</div><div class="legend-item"><span class="legend-dot service"></span>Synchronous service</div><div class="legend-item"><span class="legend-dot data"></span>Durable data</div><div class="legend-item"><span class="legend-dot async"></span>Async/event processing</div></div>
+</div></div>
+<p>The database is the <strong>system of record</strong>. Kafka distributes committed state changes to downstream consumers; it does not replace the database for payment correctness. Services remain stateless and scale horizontally.</p>
+</div>
+</div>
+<div class="section" id="section-auth">
+<div class="section-header"><span class="section-num">§ 05</span><div class="section-header-text"><h2>Merchant Authentication</h2><p>Machine to machine credentials, not a human login flow</p></div></div>
+<div class="section-body prose">
+<p>A merchant is a client of our platform, but its backend makes automated server to server calls. The simplest model is a <strong>merchant API key</strong>. An OAuth client credentials flow is also valid when short lived access tokens are preferred.</p>
+<div class="flow-diagram"><div class="flow-steps">
+<div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Merchant registers and receives merchant_id + API secret</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">Merchant calls API with Authorization: Bearer sk_live_...</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">API Gateway validates key, status, expiry and scopes</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">Gateway derives merchant_id and injects trusted identity internally</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">5</div><span class="flow-step-text">Gateway applies per merchant rate limits and routes the request</span></div>
+</div></div>
+<div class="compare-grid">
+<div class="compare-card a"><div class="compare-card-label">Baseline</div><div class="compare-card-title">API key</div><ul><li>Simple machine to machine integration</li><li>Key prefix identifies record</li><li>Secret is securely hashed/encrypted</li><li>Support revoke, rotate and expire</li></ul></div>
+<div class="compare-card b"><div class="compare-card-label">Stronger option</div><div class="compare-card-title">HMAC request signing</div><ul><li>Sign method + path + body hash + timestamp</li><li>Detect body tampering</li><li>Timestamp/nonce reduces replay risk</li><li>Useful for high security integrations</li></ul></div>
+</div>
+<div class="callout blue"><span class="callout-icon">🔐</span><div>Never trust a <code>merchant_id</code> from the request body. Derive merchant identity from the authenticated credential.</div></div>
+</div>
+</div>
+<div class="section" id="section-card">
+<div class="section-header"><span class="section-num">§ 06</span><div class="section-header-text"><h2>Secure Card Collection &amp; Tokenization</h2><p>Keep raw card data out of the merchant backend and normal services</p></div></div>
+<div class="section-body prose">
+<div class="arch-diagram"><div class="arch-inner">
+<div class="arch-row"><div class="arch-node client">Customer Browser</div><div class="arch-arrow-h" style="color:rgba(255,255,255,.3);font-size:18px">→</div><div class="arch-node primary">Hosted iframe / JS SDK<span class="node-label">our domain</span></div></div>
+<div class="arch-arrow">↓ raw card over TLS</div>
+<div class="arch-row"><div class="arch-node primary">Tokenization Service<span class="node-label">PCI compliant</span></div><div class="arch-arrow-h" style="color:rgba(255,255,255,.3);font-size:18px">→</div><div class="arch-node data">Card Vault / HSM<span class="node-label">restricted boundary</span></div></div>
+<div class="arch-arrow">↓ returns card_tok_abc123</div>
+<div class="arch-row"><div class="arch-node client">Merchant Backend<span class="node-label">token only</span></div><div class="arch-node primary">Payment Services<span class="node-label">token only</span></div></div>
+</div></div>
+<p>The first secure call must carry the raw card details somewhere; otherwise tokenization cannot happen. The design goal is not “the card never crosses a network.” The goal is that the card travels only through a <strong>small, hardened PCI compliant path</strong>.</p>
+<div class="table-wrap"><table><thead><tr><th>Control</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>HTTPS/TLS</td><td>Encrypt browser to tokenization traffic in transit</td></tr>
+<tr><td>Hosted iframe / SDK</td><td>Raw PAN and CVC bypass the merchant backend</td></tr>
+<tr><td>Tokenization</td><td>Normal payment APIs use an opaque token, not the card number</td></tr>
+<tr><td>mTLS / private network</td><td>Protect sensitive service to service traffic</td></tr>
+<tr><td>Log redaction</td><td>Prevent PAN/CVC from entering logs, traces, Kafka, analytics or support tools</td></tr>
+<tr><td>Data minimization</td><td>Store token, brand and last four digits; never store CVC after authorization</td></tr>
+</tbody></table></div>
+<div class="callout green"><span class="callout-icon">✅</span><div><strong>Interview line:</strong> Raw card data bypasses the merchant server, goes directly to our PCI compliant tokenization service over TLS, and all later payment calls use only a token.</div></div>
+</div>
+</div>
+<div class="section" id="section-intent">
+<div class="section-header"><span class="section-num">§ 07</span><div class="section-header-text"><h2>Create PaymentIntent</h2><p>Record the merchant's intent before moving any money</p></div></div>
+<div class="section-body prose">
+<div class="flow-diagram"><div class="flow-steps">
+<div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Merchant sends amount, currency, order metadata and Idempotency Key</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">Gateway authenticates merchant and applies limits</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">PaymentIntent Service checks idempotency record / unique constraint</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">Create PaymentIntent(status=CREATED) + audit event + outbox atomically</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">5</div><span class="flow-step-text">Commit DB, then return payment_intent_id to merchant</span></div>
+</div></div>
+<p>No card is charged at this stage. We only create a stable parent object that carries amount, currency, merchant ownership and lifecycle.</p>
+</div>
+</div>
+<div class="section" id="section-transaction">
+<div class="section-header"><span class="section-num">§ 08</span><div class="section-header-text"><h2>Transaction Processing Flow</h2><p>Create durable state before calling the external network</p></div></div>
+<div class="section-body prose">
+<div class="flow-diagram"><div class="flow-steps">
+<div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Merchant confirms PaymentIntent using card_token + Idempotency Key</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">Create Transaction(status=PENDING) and first TransactionAttempt</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">Write audit event + outbox in the same DB transaction</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">CDC/outbox publishes TransactionCreated keyed by payment_intent_id</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">5</div><span class="flow-step-text">Transaction Worker consumes event and calls card network/bank</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">6</div><span class="flow-step-text">Persist definite success/decline or UNKNOWN on uncertainty</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">7</div><span class="flow-step-text">Publish status change event for webhook and reconciliation consumers</span></div>
+</div></div>
+<div class="callout amber"><span class="callout-icon">📌</span><div><strong>Persist before side effect.</strong> The system must have a durable transaction identity and audit record before it sends money moving work to an external system.</div></div>
+</div>
+</div>
+<div class="section" id="section-safety">
+<div class="section-header"><span class="section-num">§ 09</span><div class="section-header-text"><h2>Transaction Safety &amp; Double Charge Prevention</h2><p>Idempotency at every retry boundary</p></div></div>
+<div class="section-body prose">
+<p>The dangerous scenario is simple: we send a $50 charge, the bank processes it, but the response packet is lost. If we retry as a fresh charge, the customer may pay twice.</p>
+<div class="compare-grid">
+<div class="compare-card a"><div class="compare-card-label">Wrong</div><div class="compare-card-title">Blind retry</div><ul><li>Create a new transaction after timeout</li><li>Generate a new external request ID</li><li>Network may create a second charge</li><li>Customer sees duplicate debit</li></ul></div>
+<div class="compare-card b"><div class="compare-card-label">Correct</div><div class="compare-card-title">Stable identity</div><ul><li>Keep the same transaction_id</li><li>Reuse the same external idempotency key</li><li>Record a new transaction_attempt</li><li>Return/recover the original result</li></ul></div>
+</div>
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">External request identity</span></div><pre><code>external_idempotency_key = <span class="code-str">"txn_82f1..."</span>
+
+<span class="code-comment">// Retry 1</span>
+charge(amount=2499, key=<span class="code-str">"txn_82f1..."</span>)
+
+<span class="code-comment">// Retry 2 after timeout — SAME key</span>
+charge(amount=2499, key=<span class="code-str">"txn_82f1..."</span>)</code></pre></div>
+<p>Safe processing also requires <strong>conditional state transitions</strong>. Use a version column or compare and set update so two workers cannot independently finalize the same transaction.</p>
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">Optimistic state transition</span></div><pre><code><span class="code-kw">UPDATE</span> transaction
+<span class="code-kw">SET</span> status = <span class="code-str">'SUCCEEDED'</span>, version = version + <span class="code-num">1</span>
+<span class="code-kw">WHERE</span> transaction_id = ?
+  <span class="code-kw">AND</span> status <span class="code-kw">IN</span> (<span class="code-str">'PENDING'</span>, <span class="code-str">'SENT'</span>, <span class="code-str">'UNKNOWN'</span>)
+  <span class="code-kw">AND</span> version = ?;</code></pre></div>
+<div class="callout green"><span class="callout-icon">✅</span><div><strong>Safety rule:</strong> the same merchant request returns the same internal result, and the same external charge identity is reused across retries.</div></div>
+</div>
+</div>
+<div class="section" id="section-unknown">
+<div class="section-header"><span class="section-num">§ 10</span><div class="section-header-text"><h2>Timeouts, UNKNOWN State &amp; Reconciliation</h2><p>Accept uncertainty instead of inventing certainty</p></div></div>
+<div class="section-body prose">
+<div class="status-track"><div class="status-node active">REQUEST SENT</div><div class="status-node warn">TIMEOUT</div><div class="status-node warn">UNKNOWN</div><div class="status-node">RECONCILIATION</div><div class="status-node good">FINAL RESULT</div></div>
+<p>A timeout means only that <strong>our system did not receive a definitive answer</strong>. It does not mean the bank failed to charge. Therefore, timeout transitions to <code>UNKNOWN</code> or <code>PENDING_RECONCILIATION</code>, never directly to <code>FAILED</code>.</p>
+<div class="flow-diagram"><div class="flow-steps">
+<div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Retry status query / charge with the same idempotency key</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">Listen for network callbacks or asynchronous settlement events</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">Periodic reconciliation compares our UNKNOWN records with network records</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">Match using external reference / idempotency key / amount / merchant</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">5</div><span class="flow-step-text">Atomically finalize SUCCEEDED or FAILED and emit an audit event</span></div>
+</div></div>
+<div class="callout amber"><span class="callout-icon">⚠️</span><div>Do not create a new charge transaction merely because “enough time passed.” Create a new transaction only after the previous result is definitely failed/canceled, or after reconciliation confirms no charge occurred.</div></div>
+</div>
+</div>
+<div class="section" id="section-audit">
+<div class="section-header"><span class="section-num">§ 11</span><div class="section-header-text"><h2>Durability &amp; Complete Auditability</h2><p>Current state, immutable history, and reliable event propagation</p></div></div>
+<div class="section-body prose">
+<p>Payment correctness requires more than the latest status. Months later, we may need to prove exactly when the charge was created, sent, timed out, retried, authorized, settled and reported to the merchant.</p>
+<div class="compare-grid">
+<div class="compare-card a"><div class="compare-card-label">Mutable view</div><div class="compare-card-title">Current state tables</div><ul><li>Fast reads for merchant APIs</li><li>Current PaymentIntent status</li><li>Current Transaction status</li><li>Optimized for operations</li></ul></div>
+<div class="compare-card b"><div class="compare-card-label">Immutable view</div><div class="compare-card-title">Event &amp; attempt history</div><ul><li>Append only payment_event_log</li><li>Append only transaction_attempt</li><li>Reconstruct full lifecycle</li><li>Supports disputes and compliance</li></ul></div>
+</div>
+<p>For every important state change, write the following in <strong>one database transaction</strong>:</p>
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">Atomic commit</span></div><pre><code><span class="code-kw">BEGIN</span>;
+
+<span class="code-kw">UPDATE</span> transaction
+<span class="code-kw">SET</span> status = <span class="code-str">'SUCCEEDED'</span>, version = version + <span class="code-num">1</span>
+<span class="code-kw">WHERE</span> transaction_id = <span class="code-str">'txn_123'</span>;
+
+<span class="code-kw">INSERT INTO</span> payment_event_log
+(event_id, aggregate_id, event_type, old_status, new_status, created_at)
+<span class="code-kw">VALUES</span>
+(<span class="code-str">'evt_9'</span>, <span class="code-str">'txn_123'</span>, <span class="code-str">'TRANSACTION_SUCCEEDED'</span>,
+ <span class="code-str">'SENT'</span>, <span class="code-str">'SUCCEEDED'</span>, now());
+
+<span class="code-kw">INSERT INTO</span> outbox
+(event_id, partition_key, event_type, payload, status)
+<span class="code-kw">VALUES</span>
+(<span class="code-str">'evt_9'</span>, <span class="code-str">'pi_456'</span>, <span class="code-str">'TRANSACTION_SUCCEEDED'</span>, ..., <span class="code-str">'NEW'</span>);
+
+<span class="code-kw">COMMIT</span>;</code></pre></div>
+<p>CDC or an outbox publisher emits committed rows to Kafka. If Kafka is unavailable, the database commit still survives and the event can be published later. Consumers deduplicate by <code>event_id</code>.</p>
+<div class="pill-row"><span class="pill blue">WAL / durable commit</span><span class="pill blue">Multi AZ replication</span><span class="pill purple">Append only audit log</span><span class="pill purple">Transactional outbox</span><span class="pill green">Replayable Kafka</span><span class="pill green">Backups + PITR</span></div>
+<div class="callout blue"><span class="callout-icon">💡</span><div><strong>Responsibility split:</strong> current tables answer “what is the state now'”, the audit log answers “how did we get here'”, and outbox/Kafka answers “how do committed changes reliably reach other services'”</div></div>
+</div>
+</div>
+<div class="section" id="section-webhook">
+<div class="section-header"><span class="section-num">§ 12</span><div class="section-header-text"><h2>Reliable Merchant Webhooks</h2><p>Server to server notification with at least once delivery</p></div></div>
+<div class="section-body prose">
+<div class="arch-diagram"><div class="arch-inner">
+<div class="arch-row"><div class="arch-node data">DB state change</div><div class="arch-arrow-h" style="color:rgba(255,255,255,.3);font-size:18px">→</div><div class="arch-node secondary">Outbox / CDC</div><div class="arch-arrow-h" style="color:rgba(255,255,255,.3);font-size:18px">→</div><div class="arch-node secondary">Kafka</div></div>
+<div class="arch-arrow">↓</div>
+<div class="arch-row"><div class="arch-node primary">Webhook Service</div><div class="arch-arrow-h" style="color:rgba(255,255,255,.3);font-size:18px">→</div><div class="arch-node client">Merchant Endpoint<span class="node-label">HTTPS</span></div></div>
+</div></div>
+<div class="json-block"><div class="json-block-header">SIGNED WEBHOOK</div><pre><code>{
+  <span class="code-key">"id"</span>: <span class="code-str">"evt_9"</span>,
+  <span class="code-key">"type"</span>: <span class="code-str">"payment.succeeded"</span>,
+  <span class="code-key">"created"</span>: <span class="code-num">1783572000</span>,
+  <span class="code-key">"data"</span>: {
+    <span class="code-key">"paymentIntentId"</span>: <span class="code-str">"pi_456"</span>,
+    <span class="code-key">"amountInCents"</span>: <span class="code-num">2499</span>,
+    <span class="code-key">"currency"</span>: <span class="code-str">"USD"</span>,
+    <span class="code-key">"status"</span>: <span class="code-str">"SUCCEEDED"</span>
+  }
+}</code></pre></div>
+<p>The webhook payload is signed using a merchant specific secret. The merchant verifies the signature, processes the event idempotently using <code>event_id</code>, and returns a 2xx response.</p>
+<div class="table-wrap"><table><thead><tr><th>Concern</th><th>Design</th></tr></thead><tbody>
+<tr><td>Delivery failure</td><td>Exponential backoff with jitter; persist next_attempt_at</td></tr>
+<tr><td>Duplicate delivery</td><td>At least once semantics; merchant deduplicates event_id</td></tr>
+<tr><td>Authenticity</td><td>HMAC signature over timestamp + raw payload</td></tr>
+<tr><td>Debugging</td><td>Delivery logs, response codes, replay button and dead letter state</td></tr>
+<tr><td>Ordering</td><td>Sequence/version per PaymentIntent; merchant ignores stale versions</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div class="section" id="section-tables">
+<div class="section-header"><span class="section-num">§ 13</span><div class="section-header-text"><h2>Database Schema</h2><p>Minimal schema that supports safety, auditability and scaling</p></div></div>
+<div class="section-body prose">
+<div class="table-wrap"><table><thead><tr><th>Table</th><th>Important columns / constraints</th></tr></thead><tbody>
+<tr><td>merchant</td><td>merchant_id PK, status, webhook_url, webhook_secret_ref, created_at</td></tr>
+<tr><td>merchant_api_key</td><td>key_id PK, merchant_id, secret_hash, scopes, status, expires_at; index by key prefix</td></tr>
+<tr><td>payment_intent</td><td>payment_intent_id PK, merchant_id, amount, currency, merchant_order_id, status, version; UNIQUE(merchant_id, create_idempotency_key)</td></tr>
+<tr><td>transaction</td><td>transaction_id PK, payment_intent_id FK, merchant_id, type, amount, status, external_idempotency_key, external_reference, version</td></tr>
+<tr><td>transaction_attempt</td><td>attempt_id PK, transaction_id FK, attempt_no, request_hash, started_at, completed_at, response_code, error_type; UNIQUE(transaction_id, attempt_no)</td></tr>
+<tr><td>payment_event_log</td><td>event_id PK, aggregate_type, aggregate_id, event_type, old_status, new_status, payload, created_at; append only</td></tr>
+<tr><td>outbox</td><td>event_id PK, partition_key, event_type, payload, created_at, published_at</td></tr>
+<tr><td>webhook_delivery</td><td>delivery_id PK, event_id, merchant_id, endpoint, attempt_no, status, next_attempt_at, response_code</td></tr>
+<tr><td>processed_event</td><td>consumer_name + event_id UNIQUE for consumer side idempotency</td></tr>
+</tbody></table></div>
+<div class="callout amber"><span class="callout-icon">📌</span><div><code>transaction.payment_intent_id</code> is a foreign key, not the primary key. One PaymentIntent can have multiple transactions.</div></div>
+</div>
+</div>
+<div class="section" id="section-kafka">
+<div class="section-header"><span class="section-num">§ 14</span><div class="section-header-text"><h2>Kafka Partitioning &amp; Ordering</h2><p>Preserve order per payment while scaling different payments in parallel</p></div></div>
+<div class="section-body prose">
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">Partition key</span></div><pre><code>partition_key = payment_intent_id</code></pre></div>
+<p>All events belonging to one PaymentIntent land in the same partition:</p>
+<div class="code-block"><div class="code-block-header"><div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div><span class="code-label">Ordered event stream</span></div><pre><code>PAYMENT_INTENT_CREATED
+→ TRANSACTION_CREATED
+→ TRANSACTION_SENT
+→ TRANSACTION_UNKNOWN
+→ TRANSACTION_SUCCEEDED
+→ WEBHOOK_REQUESTED</code></pre></div>
+<p>Different PaymentIntents are spread across partitions and processed concurrently. Within a consumer group, a partition is owned by one consumer at a time; ownership can move after failure or rebalance. The guarantee is <strong>same payment → same partition → ordered processing</strong>, not “same permanent server.”</p>
+<div class="pill-row"><span class="pill purple">Replication factor 3</span><span class="pill purple">acks=all</span><span class="pill blue">min.insync.replicas</span><span class="pill blue">consumer groups</span><span class="pill green">idempotent consumers</span></div>
+</div>
+</div>
+<div class="section" id="section-scale">
+<div class="section-header"><span class="section-num">§ 15</span><div class="section-header-text"><h2>Scaling Beyond 10,000 TPS</h2><p>Scale each bottleneck independently</p></div></div>
+<div class="section-body prose">
+<div class="metric-grid"><div class="metric-card"><div class="metric-value">10K+</div><div class="metric-label">Payment requests / sec</div></div><div class="metric-card"><div class="metric-value">~5 MB/s</div><div class="metric-label">Raw row data at 500 B each</div></div><div class="metric-card"><div class="metric-value">~432 GB/day</div><div class="metric-label">Raw data before indexes/replicas</div></div><div class="metric-card"><div class="metric-value">3×</div><div class="metric-label">Kafka replication</div></div></div>
+<div class="decision-row"><div class="decision-key">Stateless services</div><div class="decision-val">Run many API Gateway, PaymentIntent, Transaction, Webhook and Reconciliation instances behind load balancers. Autoscale on CPU, latency, queue lag and error rate.</div></div>
+<div class="decision-row"><div class="decision-key">Kafka</div><div class="decision-val">Use enough partitions for peak event volume and headroom, benchmarked in production. Partition by payment_intent_id and scale consumers through consumer groups.</div></div>
+<div class="decision-row"><div class="decision-key">Database writes</div><div class="decision-val">Start with a strongly consistent relational primary. As write volume grows, shard by merchant_id so PaymentIntent, Transaction, attempts and events for a merchant remain colocated.</div></div>
+<div class="decision-row"><div class="decision-key">Database reads</div><div class="decision-val">Use read replicas for history/reporting. Read recent status from primary or use read your writes routing when replica lag could expose stale financial state.</div></div>
+<div class="decision-row"><div class="decision-key">Caching</div><div class="decision-val">Cache merchant configuration, API key metadata and rate limit state. Do not make Redis the source of truth for mutable financial status.</div></div>
+<div class="decision-row"><div class="decision-key">Archival</div><div class="decision-val">Partition operational tables by time, move older immutable events/transactions to object storage, and keep an indexed retrieval path for audits and disputes.</div></div>
+<div class="decision-row"><div class="decision-key">Backpressure</div><div class="decision-val">Bound worker concurrency per external network, use circuit breakers and queues, and degrade gracefully when a bank is slow instead of exhausting all threads.</div></div>
+<div class="callout blue"><span class="callout-icon">💡</span><div><strong>Sharding key choice:</strong> <code>merchant_id</code> is a strong operational shard key because most ownership, authorization and reporting queries are merchant scoped. Kafka still uses <code>payment_intent_id</code> for per payment ordering.</div></div>
+</div>
+</div>
+<div class="section" id="section-failures">
+<div class="section-header"><span class="section-num">§ 16</span><div class="section-header-text"><h2>Failure Matrix</h2><p>What happens when each boundary breaks</p></div></div>
+<div class="section-body prose">
+<div class="table-wrap"><table><thead><tr><th>Failure</th><th>Correct behavior</th></tr></thead><tbody>
+<tr><td>Merchant retries create API</td><td>Same merchant idempotency key returns the original PaymentIntent</td></tr>
+<tr><td>Service crashes before DB commit</td><td>No durable state exists; request can be safely retried</td></tr>
+<tr><td>DB commits, response to merchant is lost</td><td>Merchant retry returns existing result through idempotency lookup</td></tr>
+<tr><td>DB commits, Kafka is down</td><td>Outbox row remains; publisher/CDC emits later</td></tr>
+<tr><td>Worker crashes before external call</td><td>Kafka redelivers; consumer idempotency prevents duplicate local processing</td></tr>
+<tr><td>Worker crashes after external charge</td><td>Retry uses the same external idempotency key; otherwise mark UNKNOWN and reconcile</td></tr>
+<tr><td>External network times out</td><td>Do not mark failed; move to UNKNOWN and reconcile</td></tr>
+<tr><td>Duplicate external callback</td><td>Deduplicate by external event/reference and use conditional state transitions</td></tr>
+<tr><td>Webhook endpoint is down</td><td>Persist delivery attempt and retry with exponential backoff + jitter</td></tr>
+<tr><td>Kafka consumer processes twice</td><td>Deduplicate event_id in processed_event or enforce unique business constraints</td></tr>
+<tr><td>Replica is stale</td><td>Read recent payment status from primary or gate by commit position</td></tr>
+<tr><td>One payment network provider is unhealthy</td><td>Circuit breaker, bounded retries, route only when business rules and idempotency allow</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div class="section" id="section-e2e">
+<div class="section-header"><span class="section-num">§ 17</span><div class="section-header-text"><h2>Final End to End Flow</h2><p>The complete design from merchant onboarding to final webhook</p></div></div>
+<div class="section-body prose">
+<div class="flow-diagram"><div class="flow-steps">
+<div class="flow-step"><div class="flow-step-num">1</div><span class="flow-step-text">Merchant registers → receives API key → configures webhook URL and scopes</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">2</div><span class="flow-step-text">Merchant creates PaymentIntent with amount, currency and idempotency key</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">3</div><span class="flow-step-text">Customer enters card in our hosted iframe; Tokenization Service returns card_token</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">4</div><span class="flow-step-text">Merchant confirms intent using card_token; Transaction + Attempt are created</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">5</div><span class="flow-step-text">Transaction state + audit event + outbox event commit atomically</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">6</div><span class="flow-step-text">CDC/outbox publishes to Kafka keyed by payment_intent_id</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">7</div><span class="flow-step-text">Worker calls external network using stable transaction idempotency key</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">8</div><span class="flow-step-text">Definite approval/decline finalizes state; timeout becomes UNKNOWN</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">9</div><span class="flow-step-text">Reconciliation resolves UNKNOWN using network records/callbacks</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">10</div><span class="flow-step-text">Status change event triggers signed webhook with durable retry</span></div><div class="flow-arrow"><div class="flow-arrow-line">│</div></div>
+<div class="flow-step"><div class="flow-step-num">11</div><span class="flow-step-text">Merchant verifies signature, deduplicates event_id and fulfills the order</span></div>
+</div></div>
+</div>
+</div>
+<div class="summary-box" id="section-summary">
+<h2>Final Interview Summary</h2>
+<p>A merchant authenticates using an <strong>API key</strong> and creates a <strong>PaymentIntent</strong>. The customer enters card details through our secure hosted iframe or JavaScript SDK. Raw card data goes directly to a restricted PCI compliant tokenization service over TLS, and the rest of the platform uses only a card token.</p>
+<p>When the merchant confirms payment, the Transaction Service creates a <strong>Transaction</strong> and a <strong>TransactionAttempt</strong>. Payment state, an immutable audit event, and an outbox event are committed atomically. CDC/outbox then publishes the committed event to Kafka, partitioned by <code>payment_intent_id</code> so each payment's state transitions remain ordered.</p>
+<p>Transaction workers call the external network using a stable idempotency key derived from the transaction identity. Retries reuse the same key. A timeout is never treated as failure; it becomes <strong>UNKNOWN</strong> and is later resolved by callbacks, status queries or reconciliation against the network's final records.</p>
+<p>The database remains the source of truth. Current state tables provide fast reads, append only event and attempt tables provide complete auditability, the outbox guarantees reliable propagation, and Kafka enables independently scalable consumers such as webhooks, reconciliation, fraud and analytics.</p>
+<p>To scale past <strong>10,000 TPS</strong>, services stay stateless behind load balancers, Kafka uses many partitions and consumer groups, the relational database is optimized and eventually sharded by <code>merchant_id</code>, read replicas serve history/reporting, Redis caches non financial metadata, and old immutable records are archived to object storage.</p>
+</div>
+</article></div></div>
+<footer class="article-footer">Payment System High Level Design · Stripe like Architecture · Interview Reference</footer>
+<script>
+(function() {
+  const bar = document.getElementById('scrollProgress');
+  const links = [...document.querySelectorAll('.toc-list a')];
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  function update() {
+    const h = document.documentElement;
+    const pct = (h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight)) * 100;
+    bar.style.width = pct + '%';
+    let current = sections[0];
+    for (const s of sections) { if (s.getBoundingClientRect().top <= 120) current = s; }
+    links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current.id));
+  }
+  addEventListener('scroll', update, {passive:true}); update();
+})();
+</script>
+</body>
+</html>
