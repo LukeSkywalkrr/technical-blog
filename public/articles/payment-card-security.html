@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="A beginner first, deeply technical visual guide to hosted payment fields, iframe isolation, tokenization, card vaults, HSMs, PCI scope, network tokens, and the end to end card authorization path." name="description"/>
+<title>How Stripe Like Payment Systems Keep Card Data Safe</title>
+<style>
+:root{
+  --bg:#f6f4fb;--paper:#fffefd;--ink:#111827;--muted:#606779;--line:#ddd8e8;
+  --violet:#6d4aff;--blue:#2563eb;--cyan:#0891b2;--green:#0f9f6e;--amber:#d97706;
+  --red:#dc2626;--pink:#db2777;--dark:#090d1a;--soft:#f0edff;--soft2:#eaf8ff;
+  --shadow:0 24px 80px rgba(37,22,84,.12);--radius:8px;--max:1220px
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:
+  radial-gradient(circle at 8% 0%,rgba(109,74,255,.13),transparent 34rem),
+  radial-gradient(circle at 98% 3%,rgba(8,145,178,.12),transparent 31rem),
+  linear-gradient(180deg,#fffefe,#f3f0f8);
+  color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  line-height:1.68;letter-spacing:0}
+.progress{position:fixed;z-index:100;top:0;left:0;height:4px;width:100%;background:linear-gradient(90deg,var(--violet),var(--cyan),var(--green),var(--amber));transform-origin:left;transform:scaleX(0)}
+.shell{width:min(var(--max),calc(100vw - 44px));margin:auto}
+.hero{padding:76px 0 54px;display:grid;grid-template-columns:1.02fr .98fr;gap:42px;align-items:center;min-height:78vh}
+.badge{display:inline-flex;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:#e7e1ff;color:#5138d8;font-weight:950;text-transform:uppercase;font-size:13px;letter-spacing:.08em}
+h1{font-family:Georgia,serif;font-size:clamp(46px,6.7vw,84px);line-height:.95;letter-spacing:0;margin:22px 0 17px;max-width:900px}
+.lead{font-size:clamp(19px,2vw,25px);color:#4b5563;line-height:1.5;margin:0;max-width:830px}
+.actions{display:flex;flex-wrap:wrap;gap:13px;margin-top:29px}
+.btn{display:inline-flex;text-decoration:none;color:var(--ink);font-weight:900;border:1px solid var(--line);background:#fff;border-radius:999px;padding:12px 17px;box-shadow:0 8px 25px rgba(15,23,42,.07)}
+.btn.primary{background:linear-gradient(135deg,var(--violet),#111827);color:#fff;border:0}
+.dark-card{background:var(--dark);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);color:white;position:relative;overflow:hidden}
+.dark-card:before,.diagram:before,.secure-stage:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:38px 38px}
+.dark-card>*{position:relative}
+.browser{border:1px solid rgba(148,163,184,.25);background:#101827;border-radius:20px;overflow:hidden}
+.browserbar{height:45px;border-bottom:1px solid rgba(148,163,184,.18);display:flex;gap:8px;align-items:center;padding:0 14px}
+.dot{width:10px;height:10px;border-radius:50%;background:#ef4444}.dot:nth-child(2){background:#f59e0b}.dot:nth-child(3){background:#22c55e}
+.url{margin-left:10px;flex:1;background:#ffffff0d;border:1px solid #ffffff12;border-radius:999px;padding:5px 12px;color:#94a3b8;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.checkout{padding:18px;display:grid;gap:12px}
+.fakeinput{border:1px solid rgba(148,163,184,.22);background:#ffffff08;border-radius:13px;padding:12px 14px;color:#cbd5e1;font-size:13px;display:flex;justify-content:space-between}
+.iframebox{position:relative;border:1px solid rgba(129,140,248,.55);background:linear-gradient(135deg,rgba(109,74,255,.24),rgba(8,145,178,.12));border-radius:15px;padding:15px;overflow:hidden}
+.iframebox:after{content:"PSP ORIGIN";position:absolute;right:9px;top:8px;font:900 9px ui-monospace,monospace;letter-spacing:.08em;color:#c4b5fd}
+.iframebox strong{display:block;color:#e9d5ff;font:900 13px ui-monospace,monospace}.iframebox span{color:#a7b4c8;font-size:11px}
+.tokenline{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-top:12px}
+.tiny{border:1px solid rgba(148,163,184,.2);background:#ffffff08;border-radius:12px;padding:11px;text-align:center}.tiny strong{display:block;color:#fff;font-size:12px}.tiny span{font-size:10px;color:#94a3b8}.tokenarrow{color:#7dd3fc;font-weight:950}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:17px}.tile{border:1px solid rgba(148,163,184,.22);background:rgba(255,255,255,.045);border-radius:16px;padding:14px}.tile strong{display:block}.tile span{display:block;color:#cbd5e1a8;font-size:12px;margin-top:5px;line-height:1.45}
+.layout{display:grid;grid-template-columns:278px 1fr;gap:34px;padding-bottom:80px}.toc{position:sticky;top:22px;border:1px solid var(--line);border-radius:22px;background:rgba(255,254,252,.82);backdrop-filter:blur(14px);box-shadow:0 12px 35px rgba(15,23,42,.08);overflow:hidden;max-height:calc(100vh - 44px)}
+.toc-head{padding:18px;border-bottom:1px solid var(--line)}.toc-head strong{font:700 22px/1.15 Georgia,serif;display:block}.toc-head small{color:var(--muted)}
+.toc nav{display:grid;gap:2px;padding:10px}.toc a{text-decoration:none;color:#4b5563;font-weight:850;font-size:12.8px;padding:9px 11px;border-radius:12px;display:flex;justify-content:space-between}.toc a.active,.toc a:hover{background:#e9e4ff;color:#5038d1}
+article{display:grid;gap:32px}.section{border:1px solid var(--line);border-radius:var(--radius);background:rgba(255,254,252,.92);box-shadow:0 12px 35px rgba(15,23,42,.075);overflow:hidden;scroll-margin-top:28px}.head{padding:30px 34px 23px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(255,255,255,.8),rgba(255,255,255,.45)),radial-gradient(circle at 100% 0%,rgba(109,74,255,.095),transparent 25rem)}
+.kicker{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12px;font-weight:950;letter-spacing:.13em;text-transform:uppercase}.tag{min-width:58px;height:42px;border-radius:11px;background:#e7e1ff;color:#5b3fe2;display:inline-grid;place-items:center;font:900 14px ui-monospace,SFMono-Regular,Menlo,monospace}
+.section h2{font-family:Georgia,serif;font-size:clamp(32px,4vw,50px);line-height:1.04;letter-spacing:0;margin:14px 0 8px}.sub{margin:0;color:var(--muted);font-size:19px;max-width:900px}.content{padding:30px 34px 36px}p{font-size:17px;margin:0 0 18px;color:#293142}h3{font-size:24px;letter-spacing:0;line-height:1.2;margin:31px 0 12px}h4{font-size:15px;text-transform:uppercase;letter-spacing:.1em;margin:0 0 8px;color:#374151}.mini{color:var(--muted);font-size:14px;line-height:1.58}
+.callout{border:1px solid var(--line);border-left:6px solid var(--violet);background:linear-gradient(135deg,#ece8ffaa,#ffffffdf);border-radius:16px;padding:18px 20px;margin:22px 0;font-weight:720;color:#1f2937}.callout.green{border-left-color:var(--green);background:linear-gradient(135deg,#d7f7eaaa,#fff)}.callout.amber{border-left-color:var(--amber);background:linear-gradient(135deg,#fff0cfdd,#fff)}.callout.red{border-left-color:var(--red);background:linear-gradient(135deg,#fee2e2dd,#fff)}.callout.blue{border-left-color:var(--cyan);background:linear-gradient(135deg,#dff8ffdd,#fff)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:22px 0}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0}.card{border:1px solid var(--line);background:#ffffffe8;border-radius:18px;padding:20px;box-shadow:0 8px 22px rgba(15,23,42,.04)}.card h3{margin-top:0}.card p:last-child{margin-bottom:0}
+.diagram{position:relative;margin:24px 0;padding:28px;border-radius:24px;overflow:hidden;background:var(--dark);color:#fff}.diagram>*{position:relative}
+.nodes{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.node{min-height:96px;border:1px solid rgba(147,197,253,.32);background:rgba(37,99,235,.14);border-radius:16px;display:grid;place-items:center;text-align:center;padding:16px}.node strong{font:900 16px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;color:#93c5fd}.node span{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#cbd5e199}.node.green{border-color:#34d39955;background:#10b98122}.node.green strong{color:#6ee7b7}.node.amber{border-color:#f59e0b66;background:#f59e0b22}.node.amber strong{color:#fcd34d}.node.purple{border-color:#8b5cf666;background:#8b5cf622}.node.purple strong{color:#c4b5fd}.node.red{border-color:#ef444466;background:#ef444422}.node.red strong{color:#fca5a5}
+.flow{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;align-items:center;margin:18px 0}.box{min-height:78px;border:1px solid rgba(147,197,253,.28);background:rgba(37,99,235,.13);border-radius:15px;display:grid;place-items:center;text-align:center;padding:11px;color:#bfdbfe;font:850 12px ui-monospace,SFMono-Regular,Menlo,monospace}.box.safe{border-color:#34d39955;background:#10b98122;color:#86efac}.box.hot{border-color:#f59e0b66;background:#f59e0b22;color:#fde68a}.box.danger{border-color:#ef444466;background:#ef444422;color:#fecaca}.arrow{text-align:center;color:#ffffff70;font-size:22px;font-weight:900}
+.stack{display:grid;gap:12px;margin:24px 0}.row{display:grid;grid-template-columns:205px 1fr;gap:14px}.label{border-radius:16px;background:#111827;color:white;font-weight:950;display:grid;place-items:center;text-align:center;padding:16px}.items{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:16px;padding:14px}.chip{border:1px solid var(--line);border-radius:999px;background:white;padding:8px 12px;font-size:13px;font-weight:850;color:#334155}.chip:before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--violet);margin-right:8px}.chip.green:before{background:var(--green)}.chip.amber:before{background:var(--amber)}.chip.blue:before{background:var(--cyan)}.chip.red:before{background:var(--red)}
+pre{position:relative;background:#0b1020;color:#dbeafe;border:1px solid rgba(148,163,184,.22);border-radius:18px;padding:18px;margin:20px 0;overflow:auto;box-shadow:0 10px 28px rgba(15,23,42,.1)}code{font:13px/1.72 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.copy{position:absolute;right:10px;top:10px;border:1px solid rgba(148,163,184,.34);background:rgba(255,255,255,.07);color:#cbd5e1;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:850;cursor:pointer}
+.tabs{margin:24px 0 0}.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}.tab{border:1px solid var(--line);background:white;border-radius:999px;padding:10px 14px;font-weight:950;cursor:pointer;color:#4b5563}.tab.active{background:#111827;color:white;border-color:#111827}.panel{display:none;border:1px solid var(--line);background:#ffffffe5;border-radius:18px;overflow:hidden}.panel.active{display:block}.steps{display:grid;counter-reset:s}.step{display:grid;grid-template-columns:54px 1fr;gap:16px;padding:18px;border-bottom:1px solid var(--line);counter-increment:s}.step:last-child{border-bottom:0}.step:before{content:counter(s,decimal-leading-zero);width:42px;height:42px;border-radius:14px;background:#e7e1ff;color:#563cd9;display:grid;place-items:center;font:950 14px ui-monospace,SFMono-Regular,Menlo,monospace}.step strong{display:block;margin-bottom:3px}.step span{display:block;color:var(--muted);font-size:14px;line-height:1.57}
+.compare{display:grid;grid-template-columns:180px 1fr 1fr;gap:8px;margin:24px 0}.ccell{border:1px solid var(--line);background:#fff;border-radius:13px;padding:13px;font-size:13px}.ccell.head{background:#111827;color:white;font-weight:950}.ccell.yes{background:#e9fbf3;color:#087753;font-weight:850}.ccell.no{background:#fff0f1;color:#a61b31}.ccell.maybe{background:#fff8e5;color:#955300}
+.secure-stage{position:relative;background:#090d1a;border-radius:24px;padding:28px;margin:24px 0;color:#fff;overflow:hidden}.secure-stage>*{position:relative}.origin-grid{display:grid;grid-template-columns:1fr 70px 1fr;gap:16px;align-items:stretch}.origin{border:1px solid #ffffff20;border-radius:20px;padding:19px;background:#ffffff08}.origin h4{color:#fff}.origin.merchant{border-color:#60a5fa55}.origin.psp{border-color:#a78bfa77;background:#6d4aff1f}.boundary{display:grid;place-items:center;color:#a78bfa;font:950 11px ui-monospace,monospace;text-align:center}.boundary:before{content:"";width:1px;height:100%;background:linear-gradient(transparent,#a78bfa,transparent);grid-area:1/1}.boundary span{grid-area:1/1;background:#090d1a;padding:8px 4px;writing-mode:vertical-rl;letter-spacing:.1em}
+.origin .field{border:1px solid #ffffff24;border-radius:12px;padding:11px 12px;margin-top:9px;color:#dbeafe;font:12px ui-monospace,monospace;background:#00000018}.origin .field.secret{border-color:#a78bfa66;background:#6d4aff28;color:#e9d5ff}.message{margin-top:13px;border-radius:12px;padding:11px;background:#10b98122;border:1px solid #34d39955;color:#a7f3d0;font:12px ui-monospace,monospace}
+.pathlab{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0}.pathcard{border:1px solid var(--line);border-radius:20px;background:#fff;overflow:hidden}.pathhead{padding:16px 18px;font-weight:950;border-bottom:1px solid var(--line)}.pathhead.bad{background:#fff0f1;color:#a61b31}.pathhead.good{background:#e9fbf3;color:#087753}.pathbody{padding:18px}.pathstep{display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line)}.pathstep:last-child{border-bottom:0}.ico{width:31px;height:31px;flex:0 0 31px;border-radius:10px;background:#f1edff;color:#5b3fe2;display:grid;place-items:center;font-weight:950}.pathstep b{display:block;font-size:14px}.pathstep span{display:block;font-size:12px;color:var(--muted);line-height:1.5}
+.vault{display:grid;grid-template-columns:1fr 74px 1.15fr 74px 1fr;gap:10px;align-items:center;margin:25px 0}.vaultbox{border:1px solid var(--line);background:#fff;border-radius:18px;padding:18px;text-align:center}.vaultbox strong{display:block;font-size:17px}.vaultbox span{font-size:12px;color:var(--muted)}.vaultbox.core{background:#111827;color:#fff;border-color:#111827}.vaultbox.core span{color:#a7b4c8}.varrow{text-align:center;font-size:25px;color:#7c3aed;font-weight:950}
+.envelope{display:grid;gap:12px;margin:24px 0}.layer{border-radius:18px;padding:17px 19px;border:1px solid var(--line);background:white;display:grid;grid-template-columns:155px 1fr;gap:18px;align-items:center}.layer strong{font:900 13px ui-monospace,monospace}.layer span{font-size:14px;color:var(--muted)}.layer.l1{border-left:7px solid var(--cyan)}.layer.l2{border-left:7px solid var(--violet)}.layer.l3{border-left:7px solid var(--amber)}
+.timeline{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin:24px 0}.titem{position:relative;border:1px solid var(--line);border-radius:15px;background:#fff;padding:14px 11px;text-align:center}.titem:after{content:"→";position:absolute;right:-12px;top:36%;z-index:3;color:#9ca3af;font-weight:950}.titem:last-child:after{display:none}.titem strong{display:block;font-size:12px}.titem span{display:block;font-size:10px;color:var(--muted);margin-top:5px}.titem.sensitive{background:#fff0f1;border-color:#fecaca}.titem.safe{background:#e9fbf3;border-color:#a7f3d0}
+.tablewrap{overflow:auto;margin:24px 0;border:1px solid var(--line);border-radius:18px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}th,td{padding:14px 15px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}th{background:#111827;color:white;font-weight:950}tr:last-child td{border-bottom:0}.pill{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.05em}.pill.no{background:#fee2e2;color:#991b1b}.pill.yes{background:#d1fae5;color:#065f46}.pill.limited{background:#fef3c7;color:#92400e}
+details{border:1px solid var(--line);border-radius:16px;background:#ffffffb8;margin:14px 0;overflow:hidden}summary{cursor:pointer;padding:16px 18px;font-weight:950}.details-body{padding:0 18px 18px;color:var(--muted)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}.metric{border:1px solid var(--line);background:white;border-radius:18px;padding:18px}.metric strong{display:block;font-size:23px;letter-spacing:0}.metric span{display:block;color:var(--muted);font-size:12px;margin-top:6px;line-height:1.45}
+.truths{display:grid;gap:12px;margin-top:22px;counter-reset:t}.truth{display:grid;grid-template-columns:54px 1fr;gap:14px;align-items:center;border:1px solid var(--line);border-radius:18px;background:white;padding:14px;counter-increment:t}.truth:before{content:counter(t);width:40px;height:40px;border-radius:14px;background:#111827;color:white;font:950 14px ui-monospace,monospace;display:grid;place-items:center}
+.footer{padding:44px 0 72px;color:var(--muted)}.refs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.refs a{display:block;text-decoration:none;color:#4f36d4;font-weight:850;font-size:13px;border:1px solid var(--line);border-radius:14px;background:#ffffffb8;padding:14px}.note{font-size:13px;color:#6b7280;border-top:1px solid var(--line);padding-top:18px;margin-top:22px}
+@media(max-width:1050px){.hero,.layout{grid-template-columns:1fr}.toc{position:static;max-height:none}.nodes,.grid4,.metrics{grid-template-columns:1fr 1fr}.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}.vault{grid-template-columns:1fr}.varrow{transform:rotate(90deg)}.timeline{grid-template-columns:1fr}.titem:after{content:"↓";right:auto;left:49%;top:auto;bottom:-18px}.origin-grid{grid-template-columns:1fr}.boundary{min-height:50px}.boundary:before{width:100%;height:1px}.boundary span{writing-mode:horizontal-tb}.compare{grid-template-columns:150px 1fr 1fr}}
+@media(max-width:700px){.shell{width:calc(100vw - 24px)}.hero{padding-top:44px}.head,.content{padding-left:20px;padding-right:20px}.quick,.grid2,.grid3,.grid4,.pathlab,.metrics,.refs{grid-template-columns:1fr}.row,.layer{grid-template-columns:1fr}.compare{grid-template-columns:1fr}.ccell.head:first-child{display:none}.ccell{border-radius:11px}.nodes{grid-template-columns:1fr}.tokenline{grid-template-columns:1fr}.tokenarrow{transform:rotate(90deg)}}
+@media print{.progress,.toc,.actions,.copy,.buttons{display:none}.layout,.hero{display:block}.section{break-inside:avoid;box-shadow:none}.dark-card,.diagram,.secure-stage,pre{print-color-adjust:exact;-webkit-print-color-adjust:exact}.panel{display:block;margin-bottom:12px}}
+
+.home-link{position:fixed;z-index:98;left:18px;bottom:18px;display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#111827;background:#fff;border:1px solid var(--line);border-radius:999px;padding:10px 14px;font-size:13px;font-weight:900;box-shadow:0 10px 30px rgba(15,23,42,.12)}@media(max-width:700px){.home-link{position:static;margin:12px 0 0 12px}}
+</style>
+</head>
+<body>
+<a class="home-link" href="../index.html">Back to articles</a><div class="progress" id="progress"></div>
+<header class="hero shell">
+<div>
+<span class="badge">Payment Systems / Card Security</span>
+<h1>How Stripe Like Payment Systems Keep Card Data Away From Your Servers</h1>
+<p class="lead">A beginner first visual guide to what happens after you type a card number, why HTTPS alone is not enough, how secure iframes isolate card fields, how tokenization replaces the card number, and what happens inside the payment provider's vault before the bank approves or declines the payment.</p>
+<div class="actions">
+<a class="btn primary" href="#payment-story">Start with one payment</a>
+<a class="btn" href="#iframe">Understand the iframe</a>
+<a class="btn" href="#full-flow">See the full flow</a>
+</div>
+</div>
+<div class="dark-card">
+<div class="browser">
+<div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="url">https://shop.example.com/checkout</div></div>
+<div class="checkout">
+<div class="fakeinput"><span>Email</span><span>customer@example.com</span></div>
+<div class="iframebox"><strong>Card number • Expiry • CVC</strong><span>Rendered inside a payment provider owned iframe</span></div>
+<div class="fakeinput"><span>Pay</span><span>₹4,999</span></div>
+</div>
+</div>
+<div class="tokenline">
+<div class="tiny"><strong>Raw card data</strong><span>goes PSP → PSP</span></div><div class="tokenarrow">→</div><div class="tiny"><strong>Payment method ID</strong><span>goes to merchant</span></div>
+</div>
+<div class="quick">
+<div class="tile"><strong>Isolation</strong><span>Cross origin hosted fields prevent ordinary merchant scripts from reading card field DOM.</span></div>
+<div class="tile"><strong>Tokenization</strong><span>The merchant receives a provider reference instead of the Primary Account Number.</span></div>
+<div class="tile"><strong>Vault</strong><span>A tightly controlled card data environment stores or resolves the underlying credential.</span></div>
+<div class="tile"><strong>Authorization</strong><span>The provider sends the payment credential through acquirer, network, and issuer systems.</span></div>
+</div>
+</div>
+</header>
+<main class="shell layout">
+<aside class="toc">
+<div class="toc-head"><strong>Article Map</strong><small>Begin with the customer experience, then move inward toward the vault and card network.</small></div>
+<nav>
+<a href="#payment-story">S01 <span>One payment</span></a>
+<a href="#problem">S02 <span>The real problem</span></a>
+<a href="#actors">S03 <span>People &amp; systems</span></a>
+<a href="#naive">S04 <span>The unsafe design</span></a>
+<a href="#iframe">S05 <span>Hosted fields</span></a>
+<a href="#token">S06 <span>Tokenization</span></a>
+<a href="#transit">S07 <span>TLS &amp; API edge</span></a>
+<a href="#vault">S08 <span>Vault &amp; HSM</span></a>
+<a href="#cvv">S09 <span>CVV &amp; plaintext</span></a>
+<a href="#network-token">S10 <span>Token types</span></a>
+<a href="#authorization">S11 <span>Bank authorization</span></a>
+<a href="#browser-threats">S12 <span>Browser threats</span></a>
+<a href="#inside">S13 <span>Inside the PSP</span></a>
+<a href="#correctness">S14 <span>Retries &amp; correctness</span></a>
+<a href="#full-flow">S15 <span>End to end model</span></a>
+</nav>
+</aside>
+<article>
+<section class="section" id="payment-story">
+<div class="head"><div class="kicker"><span class="tag">S01</span> Start from the customer</div><h2>What actually happens when you pay with a card?</h2><p class="sub">You see one form and one button. Behind that button is a carefully split system designed so that most of the merchant's application never sees the card number.</p></div>
+<div class="content">
+<p>Imagine you are buying headphones from <strong>shop.example.com</strong>. You type your card number, expiry date, and CVC, then press <strong>Pay ₹4,999</strong>. The page looks like one website, but the payment fields may not belong to the merchant at all.</p>
+<div class="timeline">
+<div class="titem sensitive"><strong>1. Type card</strong><span>inside a PSP hosted field</span></div>
+<div class="titem sensitive"><strong>2. Send securely</strong><span>directly to the PSP</span></div>
+<div class="titem safe"><strong>3. Create reference</strong><span>token / payment method ID</span></div>
+<div class="titem safe"><strong>4. Merchant pays</strong><span>amount + reference</span></div>
+<div class="titem sensitive"><strong>5. PSP resolves</strong><span>inside its card data boundary</span></div>
+<div class="titem sensitive"><strong>6. Bank authorizes</strong><span>approve / decline</span></div>
+<div class="titem safe"><strong>7. Status returns</strong><span>merchant sees result, not PAN</span></div>
+</div>
+<p>The merchant still knows important business data: the order, amount, customer, payment status, card brand, and often the final four digits for display. But the full card number, called the <strong>Primary Account Number (PAN)</strong>, does not need to enter the merchant backend.</p>
+<div class="callout">The core sentence: the card is entered into a payment provider controlled browser component, sent directly to the provider, replaced with a provider side reference, and only that reference is used by the merchant's normal application.</div>
+<h3>One important honesty note</h3>
+<p>Payment providers do not publish every internal detail of their production vaults. This article is therefore <strong>not a claim about Stripe's private implementation</strong>. It is an industry architecture model built from public integration behavior, PCI guidance, browser security rules, tokenization standards, and common high assurance system design.</p>
+</div>
+</section>
+<section class="section" id="problem">
+<div class="head"><div class="kicker"><span class="tag">S02</span> The problem we are solving</div><h2>“Encrypt it with HTTPS” is necessary, but it is not the whole solution.</h2><p class="sub">HTTPS protects data on the wire. It does not stop your own frontend, backend, logs, queues, support tools, or compromised scripts from seeing data that your application collected.</p></div>
+<div class="content">
+<p>Suppose the merchant builds ordinary HTML fields and submits the card number to its own backend. The browser may use HTTPS, so a person sniffing Wi Fi traffic cannot read the request. But the merchant now possesses the PAN and CVC.</p>
+<div class="grid2">
+<div class="card"><h3>HTTPS solves</h3><p>Protection against passive network eavesdropping and tampering while the browser talks to the intended server.</p><div class="items"><span class="chip green">confidentiality in transit</span><span class="chip green">server authentication</span><span class="chip green">integrity in transit</span></div></div>
+<div class="card"><h3>HTTPS does not solve</h3><p>Exposure after the application receives the data, accidental logging, malware inside the page, broad employee access, unsafe backups, or a compromised backend.</p><div class="items"><span class="chip red">application exposure</span><span class="chip red">logs and traces</span><span class="chip red">database breach</span></div></div>
+</div>
+<div class="callout red">If raw card data reaches your server, every system that can receive, process, persist, debug, replay, back up, or observe that request can become part of the card data security problem.</div>
+<h3>The design constraints</h3>
+<div class="stack">
+<div class="row"><div class="label">Minimize exposure</div><div class="items"><span class="chip">PAN should bypass merchant servers</span><span class="chip green">CVC must not be retained after authorization</span><span class="chip blue">logs must not become card databases</span></div></div>
+<div class="row"><div class="label">Preserve usability</div><div class="items"><span class="chip">merchant controls checkout look and feel</span><span class="chip green">saved cards still work</span><span class="chip blue">retries do not double charge</span></div></div>
+<div class="row"><div class="label">Limit blast radius</div><div class="items"><span class="chip">only a small vault boundary handles PAN</span><span class="chip green">least privilege access</span><span class="chip blue">segmented services and keys</span></div></div>
+<div class="row"><div class="label">Meet standards</div><div class="items"><span class="chip">PCI DSS baseline</span><span class="chip green">script integrity and tamper controls</span><span class="chip blue">auditable operations</span></div></div>
+</div>
+<p>Reducing the number of systems that handle card data can materially reduce risk and compliance scope. It does not mean the merchant has zero PCI responsibility; exact eligibility depends on the integration and validation method.</p>
+</div>
+</section>
+<section class="section" id="actors">
+<div class="head"><div class="kicker"><span class="tag">S03</span> Vocabulary before architecture</div><h2>Meet the systems involved in one card payment.</h2><p class="sub">The words are more confusing than the flow. Once the actors are clear, the architecture becomes much easier to reason about.</p></div>
+<div class="content">
+<div class="grid3">
+<div class="card"><h4>Customer / Cardholder</h4><p class="mini">The person entering the card and authorizing the purchase.</p></div>
+<div class="card"><h4>Merchant</h4><p class="mini">The business selling the product. It owns the checkout page and order system.</p></div>
+<div class="card"><h4>PSP / Gateway</h4><p class="mini">A provider such as Stripe like infrastructure that exposes APIs, captures payment details, and orchestrates payment processing.</p></div>
+<div class="card"><h4>Acquirer / Processor</h4><p class="mini">The merchant side financial institution or processing layer that connects transactions toward card networks.</p></div>
+<div class="card"><h4>Card Network</h4><p class="mini">A scheme such as Visa or Mastercard that routes messages and applies network rules.</p></div>
+<div class="card"><h4>Issuer</h4><p class="mini">The bank that issued the customer's card and ultimately approves or declines the authorization.</p></div>
+</div>
+<h3>Card data vocabulary</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Term</th><th>Meaning</th><th>Example / note</th></tr></thead>
+<tbody>
+<tr><td><strong>PAN</strong></td><td>Primary Account Number, the full card number.</td><td>Usually 12 to 19 digits, depending on the scheme.</td></tr>
+<tr><td><strong>Expiry</strong></td><td>Card expiration month and year.</td><td>Part of the payment credential; often returned as display metadata.</td></tr>
+<tr><td><strong>CVC / CVV / CID</strong></td><td>Card verification code used to help verify possession of the card details.</td><td>Terminology varies by network. It must not be stored after authorization.</td></tr>
+<tr><td><strong>Token</strong></td><td>A substitute or reference used instead of the PAN.</td><td>Can mean a PSP vault reference or a scheme issued network token.</td></tr>
+<tr><td><strong>Payment Method ID</strong></td><td>A provider side object reference representing a reusable or one time payment method.</td><td>Exact name and behavior differ by provider.</td></tr>
+<tr><td><strong>Card Data Vault</strong></td><td>The tightly controlled environment that stores or resolves sensitive card credentials.</td><td>Often called a vault or token vault; exact internal architecture is provider specific.</td></tr>
+</tbody>
+</table></div>
+<div class="callout blue">A PSP can combine several roles. The conceptual actors remain useful even when one company performs gateway, processor, acquiring, fraud, and vault functions behind one API.</div>
+</div>
+</section>
+<section class="section" id="naive">
+<div class="head"><div class="kicker"><span class="tag">S04</span> First see the bad design</div><h2>The naïve checkout sends the PAN through the merchant's entire stack.</h2><p class="sub">It is simple to code, but it dramatically expands where sensitive data can leak and what infrastructure must be protected and assessed.</p></div>
+<div class="content">
+<pre><button class="copy">copy</button><code>&lt;! Merchant owned input fields &gt;
+&lt;input id="card number" /&gt;
+&lt;input id="expiry" /&gt;
+&lt;input id="cvc" /&gt;
+
+&lt;script&gt;
+ // Raw card data enters merchant JavaScript memory
+ const payload = {
+ cardNumber: document.querySelector('#card number').value,
+ expiry: document.querySelector('#expiry').value,
+ cvc: document.querySelector('#cvc').value
+ };
+
+ // Raw card data enters the merchant API
+ await fetch('/api/pay', {
+ method: 'POST',
+ body: JSON.stringify(payload)
+ });
+&lt;/script&gt;</code></pre>
+<div class="pathlab">
+<div class="pathcard"><div class="pathhead bad">Naïve path: raw card everywhere</div><div class="pathbody">
+<div class="pathstep"><div class="ico">1</div><div><b>Merchant DOM</b><span>Any same origin script with access to the field can read the value.</span></div></div>
+<div class="pathstep"><div class="ico">2</div><div><b>Merchant JavaScript memory</b><span>Analytics, error reporting, debugging, and compromised dependencies become relevant.</span></div></div>
+<div class="pathstep"><div class="ico">3</div><div><b>Merchant API</b><span>Request filters, gateways, WAFs, access logs, traces, and application code see the payload.</span></div></div>
+<div class="pathstep"><div class="ico">4</div><div><b>Merchant data systems</b><span>Databases, queues, backups, replay tools, and support systems can accidentally retain it.</span></div></div>
+</div></div>
+<div class="pathcard"><div class="pathhead good">Secure pattern: raw card bypasses merchant</div><div class="pathbody">
+<div class="pathstep"><div class="ico">1</div><div><b>PSP hosted field</b><span>The sensitive input is rendered from a different origin.</span></div></div>
+<div class="pathstep"><div class="ico">2</div><div><b>Direct PSP request</b><span>The iframe sends card data over an encrypted connection to the provider.</span></div></div>
+<div class="pathstep"><div class="ico">3</div><div><b>Provider reference</b><span>The browser receives a token or payment method identifier.</span></div></div>
+<div class="pathstep"><div class="ico">4</div><div><b>Merchant API</b><span>Order amount and provider reference flow through normal merchant services.</span></div></div>
+</div></div>
+</div>
+<div class="callout">The goal is not merely “encrypt the PAN in the merchant database.” The stronger goal is: <strong>do not let ordinary merchant systems receive the PAN in the first place.</strong></div>
+</div>
+</section>
+<section class="section" id="iframe">
+<div class="head"><div class="kicker"><span class="tag">S05</span> Browser isolation</div><h2>The card field looks embedded, but it belongs to another origin.</h2><p class="sub">Hosted fields use one or more cross origin iframes so the browser, not a promise in application code, enforces a boundary between merchant scripts and payment field DOM.</p></div>
+<div class="content">
+<p>The merchant loads the PSP's JavaScript SDK and asks it to mount a payment component. The SDK inserts an <code>&lt;iframe&gt;</code> whose document is served from a PSP controlled origin. The customer sees a seamless card form, but the sensitive input nodes live in a separate document.</p>
+<div class="secure-stage">
+<div class="origin-grid">
+<div class="origin merchant"><h4>Merchant origin</h4><p class="mini" style="color:#a7b4c8">https://shop.example.com</p><div class="field">Email: customer@example.com</div><div class="field">Order total: ₹4,999</div><div class="field">Container: &lt;div id="payment field"&gt;</div></div><div class="message">Receives: complete=true, brand=visa, error=null</div></div>
+<div class="boundary"><span>SAME ORIGIN BOUNDARY</span></div>
+<div class="origin psp"><h4>PSP origin</h4><p class="mini" style="color:#c4b5fd">https://secure.psp.example</p><div class="field secret">PAN: 4111 1111 1111 1111</div><div class="field secret">Expiry: 12 / 30</div><div class="field secret">CVC: •••</div><div class="message">Sends card data directly to PSP tokenization endpoint</div></div>
+</div>
+</div>
+<h3>Why the merchant cannot simply read the card field</h3>
+<p>The browser's <strong>Same Origin Policy</strong> restricts scripts from one origin from reading or manipulating the DOM of a document from another origin. The merchant can position and style the outer container, but it gets very limited access to the iframe's internal document.</p>
+<div class="compare">
+<div class="ccell head">Action</div><div class="ccell head">Merchant page</div><div class="ccell head">PSP iframe</div>
+<div class="ccell">Show checkout total</div><div class="ccell yes">Yes</div><div class="ccell">Not needed</div>
+<div class="ccell">Read card input DOM</div><div class="ccell no">Blocked by cross origin boundary</div><div class="ccell yes">Yes, inside its own origin</div>
+<div class="ccell">Know whether fields are complete</div><div class="ccell maybe">Yes, through a safe status message</div><div class="ccell yes">Sends validation state</div>
+<div class="ccell">Receive full PAN</div><div class="ccell no">Should not</div><div class="ccell yes">Yes, within the provider boundary</div>
+</div>
+<h3>How does the iframe communicate without revealing the PAN?</h3>
+<p>Cross origin windows can use <code>window.postMessage()</code> for controlled communication. The iframe can report non sensitive state such as “complete,” “invalid expiry,” or “card brand detected.” The parent page should validate the sender origin exactly, validate message shape, and use an explicit target origin when sending messages.</p>
+<pre><button class="copy">copy</button><code>// Conceptual parent page listener
+window.addEventListener('message', (event) =&gt; {
+ if (event.origin !== 'https://secure.psp.example') return;
+
+ const message = validatePaymentFieldMessage(event.data);
+ payButton.disabled = !message.complete;
+});
+
+// Avoid loose checks such as:
+// event.origin.endsWith('psp.example')
+// because lookalike domains can defeat naive string matching.</code></pre>
+<div class="callout amber">The iframe is a powerful containment boundary, not a magic shield. A malicious merchant page script could still place a fake field over the real iframe, replace the container, or trick the customer. That is why payment page script integrity and tamper detection also matter.</div>
+
+</section>
+<section class="section" id="token">
+<div class="head"><div class="kicker"><span class="tag">S06</span> Replace the credential</div><h2>Tokenization turns “use this card” into “use this provider side reference.”</h2><p class="sub">The merchant receives an opaque identifier that can be sent to the payment provider, stored with a customer, and used in later payment flows without storing the PAN itself.</p></div>
+<div class="content">
+<p>After the hosted field validates the card details, the provider creates a token, payment method object, or equivalent reference. The exact object name differs by provider and API generation. Conceptually, the result looks like this:</p>
+<pre><button class="copy">copy</button><code>{
+ "payment_method_id": "pm_7Hk9...",
+ "card": {
+ "brand": "visa",
+ "last4": "4242",
+ "exp_month": 12,
+ "exp_year": 2030
+ }
+}
+
+// Full PAN: not returned to merchant code
+// CVC: not returned and not stored for future use</code></pre>
+<h3>What the merchant sends to its backend</h3>
+<pre><button class="copy">copy</button><code>POST /api/orders/checkout
+{
+ "order_id": "ord_1042",
+ "amount": 499900,
+ "currency": "INR",
+ "payment_method_id": "pm_7Hk9..."
+}</code></pre>
+<p>The merchant backend now uses its <strong>secret server side credential</strong> to call the PSP. The browser should use only provider approved public or publishable configuration. A secret API key must never be embedded in frontend JavaScript.</p>
+<div class="diagram"><div class="flow">
+<div class="box danger">PAN + CVC<br/>inside hosted field</div><div class="arrow">→</div><div class="box hot">PSP tokenization<br/>endpoint</div><div class="arrow">→</div><div class="box safe">pm_7Hk9...<br/>provider reference</div><div class="arrow">→</div><div class="box safe">merchant API<br/>order + reference</div><div class="arrow">→</div><div class="box safe">normal business<br/>services</div>
+</div></div>
+<div class="grid3">
+<div class="card"><h4>What a token helps with</h4><p class="mini">Reduces PAN exposure, supports saved payment experiences, and lets most systems use a non PAN identifier.</p></div>
+<div class="card"><h4>What a token is not</h4><p class="mini">It is not automatically harmless. A usable token plus compromised API credentials may still authorize charges, so access control remains essential.</p></div>
+<div class="card"><h4>What remains merchant data</h4><p class="mini">Order IDs, customer IDs, amount, currency, status, provider IDs, brand, and masked display information.</p></div>
+</div>
+<div class="callout green">The merchant stores the pointer, not the secret behind the pointer. The provider's authorization layer decides which account, merchant, API credential, and operation may use that pointer.</div>
+</div>
+</section>
+<section class="section" id="transit">
+<div class="head"><div class="kicker"><span class="tag">S07</span> Protect the path</div><h2>TLS protects the sensitive request while it travels to the provider.</h2><p class="sub">Isolation decides who receives the data. TLS protects the network path between the browser and that receiver. Both layers are required.</p></div>
+<div class="content">
+<div class="diagram"><div class="nodes">
+<div class="node purple"><strong>PSP iframe</strong><span>owns the sensitive DOM</span></div>
+<div class="node green"><strong>TLS channel</strong><span>confidentiality + integrity</span></div>
+<div class="node"><strong>PSP edge</strong><span>routing + filtering</span></div>
+<div class="node amber"><strong>Card data zone</strong><span>tokenize / authorize</span></div>
+</div></div>
+<p>Modern payment integrations use HTTPS with strong TLS configurations. In practice, providers commonly enforce TLS 1.2 or 1.3, strong cipher suites, valid certificates, and downgrade resistance. HSTS can tell browsers to use HTTPS for future connections to a domain.</p>
+<h3>What happens at the provider edge?</h3>
+<p>The request reaches load balancers, edge proxies, or API gateways. Those components may authenticate the integration, apply rate limits, enforce request size and schema rules, detect abuse, and route sensitive endpoints into a restricted card data environment.</p>
+<div class="grid2">
+<div class="card"><h3>Public / publishable browser identity</h3><p>Identifies the provider account or integration in client side flows. It is designed to be exposed, but it must not grant unrestricted server operations.</p></div>
+<div class="card"><h3>Secret server credential</h3><p>Used from the merchant backend. It must be stored in a secret manager or protected runtime configuration, scoped where possible, rotated, and never logged or shipped to the browser.</p></div>
+</div>
+<div class="callout blue">A gateway should not casually log raw request bodies from card endpoints. “We can redact later” is weaker than ensuring sensitive payloads never enter general purpose logging pipelines.</div>
+</div>
+</section>
+<section class="section" id="vault">
+<div class="head"><div class="kicker"><span class="tag">S08</span> The sensitive core</div><h2>The card vault concentrates sensitive work into a small, hardened boundary.</h2><p class="sub">Instead of making every payment microservice capable of handling PANs, the provider restricts detokenization and key operations to a dedicated card data environment.</p></div>
+<div class="content">
+<p>A common high level design uses a <strong>token vault</strong>: a database maps an opaque token to encrypted card data, while cryptographic keys are managed separately. The exact topology varies, but the security idea is stable: separate data, keys, privileges, and network paths.</p>
+<div class="vault">
+<div class="vaultbox"><strong>Token</strong><span>pm_7Hk9...</span></div><div class="varrow">→</div><div class="vaultbox core"><strong>Vault service</strong><span>authorization, mapping, audit, policy</span></div><div class="varrow">↔</div><div class="vaultbox"><strong>Encrypted PAN record</strong><span>ciphertext + metadata</span></div>
+</div>
+<h3>Envelope encryption: keys protect other keys</h3>
+<div class="envelope">
+<div class="layer l1"><strong>Encrypted card record</strong><span>The PAN is encrypted with a data encryption key (DEK), usually using an approved authenticated encryption construction.</span></div>
+<div class="layer l2"><strong>Wrapped DEK</strong><span>The DEK is itself encrypted, or “wrapped”, under a key encryption key (KEK). This makes per tenant or per record key rotation and access control more manageable.</span></div>
+<div class="layer l3"><strong>HSM / key boundary</strong><span>Root key material and sensitive cryptographic operations are protected by a hardened cryptographic module. FIPS 140 3 is one widely used validation standard for cryptographic modules.</span></div>
+</div>
+<div class="grid3">
+<div class="card"><h4>Network segmentation</h4><p class="mini">Only approved paths can reach sensitive services. Ordinary analytics, billing, support, and webhook services should not have detokenization access.</p></div>
+<div class="card"><h4>Strong identity</h4><p class="mini">Human and workload access uses strong authentication, least privilege, short lived credentials, approval controls, and auditable actions.</p></div>
+<div class="card"><h4>Key separation</h4><p class="mini">Encrypted card records alone should not be enough. Key systems are separately controlled, monitored, rotated, and protected.</p></div>
+</div>
+<h3>Why use an HSM?</h3>
+<p>A Hardware Security Module is a cryptographic module designed to protect keys and perform sensitive operations inside a controlled boundary. It can enforce roles, authentication, non exportability, audit behavior, and tamper response properties. “Using an HSM” is not a substitute for sound architecture, but it meaningfully raises the difficulty of extracting root key material.</p>
+<div class="callout amber">Do not assume that every provider uses exactly “one HSM, one vault database, and AES 256 in this exact sequence.” Those are common architectural patterns, not public proof of any particular provider's private implementation.</div>
+</div>
+</section>
+<section class="section" id="cvv">
+<div class="head"><div class="kicker"><span class="tag">S09</span> The strictest data rule</div><h2>The CVC is collected for a transaction, then it must not be retained after authorization.</h2><p class="sub">A saved card is represented by a token or payment method reference. The original CVC is not kept so that future transactions can silently replay it.</p></div>
+<div class="content">
+<div class="grid2">
+<div class="card"><h3>PAN</h3><p>The full card number may be retained only within an appropriately protected card data environment, typically encrypted or replaced with a token outside that environment.</p></div>
+<div class="card"><h3>CVC / CVV</h3><p>PCI rules prohibit retaining the card verification code after transaction authorization, even if someone proposes encrypting it for later use.</p></div>
+</div>
+<h3>But doesn't the provider eventually need the actual card number?</h3>
+<p>Often, yes. If the provider is authorizing with the underlying PAN, a tightly restricted component must resolve the token and make the payment credential available long enough to construct the outbound authorization message. A network token flow may use a scheme issued token and cryptogram instead.</p>
+<div class="timeline">
+<div class="titem safe"><strong>Token arrives</strong><span>ordinary reference</span></div>
+<div class="titem safe"><strong>Policy check</strong><span>merchant + operation</span></div>
+<div class="titem sensitive"><strong>Resolve credential</strong><span>inside sensitive boundary</span></div>
+<div class="titem sensitive"><strong>Build auth message</strong><span>PAN or network token</span></div>
+<div class="titem sensitive"><strong>Send to processor</strong><span>protected financial link</span></div>
+<div class="titem safe"><strong>Discard CVC</strong><span>no post auth storage</span></div>
+<div class="titem safe"><strong>Return status</strong><span>approved / declined</span></div>
+</div>
+<h3>Transient plaintext is a real engineering problem</h3>
+<p>Encryption at rest does not mean plaintext never exists. A system that must send a PAN to a downstream network may briefly hold it in process memory. High assurance designs minimize that window, minimize copies, isolate the process, avoid core dumps, avoid swapping where appropriate, use carefully designed secret buffer abstractions, and keep observability away from sensitive values.</p>
+<div class="callout red">Do not rely on “the garbage collector will erase it immediately.” Garbage collected runtimes make deterministic memory erasure difficult. The stronger controls are isolation, short lifetime, minimal copying, safe data types, restricted debugging, and preventing sensitive values from entering general purpose memory paths.</div>
+</div>
+</section>
+<section class="section" id="network-token">
+<div class="head"><div class="kicker"><span class="tag">S10</span> Not all tokens are the same</div><h2>A PSP vault token and a network token solve related but different problems.</h2><p class="sub">Both replace a PAN in parts of the payment flow. Their issuer, scope, lifecycle, and transaction behavior are different.</p></div>
+<div class="content">
+<div class="tablewrap"><table>
+<thead><tr><th>Property</th><th>PSP / gateway token</th><th>Network token</th></tr></thead>
+<tbody>
+<tr><td><strong>Who issues it?</strong></td><td>The payment provider or its vault platform.</td><td>A card network token service under EMV payment tokenization standards.</td></tr>
+<tr><td><strong>What does it reference?</strong></td><td>A credential stored or managed inside the provider's environment.</td><td>A scheme recognized payment token associated with an underlying account credential.</td></tr>
+<tr><td><strong>Where is it useful?</strong></td><td>Usually within that provider, account, or integration context.</td><td>Within approved token domains and supported network/acquirer flows.</td></tr>
+<tr><td><strong>Extra transaction proof</strong></td><td>Provider authorization and API controls govern use.</td><td>Many use cases add token cryptograms and domain restrictions to reduce replay outside the intended context.</td></tr>
+<tr><td><strong>Lifecycle</strong></td><td>The PSP manages updates, replacement, and mapping.</td><td>Network lifecycle services can update token relationships when underlying card credentials change.</td></tr>
+</tbody>
+</table></div>
+<h3>Network token domain controls</h3>
+<p>EMV payment tokenization supports restrictions that bind a token to an intended use context, for example, a device, merchant, or presentment mode. A transaction cryptogram can provide fresh proof for a specific transaction. These controls make a stolen token less useful outside its authorized domain.</p>
+<div class="diagram"><div class="nodes">
+<div class="node"><strong>Underlying PAN</strong><span>issuer account credential</span></div>
+<div class="node purple"><strong>Network token</strong><span>scheme issued substitute</span></div>
+<div class="node green"><strong>Domain controls</strong><span>device / merchant / channel</span></div>
+<div class="node amber"><strong>Cryptogram</strong><span>transaction specific proof</span></div>
+</div></div>
+<div class="callout blue">A network token is not simply “a random ID stored in Stripe's database.” It participates in a card network defined token ecosystem. A provider side token is generally a provider controlled reference into its own payment method system.</div>
+</div>
+</section>
+<section class="section" id="authorization">
+<div class="head"><div class="kicker"><span class="tag">S11</span> Leaving the vault</div><h2>The payment credential travels through financial rails to the issuing bank.</h2><p class="sub">The merchant speaks a modern API. Behind the provider, connectors translate that request into the formats and rules expected by acquirers, networks, and issuers.</p></div>
+<div class="content">
+<div class="diagram"><div class="flow">
+<div class="box safe">Merchant<br/>Payment API</div><div class="arrow">→</div><div class="box hot">PSP<br/>Orchestrator</div><div class="arrow">→</div><div class="box danger">Vault / Network<br/>Credential</div><div class="arrow">→</div><div class="box hot">Acquirer /<br/>Processor</div><div class="arrow">→</div><div class="box">Card Network</div>
+</div><div class="flow">
+<div class="box">Issuer Bank</div><div class="arrow">→</div><div class="box safe">Approve / Decline</div><div class="arrow">→</div><div class="box safe">PSP state</div><div class="arrow">→</div><div class="box safe">Merchant status</div><div class="arrow">→</div><div class="box safe">Customer result</div>
+</div></div>
+<h3>What the issuer evaluates</h3>
+<div class="grid4">
+<div class="card"><h4>Account status</h4><p class="mini">Is the card active, blocked, expired, or replaced?</p></div>
+<div class="card"><h4>Funds / credit</h4><p class="mini">Is enough available balance or credit present?</p></div>
+<div class="card"><h4>Risk signals</h4><p class="mini">Does the transaction look abnormal or fraudulent?</p></div>
+<div class="card"><h4>Authentication</h4><p class="mini">Did 3 D Secure or another cardholder authentication method provide supporting evidence?</p></div>
+</div>
+<h3>Where does ISO 8583 fit?</h3>
+<p>Many traditional payment network and processor connections use ISO 8583 or network specific dialects derived from similar concepts. A message includes a type indicator, field presence bitmap, and data elements such as account credential, amount, processing code, and response code. Exact formats differ by network, processor, geography, and modernized rail.</p>
+<pre><button class="copy">copy</button><code>Modern merchant request
+{
+ "amount": 499900,
+ "currency": "INR",
+ "payment_method": "pm_7Hk9..."
+}
+ |
+ v
+PSP routing + risk + credential resolution
+ |
+ v
+Processor / network specific authorization message
+ |
+ v
+Issuer response: approved, declined, or requires action</code></pre>
+<h3>3 D Secure is a separate layer</h3>
+<p>EMV 3 D Secure helps authenticate the cardholder in card not present payments. A low risk payment may complete through a frictionless flow; a higher risk payment can trigger a challenge such as an OTP, banking app approval, or biometric step. 3DS is not tokenization, it is an authentication protocol that can be invoked as part of the payment flow.</p>
+</div>
+</section>
+<section class="section" id="browser-threats">
+<div class="head"><div class="kicker"><span class="tag">S12</span> The browser is still hostile territory</div><h2>An iframe blocks direct DOM reading, but e skimming attacks can target the page around it.</h2><p class="sub">Modern payment security must protect not only backend databases but also the scripts, headers, frames, and rendered checkout page seen by the customer.</p></div>
+<div class="content">
+<p>A compromised analytics script, tag manager, chat widget, CDN dependency, or injected script may not be able to read the cross origin iframe's internal DOM. But it can still manipulate the merchant page.</p>
+<div class="grid3">
+<div class="card"><h4>Fake overlay</h4><p class="mini">An attacker places a pixel perfect fake card form over the legitimate hosted field and forwards the captured data elsewhere.</p></div>
+<div class="card"><h4>Script replacement</h4><p class="mini">A compromised dependency changes how the checkout is rendered or silently redirects the user to a malicious flow.</p></div>
+<div class="card"><h4>Page tampering</h4><p class="mini">Unauthorized changes alter security relevant headers, form actions, frames, event handlers, or submission behavior.</p></div>
+</div>
+<h3>Defense in depth on the payment page</h3>
+<div class="stack">
+<div class="row"><div class="label">Script governance</div><div class="items"><span class="chip">inventory every script</span><span class="chip green">authorize a business need</span><span class="chip blue">remove unused third parties</span></div></div>
+<div class="row"><div class="label">Content Security Policy</div><div class="items"><span class="chip">restrict script src</span><span class="chip green">restrict frame src</span><span class="chip blue">use nonces or hashes where appropriate</span></div></div>
+<div class="row"><div class="label">Integrity controls</div><div class="items"><span class="chip">Subresource Integrity where operationally suitable</span><span class="chip green">controlled releases</span><span class="chip blue">dependency monitoring</span></div></div>
+<div class="row"><div class="label">Change detection</div><div class="items"><span class="chip">detect unauthorized page changes</span><span class="chip green">monitor security impacting headers</span><span class="chip blue">alert and investigate</span></div></div>
+</div>
+<p>PCI DSS v4.x requirements 6.4.3 and 11.6.1 focus on payment page script authorization, integrity, inventory, and detection of unauthorized changes. The standard defines security outcomes; a particular implementation technique such as a <code>MutationObserver</code> may help, but it is not the only architecture.</p>
+<div class="callout red">Do not load every marketing and analytics script on the payment page by default. The smallest trusted script set is easier to inventory, protect, monitor, and reason about.</div>
+</div>
+</section>
+<section class="section" id="inside">
+<div class="head"><div class="kicker"><span class="tag">S13</span> Inside the payment provider</div><h2>Once inside, the rule becomes: no implicit trust and no accidental copies.</h2><p class="sub">A secure vault is weakened if decrypted data can leak into logs, traces, Kafka topics, support dashboards, crash dumps, or broad internal networks.</p></div>
+<div class="content">
+<div class="grid2">
+<div class="card"><h3>Service to service identity</h3><p>Mutual TLS can authenticate both sides of an internal connection. Workload identity systems and a service mesh can automate certificate issuance and rotation, while authorization policy decides what each service may call.</p></div>
+<div class="card"><h3>Application authorization</h3><p>mTLS answers “which workload is calling?” It does not by itself answer “may this workload de tokenize PANs?” Sensitive operations need explicit, narrow authorization and audit trails.</p></div>
+</div>
+<h3>Observability is a frequent leak path</h3>
+<pre><button class="copy">copy</button><code>// Dangerous
+logger.info("payment request = {}", requestBody);
+
+// Better
+logger.info(
+ "payment attempt orderId={} paymentMethodId={} amount={} status={}",
+ orderId,
+ paymentMethodId,
+ amount,
+ status
+);
+
+// Never depend on developers remembering every time.
+// Use structured allow lists, secret aware types, central redaction,
+// restricted debug access, and scanning as defense in depth.</code></pre>
+<div class="tablewrap"><table>
+<thead><tr><th>System</th><th>Should see full PAN?</th><th>What it should normally receive</th></tr></thead>
+<tbody>
+<tr><td>Merchant order service</td><td><span class="pill no">No</span></td><td>Order ID, amount, currency, PSP reference, payment state.</td></tr>
+<tr><td>Merchant analytics</td><td><span class="pill no">No</span></td><td>Aggregated payment outcomes, tokenized IDs, non sensitive metadata.</td></tr>
+<tr><td>Merchant support UI</td><td><span class="pill no">No</span></td><td>Brand, last four digits, expiry display, status, dispute information.</td></tr>
+<tr><td>PSP fraud service</td><td><span class="pill limited">Usually not needed</span></td><td>Tokenized identity, BIN/IIN derived attributes, device, behavior, velocity, network signals.</td></tr>
+<tr><td>PSP vault / connector</td><td><span class="pill yes">Restricted</span></td><td>Encrypted credential at rest; controlled plaintext or network token for authorization only.</td></tr>
+<tr><td>Logs / traces / Kafka</td><td><span class="pill no">No</span></td><td>Allow listed metadata with redaction and secret aware serialization.</td></tr>
+</tbody>
+</table></div>
+<h3>Useful DLP controls</h3>
+<p>Defense in depth scanners can detect PAN shaped digit sequences, apply Luhn validation, redact or quarantine suspicious telemetry, and alert security teams. They are a backup control, not permission to log raw requests. Encodings, formatting, false positives, and incomplete context make perfect detection impossible.</p>
+<div class="callout green">The best log redaction is architectural: sensitive values never reach the generic logger. Regex redaction is the safety net beneath that design, not the primary boundary.</div>
+</div>
+</section>
+<section class="section" id="correctness">
+<div class="head"><div class="kicker"><span class="tag">S14</span> Security is not enough</div><h2>A secure payment that charges twice is still a broken payment system.</h2><p class="sub">Idempotency, state machines, retries, reconciliation, and immutable audit records protect financial correctness when networks time out and clients retry.</p></div>
+<div class="content">
+<p>Suppose the PSP sent an authorization request, the issuer approved it, but the response was lost. The merchant sees a timeout. Should it retry? Without a stable payment intent and idempotency key, a retry can create a second charge.</p>
+<div class="tabs">
+<div class="buttons"><button class="tab active" data-tab="timeout">Timeout scenario</button><button class="tab" data-tab="idempotency">Idempotent retry</button><button class="tab" data-tab="state">State machine</button></div>
+<div class="panel active" data-panel="timeout"><div class="steps">
+<div class="step"><div><strong>Merchant sends payment request</strong><span>The request contains an order/payment intent and an idempotency key.</span></div></div>
+<div class="step"><div><strong>Issuer approves</strong><span>The financial operation may already have succeeded.</span></div></div>
+<div class="step"><div><strong>Response is lost</strong><span>The merchant cannot infer failure from a transport timeout.</span></div></div>
+<div class="step"><div><strong>Merchant retries safely</strong><span>The same idempotency key asks for the same logical operation rather than creating a new one.</span></div></div>
+</div></div>
+<div class="panel" data-panel="idempotency"><div class="steps">
+<div class="step"><div><strong>Persist the key with the operation</strong><span>Do not treat idempotency as only an ephemeral cache lookup if correctness requires durable recovery.</span></div></div>
+<div class="step"><div><strong>Bind key to request semantics</strong><span>The same key with a conflicting amount or operation should be rejected rather than silently reused.</span></div></div>
+<div class="step"><div><strong>Return the prior result</strong><span>A replay returns the stored outcome or the same in progress operation.</span></div></div>
+<div class="step"><div><strong>Reconcile unknown states</strong><span>When external status remains uncertain, query or reconcile instead of guessing.</span></div></div>
+</div></div>
+<div class="panel" data-panel="state"><div class="steps">
+<div class="step"><div><strong>Created</strong><span>Payment intent exists but has not reached the network.</span></div></div>
+<div class="step"><div><strong>Requires action / processing</strong><span>Authentication, asynchronous network work, or external confirmation is pending.</span></div></div>
+<div class="step"><div><strong>Succeeded or failed</strong><span>Terminal business outcome is known.</span></div></div>
+<div class="step"><div><strong>Reconciled</strong><span>Internal ledger and external processor records agree, including late or disputed outcomes.</span></div></div>
+</div></div>
+</div>
+<h3>Security boundary versus correctness boundary</h3>
+<div class="grid2">
+<div class="card"><h3>Card data security</h3><p>Hosted fields, tokenization, TLS, vault isolation, key management, no CVC retention, logging controls.</p></div>
+<div class="card"><h3>Financial integrity</h3><p>Idempotency, durable state, double entry ledgering, safe retries, reconciliation, webhooks, audit history.</p></div>
+</div>
+<div class="callout amber">These concerns interact but should not be mixed. A token prevents the merchant from handling the PAN; it does not by itself prevent duplicate charges. An idempotency key prevents duplicate operations; it does not protect card data.</div>
+</div>
+</section>
+<section class="section" id="full-flow">
+<div class="head"><div class="kicker"><span class="tag">S15</span> Put everything together</div><h2>The complete mental model, from keystroke to bank response.</h2><p class="sub">This is the end to end flow you should be able to explain in a system design interview or use to review a real payment integration.</p></div>
+<div class="content">
+<div class="tabs">
+<div class="buttons"><button class="tab active" data-tab="browserflow">1. Browser</button><button class="tab" data-tab="merchantflow">2. Merchant</button><button class="tab" data-tab="pspflow">3. PSP</button><button class="tab" data-tab="bankflow">4. Bank network</button></div>
+<div class="panel active" data-panel="browserflow"><div class="steps">
+<div class="step"><div><strong>Merchant page loads provider SDK</strong><span>The SDK mounts hosted payment fields from a provider controlled origin.</span></div></div>
+<div class="step"><div><strong>Customer types card details</strong><span>PAN, expiry, and CVC enter the PSP iframe DOM, not merchant owned input nodes.</span></div></div>
+<div class="step"><div><strong>Browser enforces origin separation</strong><span>Same Origin Policy prevents ordinary merchant scripts from reading the iframe document.</span></div></div>
+<div class="step"><div><strong>Iframe sends card data to PSP over TLS</strong><span>The sensitive request bypasses the merchant backend.</span></div></div>
+<div class="step"><div><strong>Provider returns a payment method reference</strong><span>The merchant receives a token/ID and limited display metadata, not the PAN or CVC.</span></div></div>
+</div></div>
+<div class="panel" data-panel="merchantflow"><div class="steps">
+<div class="step"><div><strong>Frontend submits order + provider reference</strong><span>The payload contains amount, currency, order ID, and payment method ID.</span></div></div>
+<div class="step"><div><strong>Backend validates order truth</strong><span>The server recalculates price and does not trust a client provided amount.</span></div></div>
+<div class="step"><div><strong>Backend calls PSP with secret credentials</strong><span>The request uses an idempotency key and a durable payment intent.</span></div></div>
+<div class="step"><div><strong>Merchant stores business state</strong><span>Order, provider IDs, status, brand/last4 for display, and audit metadata, never CVC.</span></div></div>
+</div></div>
+<div class="panel" data-panel="pspflow"><div class="steps">
+<div class="step"><div><strong>Authenticate, authorize, and rate limit</strong><span>Provider edge validates the account, operation, request, and abuse signals.</span></div></div>
+<div class="step"><div><strong>Run risk and authentication orchestration</strong><span>The PSP evaluates fraud signals and may invoke 3 D Secure.</span></div></div>
+<div class="step"><div><strong>Resolve the payment credential</strong><span>The vault maps the provider reference to encrypted PAN data or selects a network token.</span></div></div>
+<div class="step"><div><strong>Perform controlled cryptographic operations</strong><span>Keys are separated and protected; sensitive plaintext is minimized and contained.</span></div></div>
+<div class="step"><div><strong>Send authorization through a processor/acquirer connector</strong><span>Only restricted components handle the credential needed by the financial rail.</span></div></div>
+</div></div>
+<div class="panel" data-panel="bankflow"><div class="steps">
+<div class="step"><div><strong>Acquirer/processor routes toward the card network</strong><span>The connector uses the required network specific message format and rules.</span></div></div>
+<div class="step"><div><strong>Card network routes to issuer</strong><span>The network applies token, routing, and scheme rules.</span></div></div>
+<div class="step"><div><strong>Issuer approves, declines, or requests authentication</strong><span>The bank evaluates account status, funds, risk, and authentication evidence.</span></div></div>
+<div class="step"><div><strong>Response returns through the chain</strong><span>The PSP updates its payment state and sends a normalized result to the merchant.</span></div></div>
+<div class="step"><div><strong>Asynchronous events finish the story</strong><span>Webhooks, settlement, refunds, disputes, and reconciliation update later lifecycle states.</span></div></div>
+</div></div>
+</div>
+<h3>Who sees what?</h3>
+<div class="metrics">
+<div class="metric"><strong>Merchant UI</strong><span>order data, status, card brand/last4; not full PAN/CVC</span></div>
+<div class="metric"><strong>Merchant API</strong><span>provider reference, amount, order, state; not full PAN/CVC</span></div>
+<div class="metric"><strong>PSP vault</strong><span>restricted encrypted credential and controlled resolution capability</span></div>
+<div class="metric"><strong>Bank rail</strong><span>PAN or network token plus transaction and authentication data</span></div>
+</div>
+<h3>The final truths</h3>
+<div class="truths">
+<div class="truth">HTTPS protects data during transit; it does not keep data out of the application that collected it.</div>
+<div class="truth">Hosted fields place sensitive card inputs inside a PSP controlled cross origin iframe.</div>
+<div class="truth">The browser's Same Origin Policy prevents ordinary merchant scripts from reading the iframe DOM.</div>
+<div class="truth">The iframe sends PAN, expiry, and CVC directly to the provider over a protected connection.</div>
+<div class="truth">The merchant receives a token or payment method reference rather than the full PAN.</div>
+<div class="truth">A token reduces PAN exposure but still needs authorization, scoping, and secret key protection.</div>
+<div class="truth">The provider confines credential storage and resolution to a segmented card data environment.</div>
+<div class="truth">Envelope encryption separates encrypted records, data keys, and root key encryption controls.</div>
+<div class="truth">CVC must not be retained after authorization, even for future recurring payments.</div>
+<div class="truth">Some authorizations use the underlying PAN; others can use card network issued tokens and cryptograms.</div>
+<div class="truth">An iframe reduces direct DOM exposure but does not eliminate page overlay, supply chain, or e skimming threats.</div>
+<div class="truth">Sensitive values must be excluded from logs, traces, queues, crash dumps, analytics, and broad internal services.</div>
+<div class="truth">Idempotency and payment state machines protect financial correctness; they are separate from tokenization.</div>
+<div class="truth">The strongest architecture continuously minimizes who can see the credential, how long they can see it, and what they can do with it.</div>
+</div>
+<div class="callout green">One line holy grail: the merchant embeds a PSP controlled card field; the browser sends card data directly to the PSP; the PSP returns a constrained reference; only the provider's hardened card data boundary can resolve that reference for authorization; every other system uses tokens, masked metadata, and payment state.</div>
+<h3>Interview ready answer</h3>
+<pre><button class="copy">copy</button><code>We should avoid letting raw PAN or CVC touch merchant servers.
+The checkout loads the payment provider's SDK, which renders hosted
+card fields in a cross origin iframe. The browser's same origin policy
+prevents merchant JavaScript from reading the iframe DOM.
+
+The iframe sends card details directly to the PSP over TLS. The PSP
+returns a token or payment method ID. Our frontend sends only that ID,
+the order ID, and amount to our backend. The backend uses a secret,
+scoped API credential and an idempotency key to create or confirm the
+payment.
+
+Inside the PSP, only a segmented card data environment can resolve the
+token. Card data is encrypted at rest with separated key management,
+and sensitive key operations are protected by hardened cryptographic
+modules. CVC is not stored after authorization. The PSP then sends the
+PAN or a network token through the acquirer/card network to the issuer.
+
+The issuer approves or declines, the result returns to us, and our
+normal services store only payment state, provider IDs, and masked card
+metadata. We also protect the payment page against e skimming and make
+sure PAN never leaks into logs, traces, Kafka, analytics, or support tools.</code></pre>
+</div>
+</section>
+</article>
+</main>
+<footer class="footer shell">
+<h2>References used for accuracy</h2>
+<p>The article is a study guide based on the supplied research, public provider documentation, browser platform documentation, PCI SSC guidance, EMVCo standards material, and NIST cryptographic module guidance.</p>
+<div class="refs">
+<a href="https://docs.stripe.com/payments/elements" rel="noreferrer" target="_blank">Stripe Docs, Elements and client side tokenization</a>
+<a href="https://docs.stripe.com/payments/save-card-without-authentication" rel="noreferrer" target="_blank">Stripe Docs, Element iframe sends payment information over HTTPS</a>
+<a href="https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy" rel="noreferrer" target="_blank">MDN, Same Origin Policy</a>
+<a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage" rel="noreferrer" target="_blank">MDN, window.postMessage()</a>
+<a href="https://www.pcisecuritystandards.org/standards/pci-dss/" rel="noreferrer" target="_blank">PCI SSC, PCI Data Security Standard</a>
+<a href="https://blog.pcisecuritystandards.org/new-information-supplement-payment-page-security-and-preventing-e-skimming" rel="noreferrer" target="_blank">PCI SSC, Payment page security and e skimming</a>
+<a href="https://www.pcisecuritystandards.org/faqs/1574/" rel="noreferrer" target="_blank">PCI SSC FAQ, Card verification codes cannot be retained after authorization</a>
+<a href="https://www.pcisecuritystandards.org/documents/Tokenization_Product_Security_Guidelines.pdf" rel="noreferrer" target="_blank">PCI SSC, Tokenization Product Security Guidelines</a>
+<a href="https://www.emvco.com/emv-technologies/payment-tokenisation/" rel="noreferrer" target="_blank">EMVCo, EMV Payment Tokenisation</a>
+<a href="https://www.emvco.com/emv-technologies/3-d-secure/" rel="noreferrer" target="_blank">EMVCo, EMV 3 D Secure</a>
+<a href="https://csrc.nist.gov/pubs/fips/140-3/final" rel="noreferrer" target="_blank">NIST, FIPS 140 3 Security Requirements for Cryptographic Modules</a>
+<a href="https://docs.stripe.com/api/idempotent_requests" rel="noreferrer" target="_blank">Stripe API Docs, Idempotent requests</a>
+</div>
+<p class="note"><strong>Scope note:</strong> PCI eligibility and scope depend on the exact integration, payment channels, systems, and assessor/acquirer requirements. Hosted fields and tokenization can reduce exposure and scope; they do not remove the merchant's responsibility to secure its checkout page and connected environment.</p>
+</footer>
+<script>
+const progress=document.getElementById('progress');
+function updateProgress(){const d=document.documentElement;const total=d.scrollHeight-d.clientHeight;progress.style.transform=`scaleX(${total?d.scrollTop/total:0})`}
+document.addEventListener('scroll',updateProgress,{passive:true});updateProgress();
+
+const links=[...document.querySelectorAll('.toc a')];
+const sections=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(!e.isIntersecting)return;links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id))})},{rootMargin:'-18% 0px -72% 0px',threshold:.01});
+sections.forEach(s=>observer.observe(s));
+
+document.querySelectorAll('.copy').forEach(btn=>btn.addEventListener('click',async()=>{const code=btn.parentElement.querySelector('code')?.innerText||'';try{await navigator.clipboard.writeText(code);const old=btn.textContent;btn.textContent='copied';setTimeout(()=>btn.textContent=old,1000)}catch(e){btn.textContent='select'}}));
+
+document.querySelectorAll('.tabs').forEach(group=>{const buttons=[...group.querySelectorAll('.tab')];const panels=[...group.querySelectorAll('.panel')];buttons.forEach(button=>button.addEventListener('click',()=>{const tab=button.dataset.tab;buttons.forEach(b=>b.classList.toggle('active',b===button));panels.forEach(p=>p.classList.toggle('active',p.dataset.panel===tab))}))});
+</script>
+</body>
+</html>
