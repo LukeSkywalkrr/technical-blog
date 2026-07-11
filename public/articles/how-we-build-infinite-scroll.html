@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How We Build Infinite Scroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,900&family=Spline+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0d1b24;          /* deep slate-teal paper */
+    --ink-2:#122530;        /* raised panel */
+    --ink-3:#183341;        /* card / code well */
+    --paper:#f3ede1;        /* warm off-white text */
+    --paper-dim:#a9b4b8;    /* muted text */
+    --paper-faint:#66757c;  /* faintest text / rules */
+    --signal:#ffb347;       /* amber signal accent */
+    --signal-deep:#e8863a;  /* darker amber */
+    --pulse:#5ad1c4;        /* teal counter-accent */
+    --danger:#ff7a6b;       /* problem / red */
+    --rule:rgba(243,237,225,.12);
+    --maxw:720px;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--paper);
+    font-family:'Spline Sans',system-ui,sans-serif;
+    font-size:19px;
+    line-height:1.75;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* ambient grain / signal glow at top */
+  body::before{
+    content:"";
+    position:fixed;inset:0;
+    background:
+      radial-gradient(1200px 500px at 70% -10%, rgba(255,179,71,.10), transparent 60%),
+      radial-gradient(900px 500px at 10% 5%, rgba(90,209,196,.06), transparent 60%);
+    pointer-events:none;z-index:0;
+  }
+
+  /* the reading-progress "scroll" bar — the page is itself an infinite scroll */
+  .progress-track{
+    position:fixed;top:0;left:0;right:0;height:3px;
+    background:transparent;z-index:50;
+  }
+  .progress-fill{
+    height:100%;width:0%;
+    background:linear-gradient(90deg,var(--pulse),var(--signal));
+    box-shadow:0 0 12px rgba(255,179,71,.5);
+    transition:width .1s linear;
+  }
+
+  main{position:relative;z-index:1}
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+  /* ---------- HERO ---------- */
+  header.hero{
+    max-width:var(--maxw);margin:0 auto;
+    padding:120px 24px 60px;
+    position:relative;
+  }
+  .eyebrow{
+    font-family:'Spline Sans Mono',monospace;
+    font-size:12.5px;letter-spacing:.28em;text-transform:uppercase;
+    color:var(--signal);
+    display:flex;align-items:center;gap:12px;margin-bottom:28px;
+  }
+  .eyebrow::before{
+    content:"";width:34px;height:1px;background:var(--signal);
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:900;
+    font-size:clamp(44px,8vw,76px);
+    line-height:.98;
+    letter-spacing:-.02em;
+    margin:0 0 26px;
+  }
+  h1 .drop{color:var(--signal);font-style:italic}
+  .dek{
+    font-size:21px;color:var(--paper-dim);max-width:600px;
+    line-height:1.6;
+  }
+  .byline{
+    margin-top:40px;font-family:'Spline Sans Mono',monospace;
+    font-size:13px;color:var(--paper-faint);letter-spacing:.05em;
+    display:flex;flex-wrap:wrap;gap:8px 20px;
+    padding-top:22px;border-top:1px solid var(--rule);
+  }
+  .byline span{white-space:nowrap}
+
+  /* falling-feed hero motif */
+  .feed-motif{
+    position:absolute;right:-10px;top:90px;width:120px;
+    display:none;
+  }
+  @media(min-width:1080px){.feed-motif{display:block;right:-160px}}
+  .feed-card{
+    height:14px;border-radius:4px;margin-bottom:10px;
+    background:var(--rule);
+    animation:slide 3.4s ease-in-out infinite;
+  }
+  .feed-card:nth-child(1){width:100%;animation-delay:0s}
+  .feed-card:nth-child(2){width:80%;animation-delay:.2s;background:rgba(255,179,71,.35)}
+  .feed-card:nth-child(3){width:92%;animation-delay:.4s}
+  .feed-card:nth-child(4){width:70%;animation-delay:.6s}
+  .feed-card:nth-child(5){width:88%;animation-delay:.8s;background:rgba(90,209,196,.3)}
+  @keyframes slide{
+    0%,100%{transform:translateY(0);opacity:.5}
+    50%{transform:translateY(6px);opacity:1}
+  }
+
+  /* ---------- SECTIONS ---------- */
+  section{padding:22px 0}
+  .chapter{
+    max-width:var(--maxw);margin:56px auto 10px;padding:0 24px;
+  }
+  .chapter-tag{
+    font-family:'Spline Sans Mono',monospace;
+    font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--pulse);margin-bottom:14px;display:flex;align-items:center;gap:10px;
+  }
+  .chapter-tag .num{
+    color:var(--ink);background:var(--pulse);
+    border-radius:5px;padding:2px 8px;font-weight:600;font-size:11px;
+  }
+  h2{
+    font-family:'Fraunces',serif;font-weight:600;
+    font-size:clamp(30px,5vw,42px);line-height:1.08;
+    letter-spacing:-.015em;margin:0 0 8px;
+  }
+  h3{
+    font-family:'Fraunces',serif;font-weight:600;
+    font-size:24px;line-height:1.2;margin:44px 0 4px;color:var(--paper);
+  }
+  p{margin:20px 0}
+  .lead{font-size:22px;line-height:1.55;color:var(--paper)}
+  em{color:var(--signal);font-style:italic}
+  strong{color:var(--paper);font-weight:600}
+  a{color:var(--signal);text-decoration:none;border-bottom:1px solid rgba(255,179,71,.4)}
+
+  /* pull-forward first letter of each chapter opener */
+  .opener::first-letter{
+    font-family:'Fraunces',serif;font-weight:900;
+    font-size:3.4em;line-height:.8;float:left;
+    padding:6px 12px 0 0;color:var(--signal);
+  }
+
+  /* ---------- CALLOUTS ---------- */
+  .note{
+    background:var(--ink-2);
+    border-left:3px solid var(--pulse);
+    border-radius:0 10px 10px 0;
+    padding:16px 20px;margin:26px 0;
+    font-size:16px;line-height:1.6;color:var(--paper-dim);
+  }
+  .note .label{
+    font-family:'Spline Sans Mono',monospace;font-size:11px;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--pulse);
+    display:block;margin-bottom:6px;
+  }
+  .note strong{color:var(--paper)}
+
+  .problem{
+    background:linear-gradient(180deg,rgba(255,122,107,.08),transparent);
+    border:1px solid rgba(255,122,107,.25);
+    border-radius:12px;padding:22px 24px;margin:30px 0;
+  }
+  .problem .label{
+    font-family:'Spline Sans Mono',monospace;font-size:11px;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--danger);
+    display:block;margin-bottom:8px;
+  }
+  .problem p{margin:0}
+
+  /* progress ribbon: "we've covered X, Y to go" */
+  .ribbon{
+    display:flex;align-items:center;gap:14px;
+    margin:50px auto;max-width:var(--maxw);padding:0 24px;
+  }
+  .ribbon .line{flex:1;height:1px;background:var(--rule)}
+  .ribbon .pill{
+    font-family:'Spline Sans Mono',monospace;font-size:12px;
+    letter-spacing:.06em;color:var(--signal);
+    border:1px solid rgba(255,179,71,.35);border-radius:100px;
+    padding:6px 16px;white-space:nowrap;
+    background:rgba(255,179,71,.06);
+  }
+
+  /* code well */
+  .code{
+    background:var(--ink-3);
+    border:1px solid var(--rule);
+    border-radius:10px;
+    font-family:'Spline Sans Mono',monospace;
+    font-size:14px;line-height:1.7;color:#cfe0e5;
+    padding:18px 20px;margin:24px 0;overflow-x:auto;
+  }
+  .code .k{color:var(--signal)}
+  .code .c{color:var(--paper-faint);font-style:italic}
+  .code .s{color:var(--pulse)}
+
+  /* the offset-vs-cursor mini demo */
+  .demo{
+    background:var(--ink-2);border:1px solid var(--rule);
+    border-radius:14px;padding:24px;margin:30px 0;
+  }
+  .demo h4{
+    font-family:'Spline Sans Mono',monospace;font-size:12px;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--paper-dim);
+    margin:0 0 18px;font-weight:500;
+  }
+  .bars{display:flex;flex-direction:column;gap:14px}
+  .bar-row{display:flex;align-items:center;gap:14px}
+  .bar-label{
+    font-family:'Spline Sans Mono',monospace;font-size:12px;
+    color:var(--paper-faint);width:96px;flex-shrink:0;text-align:right;
+  }
+  .bar-track{flex:1;height:26px;background:var(--ink-3);border-radius:6px;overflow:hidden;position:relative}
+  .bar-val{
+    height:100%;border-radius:6px;width:0;
+    display:flex;align-items:center;justify-content:flex-end;
+    padding-right:10px;font-family:'Spline Sans Mono',monospace;
+    font-size:12px;color:var(--ink);font-weight:600;
+    transition:width 1.1s cubic-bezier(.2,.7,.2,1);
+  }
+  .bar-val.offset{background:linear-gradient(90deg,var(--signal-deep),var(--danger))}
+  .bar-val.cursor{background:linear-gradient(90deg,var(--pulse),#7fe3d8)}
+  .demo-legend{
+    display:flex;gap:22px;margin-top:18px;font-size:13px;color:var(--paper-dim);
+    font-family:'Spline Sans Mono',monospace;
+  }
+  .demo-legend .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:middle}
+  .dot.o{background:var(--danger)}
+  .dot.c{background:var(--pulse)}
+
+  /* stat strip */
+  .stats{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+    background:var(--rule);border:1px solid var(--rule);border-radius:12px;
+    overflow:hidden;margin:30px 0;
+  }
+  .stat{background:var(--ink-2);padding:22px 18px;text-align:center}
+  .stat .n{
+    font-family:'Fraunces',serif;font-weight:900;font-size:32px;
+    color:var(--signal);line-height:1;
+  }
+  .stat .l{font-size:12.5px;color:var(--paper-dim);margin-top:8px;line-height:1.4}
+  @media(max-width:560px){.stats{grid-template-columns:1fr}}
+
+  /* platform cards */
+  .platform{
+    border:1px solid var(--rule);border-radius:14px;
+    padding:26px;margin:24px 0;background:var(--ink-2);
+    position:relative;overflow:hidden;
+  }
+  .platform::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+    background:var(--accent,var(--signal));
+  }
+  .platform .p-name{
+    font-family:'Fraunces',serif;font-weight:600;font-size:24px;
+    display:flex;align-items:baseline;gap:12px;margin-bottom:6px;
+  }
+  .platform .p-tag{
+    font-family:'Spline Sans Mono',monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--paper-faint);
+  }
+  .platform p{margin:14px 0 0;font-size:17px}
+
+  hr.soft{border:none;border-top:1px solid var(--rule);margin:60px 0}
+
+  /* closing */
+  .closing{
+    max-width:var(--maxw);margin:40px auto 0;padding:56px 24px 100px;
+    text-align:center;
+  }
+  .closing h2{margin-bottom:20px}
+  .closing p{color:var(--paper-dim);max-width:560px;margin-left:auto;margin-right:auto}
+  .end-mark{
+    font-family:'Spline Sans Mono',monospace;color:var(--signal);
+    letter-spacing:.3em;font-size:13px;margin-top:40px;
+  }
+
+  ::selection{background:var(--signal);color:var(--ink)}
+
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    html{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-track"><div class="progress-fill" id="pfill"></div></div>
+
+<main>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="feed-motif" aria-hidden="true">
+      <div class="feed-card"></div><div class="feed-card"></div>
+      <div class="feed-card"></div><div class="feed-card"></div>
+      <div class="feed-card"></div>
+    </div>
+    <div class="eyebrow">Engineering, told slowly</div>
+    <h1>How we build<br>the feed that <span class="drop">never<br>ends</span></h1>
+    <p class="dek">You've scrolled one today. Maybe for an hour. It felt like nothing — content just kept arriving. That "nothing" is one of the hardest things to build in software. Let's build it together, one problem at a time.</p>
+    <div class="byline">
+      <span>◆ A build-along</span>
+      <span>◆ ~15 min read</span>
+      <span>◆ No prior magic required</span>
+    </div>
+  </header>
+
+  <!-- CH 1: THE ILLUSION -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">01</span> The trick you never noticed</div>
+      <h2>It's supposed to feel like nothing</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener lead">Here's the strange thing about infinite scroll: when it works perfectly, you don't notice it at all. You flick your thumb, more posts appear, and you keep going. There's no "Next Page" button. No loading spinner that makes you wait. It just <em>flows</em>.</p>
+
+      <p>That seamlessness is the whole product. The second a user feels a stutter — a blank gap, a jump, a wait — the spell breaks and they close the app. So the goal we're chasing isn't "show more posts." It's much sneakier than that:</p>
+
+      <p class="lead"><strong>Make an endless river of content feel effortless, while a machine somewhere sweats to keep it flowing.</strong></p>
+
+      <p>To pull this off, the app has to quietly ask a server for the next batch of posts <em>before</em> you even reach the bottom. That server has to figure out which posts you specifically want to see, put them in the right order, and hand them back — all in under half a second. Every time. For hundreds of millions of people at once.</p>
+
+      <div class="note">
+        <span class="label">Quick word</span>
+        A <strong>server</strong> is just another computer, sitting in a data center, whose whole job is to answer requests from your phone. When we say "the backend," we mean the servers and databases doing the work you never see.
+      </div>
+
+      <p>So let's start where every engineer starts: with the obvious, simple idea. And then let's watch it fall apart. Because understanding <em>why</em> the simple idea breaks is the entire key to building the real thing.</p>
+    </div>
+  </section>
+
+  <div class="ribbon">
+    <div class="line"></div>
+    <div class="pill">◆ Warmed up. Now the first real problem →</div>
+    <div class="line"></div>
+  </div>
+
+  <!-- CH 2: THE NAIVE ATTEMPT -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">02</span> The obvious idea</div>
+      <h2>"Just grab the next twenty"</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener">Imagine every post lives in a giant list in the database, newest at the top. When you open the app, we hand you the first 20. You scroll to the bottom, and we say to the database: <em>"skip the 20 you already sent, give me the next 20."</em> Scroll again: <em>"skip 40, give me 20."</em></p>
+
+      <p>This has a name. It's called <strong>offset pagination</strong>, and it's the first thing almost everyone reaches for. In database language it looks like this:</p>
+
+      <div class="code">
+<span class="k">SELECT</span> * <span class="k">FROM</span> posts<br>
+<span class="k">ORDER BY</span> created_at <span class="k">DESC</span><br>
+<span class="k">LIMIT</span> 20 <span class="k">OFFSET</span> 100000<span class="c">  -- skip 100,000, then give me 20</span>
+      </div>
+
+      <div class="note">
+        <span class="label">Quick word</span>
+        A <strong>database</strong> is an organized warehouse for data — think of a spreadsheet with billions of rows. <strong>OFFSET</strong> means "skip this many rows first." <strong>LIMIT</strong> means "then give me this many."
+      </div>
+
+      <p>It's clean. It's easy to understand. You could even build old-school numbered pages with it — jump straight to page 50. For a small app, it works fine.</p>
+
+      <p>And then your app gets popular. And it quietly starts to die.</p>
+    </div>
+  </section>
+
+  <!-- CH 3: WHY IT BREAKS (PROBLEM 1) -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">03</span> Crack #1 — it gets slower the deeper you go</div>
+      <h2>The database can't teleport</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener">Here's the part that surprises people. When you say <em>"skip 100,000 rows,"</em> the database can't magically leap to row 100,001. It has no teleporter. It has to walk past all 100,000 rows, one by one, counting them off, throwing every single one away — <em>and only then</em> start collecting the 20 you asked for.</p>
+
+      <div class="problem">
+        <span class="label">The problem</span>
+        <p>The further a user scrolls, the more rows the database has to count and discard before it reaches the good part. Scroll deep enough and a single request that should take milliseconds takes <strong>seconds</strong> — long enough that the request times out and the user sees a broken feed.</p>
+      </div>
+
+      <p>This isn't a small tax. Watch what happens to the response time as a real user scrolls deeper into a table of a million posts. The bars below tell the whole story — offset in warm red, and (spoiler) the fix we're building toward in teal.</p>
+
+      <div class="demo" id="speed-demo">
+        <h4>Time to fetch the next 20 posts</h4>
+        <div class="bars">
+          <div class="bar-row">
+            <div class="bar-label">Page 1</div>
+            <div class="bar-track"><div class="bar-val offset" data-w="3" data-t="0.003s"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Page 50</div>
+            <div class="bar-track"><div class="bar-val offset" data-w="14" data-t="0.045s"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Page 500</div>
+            <div class="bar-track"><div class="bar-val offset" data-w="55" data-t="0.380s"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Page 5,000</div>
+            <div class="bar-track"><div class="bar-val offset" data-w="100" data-t="3.200s ⚠"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Any page →</div>
+            <div class="bar-track"><div class="bar-val cursor" data-w="4" data-t="~0.004s"></div></div>
+          </div>
+        </div>
+        <div class="demo-legend">
+          <span><span class="dot o"></span>Offset — slower every page</span>
+          <span><span class="dot c"></span>The fix — flat, always fast</span>
+        </div>
+      </div>
+
+      <p>By page 5,000, offset is over <strong>600 times slower</strong> than it needs to be. And notice the teal bar at the bottom: whatever page you're on, it barely moves. That flatness is the target. Hold onto it — we'll earn it in a minute.</p>
+    </div>
+  </section>
+
+  <!-- CH 4: PROBLEM 2 -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">04</span> Crack #2 — the feed shifts under your feet</div>
+      <h2>The ghost of the duplicate post</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener">Speed isn't even the worst of it. There's a second crack, and it's the kind that makes users think your app is broken.</p>
+
+      <p>Picture this. You've just read posts 1 through 20. While you were reading, five new posts got published at the top of the feed — totally normal, this happens thousands of times a second on a busy app. Now you scroll down and the app asks for <em>"the next 20, skip the first 20."</em></p>
+
+      <p>But the list has shifted. Those five new posts pushed everything down by five slots. So "skip 20" now lands you five posts <em>too early</em> — and you get shown five posts you already read.</p>
+
+      <div class="problem">
+        <span class="label">The problem</span>
+        <p>Because offset counts by <em>position</em>, and positions move whenever content is added or removed, users see <strong>duplicate posts</strong> when things are inserted, and <strong>silently skip posts</strong> when things are deleted. On a live feed, the ground is always moving.</p>
+      </div>
+
+      <p>So now we have two separate wounds from the same idea: it's slow, and it's unreliable. Both come from one root cause — and naming that root cause is the moment everything clicks.</p>
+    </div>
+  </section>
+
+  <div class="ribbon">
+    <div class="line"></div>
+    <div class="pill">◆ Two problems diagnosed. Now — how do we think about the fix?</div>
+    <div class="line"></div>
+  </div>
+
+  <!-- CH 5: THE DIRECTION -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">05</span> The shift in thinking</div>
+      <h2>Stop counting positions. Start dropping a bookmark.</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener lead">Here's the insight that fixes both problems at once. Every pain we just felt came from one habit: we described where to continue by <em>counting from the start</em>. "Skip 100,000." "Skip 20." Counting is fragile because the thing you're counting keeps changing.</p>
+
+      <p>So flip it. Instead of remembering <em>how many posts you've seen</em>, remember <em>the last exact post you saw</em>. Not "I'm 20 posts in" but "the last thing I read was that specific post, published at 12:00:00, with ID 456. Just give me what comes after it."</p>
+
+      <p>It's the difference between telling a friend <em>"start reading on page 213"</em> versus <em>"start right after the sentence about the lighthouse."</em> If someone adds or removes a paragraph, the page number is wrong — but "after the lighthouse" is still exactly right. It's an anchor to a real thing, not to a position that drifts.</p>
+
+      <div class="note">
+        <span class="label">The name for it</span>
+        This bookmark is called a <strong>cursor</strong>. The whole approach is <strong>cursor-based pagination</strong> (engineers also call it <em>keyset pagination</em>). It's what every large-scale feed on earth uses. Everything for the rest of this piece builds on it.
+      </div>
+
+      <p>That's the direction. Now let's actually build it and watch both cracks seal shut.</p>
+    </div>
+  </section>
+
+  <!-- CH 6: THE ACTUAL SOLUTION -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">06</span> Building the real thing</div>
+      <h2>The cursor, step by step</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener">Instead of "skip 20," the app now hands the server the bookmark from the last post it received. The server turns that into a plain, honest question to the database: <em>"give me the posts that come after this exact one."</em></p>
+
+      <div class="code">
+<span class="k">SELECT</span> * <span class="k">FROM</span> posts<br>
+<span class="k">WHERE</span> (created_at, id) &lt; (<span class="s">'2026-04-07T12:00:00Z'</span>, <span class="s">456</span>)<br>
+<span class="k">ORDER BY</span> created_at <span class="k">DESC</span>, id <span class="k">DESC</span><br>
+<span class="k">LIMIT</span> 20;
+      </div>
+
+      <p>The magic is in that <strong>WHERE</strong> line. Because the database keeps posts in a sorted index — think of the tabbed dividers in a filing cabinet — it can jump <em>straight</em> to the bookmarked post and start reading from there. No walking past 100,000 rows. No counting. It lands on the spot instantly, no matter how deep you've scrolled.</p>
+
+      <div class="note">
+        <span class="label">Quick word</span>
+        An <strong>index</strong> is a pre-sorted shortcut the database keeps on the side, like the tabbed dividers in a filing cabinet. It's how the database finds one exact record without reading everything before it.
+      </div>
+
+      <p><strong>Crack #1, sealed.</strong> That flat teal bar from earlier? This is where it comes from. Every page is a direct jump, so every page is fast — page 5 or page 50,000, it doesn't care.</p>
+
+      <p><strong>Crack #2, sealed too.</strong> New posts appearing at the top can't hurt us anymore, because we never said "skip 20." We said "after post 456." Post 456 is still post 456 no matter how much gets added above it. No duplicates. No skips. The feed is stable.</p>
+
+      <h3>One sneaky detail: the tiebreaker</h3>
+      <p>Did you notice we bookmarked <em>two</em> things — the timestamp <em>and</em> the ID? That's not an accident. On a busy app, dozens of posts can share the exact same timestamp, right down to the microsecond. If our bookmark only said "after 12:00:00," the database wouldn't know <em>which</em> of those identical-time posts we meant, and could hand back a mess of duplicates or gaps.</p>
+
+      <p>So we add the post's unique ID as a <strong>tiebreaker</strong>. The database checks the time first; if two posts tie, it uses the ID to settle it, precisely. That one extra field is the difference between a feed that's <em>usually</em> right and one that's <em>always</em> right.</p>
+
+      <h3>We also hide the bookmark</h3>
+      <p>We'd never hand the raw timestamp and ID to the app in plain sight — that would leak how our database is built and let clever people tamper with it. Instead we scramble the bookmark into a short, meaningless-looking token and often <strong>sign</strong> it (a tamper-proof seal) so nobody can forge one. The app just carries this opaque token around; only our server knows how to read it.</p>
+
+      <h3>And one clever shortcut: "grab one extra"</h3>
+      <p>How does the app know when to <em>stop</em> — when there's nothing left to load? Counting every remaining post would be expensive. So we cheat, gracefully: if the app wants 20 posts, we quietly ask the database for <strong>21</strong>. If 21 come back, we know there's more, so we send the 20 and flip a little "there's more" switch to on. If only 20 or fewer come back, we've hit the end, and we switch it off. One extra row answers the whole question.</p>
+
+      <div class="stats">
+        <div class="stat"><div class="n">O(1)</div><div class="l">Roughly constant speed, at any depth</div></div>
+        <div class="stat"><div class="n">0</div><div class="l">Duplicates or skips from a shifting feed</div></div>
+        <div class="stat"><div class="n">+1</div><div class="l">Extra row that tells us when to stop</div></div>
+      </div>
+
+      <div class="note">
+        <span class="label">Quick word</span>
+        <strong>O(1)</strong> is shorthand engineers use for "the work stays the same no matter how big the data gets." Offset was <strong>O(N)</strong> — the work grew with the pile. Getting from O(N) to O(1) is the whole ballgame.
+      </div>
+    </div>
+  </section>
+
+  <div class="ribbon">
+    <div class="line"></div>
+    <div class="pill">◆ The engine works. But the user still sees the screen — let's fix that side too.</div>
+    <div class="line"></div>
+  </div>
+
+  <!-- CH 7: THE FRONTEND ILLUSION -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">07</span> Keeping the screen calm</div>
+      <h2>The illusion has a second half</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener">A fast, stable backend is only half the promise. The other half lives on your screen. And screens have their own breaking point: they choke when asked to hold too much at once.</p>
+
+      <p>If you scrolled for twenty minutes and the app kept every post you passed, your phone would be trying to draw tens of thousands of items at once. The browser grinds, scrolling gets choppy, memory balloons, and eventually the whole thing crashes.</p>
+
+      <div class="problem">
+        <span class="label">The problem</span>
+        <p>A phone or browser can't keep thousands of on-screen items alive at once without stuttering and running out of memory. But a "feed that never ends" seems to demand exactly that.</p>
+      </div>
+
+      <h3>The fix: only draw what fits on the glass</h3>
+      <p>Here's the sleight of hand. At any moment, only about 20 posts actually fit on your screen. So why keep the other 9,980 drawn? We don't. The app draws only the handful you can see (plus a couple just off-screen so nothing flickers), and as you scroll, it <em>recycles</em> those same few slots — pouring new post data into them like water into the same set of glasses.</p>
+
+      <p>To keep the scrollbar honest, the app props up an invisible spacer as tall as <em>all</em> the posts would be. So it feels like thousands of items are there — but only a couple dozen ever truly exist. This trick has a name: <strong>virtualization</strong>, or "windowing," because you're only ever looking through a small moving window onto a huge imaginary list.</p>
+
+      <div class="note">
+        <span class="label">Quick word</span>
+        The <strong>frontend</strong> is the part running on your device — the screen, the buttons, the scrolling. The <strong>backend</strong> is the servers it talks to. Both have to cooperate for the feed to feel seamless.
+      </div>
+
+      <h3>The last enemy: the jump</h3>
+      <p>You've felt this one. You go to tap something, an image finishes loading, everything lurches down, and you tap the wrong thing. That lurch is called a <strong>layout shift</strong>, and it's the fastest way to make an app feel cheap.</p>
+
+      <p>The defense is preparation. Before a post's image arrives, the app reserves the exact space it will need — often showing a grey <strong>skeleton</strong> placeholder in the meantime. And it fetches the next batch <em>early</em>, while you're still a screen or two away from the bottom, so the new posts are already sitting there by the time you arrive. Done right, the seam is invisible. That's the target the big platforms hold themselves to: the whole handoff, start to finish, inside roughly <strong>half a second</strong>.</p>
+    </div>
+  </section>
+
+  <hr class="soft">
+
+  <!-- CH 8: THE GIANTS -->
+  <section>
+    <div class="chapter">
+      <div class="chapter-tag"><span class="num">08</span> How the giants really do it</div>
+      <h2>Same idea, planetary muscle</h2>
+    </div>
+    <div class="wrap">
+      <p class="opener">Everything so far is the foundation — and every giant stands on it. But at the scale of hundreds of millions of people, they bolt on extra machinery to decide not just <em>where</em> the feed continues, but <em>what</em> deserves to be in it at all. Here's the flavor of each, in plain terms.</p>
+
+      <div class="platform" style="--accent:#5ad1c4">
+        <div class="p-name">Twitter / X <span class="p-tag">precompute at write time</span></div>
+        <p>X figured that people <em>read</em> far more than they <em>post</em>, so it does the heavy lifting the moment someone posts, not when you scroll. When you tweet, a service fans that tweet out and drops its ID straight into the ready-made timelines of your followers — kept in ultra-fast memory so it's waiting the instant they open the app.</p>
+        <p>The exception is celebrities. Fanning one post out to 100 million followers would jam the system, so posts from the hugely-followed skip the fan-out and get <em>mixed in</em> as you read instead. A blend of "prepared ahead" and "assembled on demand."</p>
+      </div>
+
+      <div class="platform" style="--accent:#ff7a6b">
+        <div class="p-name">Instagram <span class="p-tag">a funnel of rankers</span></div>
+        <p>Instagram can't score billions of possible posts for you in half a second, so it narrows the field in stages — a funnel. A cheap, fast model skims the huge pool down to a few thousand maybes; a slower, smarter model studies the finalists and predicts how likely you are to like, click, or hide each one.</p>
+        <p>It also deliberately fights sameness. If it just chased raw engagement, it would flood you with near-identical posts until you got bored. So it applies a <em>diversity</em> penalty, gently pushing down anything too similar to what it just showed you — keeping the river varied.</p>
+      </div>
+
+      <div class="platform" style="--accent:#ffb347">
+        <div class="p-name">LinkedIn <span class="p-tag">recency and self-correction</span></div>
+        <p>LinkedIn leans hard on freshness — a system there hard-evicts anything older than 30 days from the main feed index, so stale posts simply can't surface. Its ranking runs in stages too, with a final pass that enforces variety before anything reaches you.</p>
+        <p>Its cleverest trick handles <em>silence</em>. If a post slides past you and you don't react, that no-reaction is treated as a quiet "no thanks." The system dials that post's score down so the next batch you pull skips it and brings something fresher. The feed literally learns from what you scroll past.</p>
+      </div>
+
+      <p>Notice the shared spine under all three. They precompute what they can, assemble the rest on demand, rank hard, and lean on the exact same cursor foundation we built by hand — just wrapped in far more muscle.</p>
+    </div>
+  </section>
+
+  <!-- CLOSING -->
+  <section class="closing">
+    <div class="chapter-tag" style="justify-content:center">
+      <span class="num">09</span> The whole picture
+    </div>
+    <h2>What "nothing" is actually made of</h2>
+    <p>We started with a feed that felt like nothing to use. Now you know what's underneath: a bookmark instead of a page number, so the database can leap straight to your spot and never trip over a shifting feed. A screen that only ever draws a handful of posts while faking thousands. A frantic little handoff that finishes before you notice it started. And, on top, a ranking brain deciding what's worth your next flick.</p>
+    <p>The next time content just keeps arriving under your thumb, you'll know the truth — that the effortless part is the hardest part, and a lot of careful engineering is working very hard so that you feel absolutely nothing.</p>
+    <div class="end-mark">◆  ◆  ◆</div>
+  </section>
+
+</main>
+
+<script>
+  // reading progress bar — the article is its own infinite scroll
+  const fill = document.getElementById('pfill');
+  function updateProgress(){
+    const h = document.documentElement;
+    const scrolled = h.scrollTop;
+    const total = h.scrollHeight - h.clientHeight;
+    fill.style.width = (total > 0 ? (scrolled/total)*100 : 0) + '%';
+  }
+  window.addEventListener('scroll', updateProgress, {passive:true});
+  updateProgress();
+
+  // animate the speed-demo bars when they scroll into view
+  const demo = document.getElementById('speed-demo');
+  const bars = demo.querySelectorAll('.bar-val');
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        bars.forEach((b,i)=>{
+          setTimeout(()=>{
+            b.style.width = b.dataset.w + '%';
+            b.textContent = b.dataset.t;
+          }, i*180);
+        });
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold:0.4});
+  io.observe(demo);
+</script>
+
+</body>
+</html>
