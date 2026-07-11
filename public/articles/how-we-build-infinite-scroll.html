@@ -314,9 +314,9 @@
     </div>
     <div class="eyebrow">Engineering, told slowly</div>
     <h1>How we build<br>the feed that <span class="drop">never<br>ends</span></h1>
-    <p class="dek">You've scrolled one today. Maybe for an hour. It felt like nothing — content just kept arriving. That "nothing" is one of the hardest things to build in software. Let's build it together, one problem at a time.</p>
+    <p class="dek">You've probably scrolled through one today. Maybe for an hour. Content kept arriving, and the feed barely asked for your attention. That quiet experience takes a surprising amount of engineering. Let's build it one problem at a time.</p>
     <div class="byline">
-      <span>◆ A build-along</span>
+      <span>◆ A build along</span>
       <span>◆ ~15 min read</span>
       <span>◆ No prior magic required</span>
     </div>
@@ -329,20 +329,15 @@
       <h2>It's supposed to feel like nothing</h2>
     </div>
     <div class="wrap">
-      <p class="opener lead">Here's the strange thing about infinite scroll: when it works perfectly, you don't notice it at all. You flick your thumb, more posts appear, and you keep going. There's no "Next Page" button. No loading spinner that makes you wait. It just <em>flows</em>.</p>
+      <p class="opener lead">Infinite scroll works best when you barely notice it. You flick your thumb, more posts appear, and you keep going. No "Next Page" button. No long pause. The feed simply <em>flows</em>.</p>
 
-      <p>That seamlessness is the whole product. The second a user feels a stutter — a blank gap, a jump, a wait — the spell breaks and they close the app. So the goal we're chasing isn't "show more posts." It's much sneakier than that:</p>
+      <p>That seamlessness is the product. A blank gap, a jump, or a visible wait breaks the experience. So the real goal is not simply "show more posts." It is this:</p>
 
-      <p class="lead"><strong>Make an endless river of content feel effortless, while a machine somewhere sweats to keep it flowing.</strong></p>
+      <p class="lead"><strong>Make an endless stream of content feel continuous while the backend fetches, ranks, and renders each new batch.</strong></p>
 
-      <p>To pull this off, the app has to quietly ask a server for the next batch of posts <em>before</em> you even reach the bottom. That server has to figure out which posts you specifically want to see, put them in the right order, and hand them back — all in under half a second. Every time. For hundreds of millions of people at once.</p>
+      <p>To do that, the app requests the next batch <em>before</em> you reach the bottom. The backend must decide which posts belong in your feed, preserve their order, and return them quickly enough that the next batch is ready before you need it.</p>
 
-      <div class="note">
-        <span class="label">Quick word</span>
-        A <strong>server</strong> is just another computer, sitting in a data center, whose whole job is to answer requests from your phone. When we say "the backend," we mean the servers and databases doing the work you never see.
-      </div>
-
-      <p>So let's start where every engineer starts: with the obvious, simple idea. And then let's watch it fall apart. Because understanding <em>why</em> the simple idea breaks is the entire key to building the real thing.</p>
+      <p>We will start with the simplest implementation, see exactly where it fails, and then replace it with a design that works for a live production feed.</p>
     </div>
   </section>
 
@@ -366,15 +361,15 @@
       <div class="code">
 <span class="k">SELECT</span> * <span class="k">FROM</span> posts<br>
 <span class="k">ORDER BY</span> created_at <span class="k">DESC</span><br>
-<span class="k">LIMIT</span> 20 <span class="k">OFFSET</span> 100000<span class="c">  -- skip 100,000, then give me 20</span>
+<span class="k">LIMIT</span> 20 <span class="k">OFFSET</span> 100000<span class="c">  /* discard 100,000 rows, then return 20 */</span>
       </div>
 
       <div class="note">
         <span class="label">Quick word</span>
-        A <strong>database</strong> is an organized warehouse for data — think of a spreadsheet with billions of rows. <strong>OFFSET</strong> means "skip this many rows first." <strong>LIMIT</strong> means "then give me this many."
+        In this query, <strong>OFFSET 100000</strong> tells the database to discard the first 100,000 rows from the sorted result. <strong>LIMIT 20</strong> returns only the next 20 rows. In Oracle, the equivalent syntax is <strong>OFFSET 100000 ROWS FETCH NEXT 20 ROWS ONLY</strong>.
       </div>
 
-      <p>It's clean. It's easy to understand. You could even build old-school numbered pages with it — jump straight to page 50. For a small app, it works fine.</p>
+      <p>It's clean. It's easy to understand. You could even build old school numbered pages and jump straight to page 50. For a small app, it works fine.</p>
 
       <p>And then your app gets popular. And it quietly starts to die.</p>
     </div>
@@ -383,18 +378,18 @@
   <!-- CH 3: WHY IT BREAKS (PROBLEM 1) -->
   <section>
     <div class="chapter">
-      <div class="chapter-tag"><span class="num">03</span> Crack #1 — it gets slower the deeper you go</div>
+      <div class="chapter-tag"><span class="num">03</span> Crack #1: it gets slower the deeper you go</div>
       <h2>The database can't teleport</h2>
     </div>
     <div class="wrap">
-      <p class="opener">Here's the part that surprises people. When you say <em>"skip 100,000 rows,"</em> the database can't magically leap to row 100,001. It has no teleporter. It has to walk past all 100,000 rows, one by one, counting them off, throwing every single one away — <em>and only then</em> start collecting the 20 you asked for.</p>
+      <p class="opener">When you say <em>"skip 100,000 rows,"</em> the database still has to locate and discard those 100,000 rows before it can return the next 20. OFFSET does not identify a stable starting row. It only describes how many rows must be ignored in the current sorted result.</p>
 
       <div class="problem">
         <span class="label">The problem</span>
-        <p>The further a user scrolls, the more rows the database has to count and discard before it reaches the good part. Scroll deep enough and a single request that should take milliseconds takes <strong>seconds</strong> — long enough that the request times out and the user sees a broken feed.</p>
+        <p>The deeper the offset, the more rows the database must scan and discard before returning the requested page. Eventually a request that took milliseconds can take <strong>seconds</strong>, time out, or consume enough database work to affect other users.</p>
       </div>
 
-      <p>This isn't a small tax. Watch what happens to the response time as a real user scrolls deeper into a table of a million posts. The bars below tell the whole story — offset in warm red, and (spoiler) the fix we're building toward in teal.</p>
+      <p>This is why latency grows with scroll depth. The red bars show an illustrative offset query as the skipped row count increases. The teal bar shows the cursor approach we will build next, where the query starts from a known sort key instead of recounting from the beginning.</p>
 
       <div class="demo" id="speed-demo">
         <h4>Time to fetch the next 20 posts</h4>
@@ -416,45 +411,57 @@
             <div class="bar-track"><div class="bar-val offset" data-w="100" data-t="3.200s ⚠"></div></div>
           </div>
           <div class="bar-row">
-            <div class="bar-label">Any page →</div>
-            <div class="bar-track"><div class="bar-val cursor" data-w="4" data-t="~0.004s"></div></div>
+            <div class="bar-label">Cursor, any depth</div>
+            <div class="bar-track"><div class="bar-val cursor" data-w="18" data-t="~0.004s"></div></div>
           </div>
         </div>
         <div class="demo-legend">
-          <span><span class="dot o"></span>Offset — slower every page</span>
-          <span><span class="dot c"></span>The fix — flat, always fast</span>
+          <span><span class="dot o"></span>Offset: slower every page</span>
+          <span><span class="dot c"></span>Cursor: stable at any depth</span>
         </div>
       </div>
 
-      <p>By page 5,000, offset is over <strong>600 times slower</strong> than it needs to be. And notice the teal bar at the bottom: whatever page you're on, it barely moves. That flatness is the target. Hold onto it — we'll earn it in a minute.</p>
+      <p>By page 5,000, the example offset query is over <strong>600 times slower</strong> than the cursor query. The exact numbers depend on the database, the index, and the data, but the pattern is what matters. Offset work grows with the number of skipped rows. The cursor keeps the starting point explicit, so the teal bar stays nearly flat at any depth.</p>
     </div>
   </section>
 
   <!-- CH 4: PROBLEM 2 -->
   <section>
     <div class="chapter">
-      <div class="chapter-tag"><span class="num">04</span> Crack #2 — the feed shifts under your feet</div>
+      <div class="chapter-tag"><span class="num">04</span> Crack #2: the feed shifts under your feet</div>
       <h2>The ghost of the duplicate post</h2>
     </div>
     <div class="wrap">
       <p class="opener">Speed isn't even the worst of it. There's a second crack, and it's the kind that makes users think your app is broken.</p>
 
-      <p>Picture this. You've just read posts 1 through 20. While you were reading, five new posts got published at the top of the feed — totally normal, this happens thousands of times a second on a busy app. Now you scroll down and the app asks for <em>"the next 20, skip the first 20."</em></p>
+      <p>Picture this. You have just read posts A through T, the first 20 rows in the feed. While you are reading, five new posts are inserted at the top. That is normal on a live feed. When you scroll again, the app still asks for <em>"OFFSET 20, then return the next 20."</em></p>
 
-      <p>But the list has shifted. Those five new posts pushed everything down by five slots. So "skip 20" now lands you five posts <em>too early</em> — and you get shown five posts you already read.</p>
+      <div class="code">
+<span class="c">BEFORE NEW POSTS</span><br><br>
+Positions 1 to 20: <span class="s">A ... T</span>  <span class="c">already read</span><br>
+Position 21 onward: <span class="s">U, V, W ...</span><br><br>
+<span class="c">AFTER FIVE NEW POSTS</span><br><br>
+Positions 1 to 5: <span class="s">N1 ... N5</span><br>
+Positions 6 to 25: <span class="s">A ... T</span><br><br>
+<span class="k">OFFSET 20</span> now starts at position 21:<br>
+<span class="s">P, Q, R, S, T, U, V ...</span><br><br>
+<span class="c">P through T appear again.</span>
+      </div>
+
+      <p>The offset did exactly what we asked. It skipped the first 20 positions in the <em>new</em> version of the list. But those positions no longer contain the same 20 posts. The five new rows moved A through T down by five places, so the next page begins at P instead of U. The user sees P through T twice.</p>
 
       <div class="problem">
         <span class="label">The problem</span>
-        <p>Because offset counts by <em>position</em>, and positions move whenever content is added or removed, users see <strong>duplicate posts</strong> when things are inserted, and <strong>silently skip posts</strong> when things are deleted. On a live feed, the ground is always moving.</p>
+        <p>Offset tracks <em>position</em>, not identity. Inserts above the current page can create <strong>duplicates</strong>. Deletions above it can move unseen posts into the skipped range and create <strong>gaps</strong>. A live feed changes while the user is reading it.</p>
       </div>
 
-      <p>So now we have two separate wounds from the same idea: it's slow, and it's unreliable. Both come from one root cause — and naming that root cause is the moment everything clicks.</p>
+      <p>We now have two failures from the same design. Deep offsets are expensive, and moving positions make pagination inconsistent. Both problems come from using a changing position as the continuation point.</p>
     </div>
   </section>
 
   <div class="ribbon">
     <div class="line"></div>
-    <div class="pill">◆ Two problems diagnosed. Now — how do we think about the fix?</div>
+    <div class="pill">◆ Two problems diagnosed. Now, how do we think about the fix?</div>
     <div class="line"></div>
   </div>
 
@@ -462,21 +469,21 @@
   <section>
     <div class="chapter">
       <div class="chapter-tag"><span class="num">05</span> The shift in thinking</div>
-      <h2>Stop counting positions. Start dropping a bookmark.</h2>
+      <h2>Move from offsets to cursors</h2>
     </div>
     <div class="wrap">
-      <p class="opener lead">Here's the insight that fixes both problems at once. Every pain we just felt came from one habit: we described where to continue by <em>counting from the start</em>. "Skip 100,000." "Skip 20." Counting is fragile because the thing you're counting keeps changing.</p>
+      <p class="opener lead">Both failures come from using a changing position as continuation state. "OFFSET 20" means "start at position 21 in the list as it exists now." If rows are inserted or deleted, position 21 can refer to a different post.</p>
 
-      <p>So flip it. Instead of remembering <em>how many posts you've seen</em>, remember <em>the last exact post you saw</em>. Not "I'm 20 posts in" but "the last thing I read was that specific post, published at 12:00:00, with ID 456. Just give me what comes after it."</p>
+      <p>A cursor stores the sort key of the last row returned. For a feed ordered by <strong>created_at DESC, id DESC</strong>, the cursor can contain the last post's <strong>created_at</strong> and <strong>id</strong>. The next request asks for rows that come after that exact key in the same ordering.</p>
 
-      <p>It's the difference between telling a friend <em>"start reading on page 213"</em> versus <em>"start right after the sentence about the lighthouse."</em> If someone adds or removes a paragraph, the page number is wrong — but "after the lighthouse" is still exactly right. It's an anchor to a real thing, not to a position that drifts.</p>
+      <p>That changes the API from "skip 20 rows" to "continue after this row." The continuation point is tied to a stable value from the result set, not to a position that can move.</p>
 
       <div class="note">
         <span class="label">The name for it</span>
-        This bookmark is called a <strong>cursor</strong>. The whole approach is <strong>cursor-based pagination</strong> (engineers also call it <em>keyset pagination</em>). It's what every large-scale feed on earth uses. Everything for the rest of this piece builds on it.
+        This approach is called <strong>cursor based pagination</strong> or <strong>keyset pagination</strong>. It is a common choice for large, continuously changing feeds because it avoids deep offsets and gives each request a stable continuation point.
       </div>
 
-      <p>That's the direction. Now let's actually build it and watch both cracks seal shut.</p>
+      <p>Now we can build the query and see how the cursor fixes both problems.</p>
     </div>
   </section>
 
@@ -491,32 +498,46 @@
 
       <div class="code">
 <span class="k">SELECT</span> * <span class="k">FROM</span> posts<br>
-<span class="k">WHERE</span> (created_at, id) &lt; (<span class="s">'2026-04-07T12:00:00Z'</span>, <span class="s">456</span>)<br>
+<span class="k">WHERE</span> (created_at, id) &lt; (<span class="s">:last_created_at</span>, <span class="s">:last_id</span>)<br>
 <span class="k">ORDER BY</span> created_at <span class="k">DESC</span>, id <span class="k">DESC</span><br>
 <span class="k">LIMIT</span> 20;
       </div>
 
-      <p>The magic is in that <strong>WHERE</strong> line. Because the database keeps posts in a sorted index — think of the tabbed dividers in a filing cabinet — it can jump <em>straight</em> to the bookmarked post and start reading from there. No walking past 100,000 rows. No counting. It lands on the spot instantly, no matter how deep you've scrolled.</p>
+      <p>The important part is the <strong>WHERE</strong> clause. With an index that matches the ordering, for example <strong>(created_at DESC, id DESC)</strong>, the database can seek to the cursor key and scan only the next 20 index entries. It does not need to count and discard every row before the cursor.</p>
 
       <div class="note">
-        <span class="label">Quick word</span>
-        An <strong>index</strong> is a pre-sorted shortcut the database keeps on the side, like the tabbed dividers in a filing cabinet. It's how the database finds one exact record without reading everything before it.
+        <span class="label">Index requirement</span>
+        For this query, the useful index is the same key used by the filter and sort: <strong>(created_at DESC, id DESC)</strong>. The cursor identifies where the index scan should begin, and <strong>LIMIT 20</strong> bounds how many rows are read.
       </div>
 
-      <p><strong>Crack #1, sealed.</strong> That flat teal bar from earlier? This is where it comes from. Every page is a direct jump, so every page is fast — page 5 or page 50,000, it doesn't care.</p>
+      <p><strong>Crack #1, sealed.</strong> The query begins at the cursor key instead of scanning through every earlier result. Page 5 and page 50,000 perform roughly the same amount of page work.</p>
 
-      <p><strong>Crack #2, sealed too.</strong> New posts appearing at the top can't hurt us anymore, because we never said "skip 20." We said "after post 456." Post 456 is still post 456 no matter how much gets added above it. No duplicates. No skips. The feed is stable.</p>
+      <p><strong>Crack #2, sealed too.</strong> New posts at the top do not change the cursor key. The next request continues after the last row the user actually received, so inserts above it do not move the continuation point.</p>
 
-      <h3>One sneaky detail: the tiebreaker</h3>
-      <p>Did you notice we bookmarked <em>two</em> things — the timestamp <em>and</em> the ID? That's not an accident. On a busy app, dozens of posts can share the exact same timestamp, right down to the microsecond. If our bookmark only said "after 12:00:00," the database wouldn't know <em>which</em> of those identical-time posts we meant, and could hand back a mess of duplicates or gaps.</p>
+      <h3>Why not use only the post ID?</h3>
+      <p>The cursor must represent the same ordering used by the query. Here the feed is ordered by <strong>created_at DESC, id DESC</strong>, so the cursor carries both values.</p>
 
-      <p>So we add the post's unique ID as a <strong>tiebreaker</strong>. The database checks the time first; if two posts tie, it uses the ID to settle it, precisely. That one extra field is the difference between a feed that's <em>usually</em> right and one that's <em>always</em> right.</p>
+      <p>You can use only the ID when the feed itself is ordered by ID and those IDs are strictly monotonic. But many systems use UUIDs, random IDs, or an order that does not match ID order. In those cases, the ID alone does not tell the database where the row belongs in the feed.</p>
+
+      <p>In this query, <strong>created_at</strong> preserves the recency order. The <strong>id</strong> makes that order unique when two posts have the same timestamp. Together they create a deterministic sort order, so the next page cannot lose or repeat rows at the boundary.</p>
 
       <h3>We also hide the bookmark</h3>
-      <p>We'd never hand the raw timestamp and ID to the app in plain sight — that would leak how our database is built and let clever people tamper with it. Instead we scramble the bookmark into a short, meaningless-looking token and often <strong>sign</strong> it (a tamper-proof seal) so nobody can forge one. The app just carries this opaque token around; only our server knows how to read it.</p>
+      <p>The API normally returns an opaque cursor instead of exposing separate database fields. A simple implementation can serialize the values to JSON, encode them with Base64URL, and optionally attach an HMAC signature. The encoding keeps the client independent of the cursor schema. The signature lets the backend reject a modified cursor. Base64URL by itself is not encryption.</p>
+
+      <div class="code">
+<span class="c">RAW CURSOR PAYLOAD</span><br>
+{<span class="s">"createdAt"</span>:<span class="s">"20260407T120000Z"</span>,<span class="s">"id"</span>:456}<br><br>
+<span class="c">API RESPONSE</span><br>
+{<br>
+&nbsp;&nbsp;<span class="s">"items"</span>: [ ... ],<br>
+&nbsp;&nbsp;<span class="s">"nextCursor"</span>: <span class="s">"eyJjcmVhdGVkQXQiOiIyMDI2MDQwN1QxMjAwMDBaIiwiaWQiOjQ1Nn0.signature"</span><br>
+}<br><br>
+<span class="c">NEXT REQUEST</span><br>
+GET /feed?cursor=<span class="s">eyJj...signature</span>&amp;limit=<span class="s">20</span>
+      </div>
 
       <h3>And one clever shortcut: "grab one extra"</h3>
-      <p>How does the app know when to <em>stop</em> — when there's nothing left to load? Counting every remaining post would be expensive. So we cheat, gracefully: if the app wants 20 posts, we quietly ask the database for <strong>21</strong>. If 21 come back, we know there's more, so we send the 20 and flip a little "there's more" switch to on. If only 20 or fewer come back, we've hit the end, and we switch it off. One extra row answers the whole question.</p>
+      <p>How does the app know when to <em>stop</em>, when there is nothing left to load? Counting every remaining post would be expensive. So if the app wants 20 posts, the backend asks the database for <strong>21</strong>. If 21 rows come back, there is another page. The backend returns 20 items and sets <strong>hasNextPage</strong> to true. If 20 or fewer rows come back, it returns them and sets <strong>hasNextPage</strong> to false.</p>
 
       <div class="stats">
         <div class="stat"><div class="n">O(1)</div><div class="l">Roughly constant speed, at any depth</div></div>
@@ -524,16 +545,12 @@
         <div class="stat"><div class="n">+1</div><div class="l">Extra row that tells us when to stop</div></div>
       </div>
 
-      <div class="note">
-        <span class="label">Quick word</span>
-        <strong>O(1)</strong> is shorthand engineers use for "the work stays the same no matter how big the data gets." Offset was <strong>O(N)</strong> — the work grew with the pile. Getting from O(N) to O(1) is the whole ballgame.
-      </div>
-    </div>
+     </div>
   </section>
 
   <div class="ribbon">
     <div class="line"></div>
-    <div class="pill">◆ The engine works. But the user still sees the screen — let's fix that side too.</div>
+    <div class="pill">◆ The engine works. But the user still sees the screen, so let's fix that side too.</div>
     <div class="line"></div>
   </div>
 
@@ -550,23 +567,19 @@
 
       <div class="problem">
         <span class="label">The problem</span>
-        <p>A phone or browser can't keep thousands of on-screen items alive at once without stuttering and running out of memory. But a "feed that never ends" seems to demand exactly that.</p>
+        <p>A phone or browser cannot keep thousands of visible item components alive at once without stuttering and consuming too much memory. But a "feed that never ends" seems to demand exactly that.</p>
       </div>
 
       <h3>The fix: only draw what fits on the glass</h3>
-      <p>Here's the sleight of hand. At any moment, only about 20 posts actually fit on your screen. So why keep the other 9,980 drawn? We don't. The app draws only the handful you can see (plus a couple just off-screen so nothing flickers), and as you scroll, it <em>recycles</em> those same few slots — pouring new post data into them like water into the same set of glasses.</p>
+      <p>Here's the sleight of hand. At any moment, only about 20 posts actually fit on your screen. So why keep the other 9,980 drawn? We don't. The app draws only the handful you can see, plus a small buffer just outside the viewport so nothing flickers. As you scroll, it <em>recycles</em> those same item components and binds them to new post data.</p>
 
-      <p>To keep the scrollbar honest, the app props up an invisible spacer as tall as <em>all</em> the posts would be. So it feels like thousands of items are there — but only a couple dozen ever truly exist. This trick has a name: <strong>virtualization</strong>, or "windowing," because you're only ever looking through a small moving window onto a huge imaginary list.</p>
+      <p>To keep the scrollbar honest, the app uses an invisible spacer as tall as <em>all</em> the posts would be. It feels like thousands of items are present, but only a small window of components is mounted at any time. This technique is called <strong>virtualization</strong>, or "windowing," because the UI renders only the moving window around the current viewport.</p>
 
-      <div class="note">
-        <span class="label">Quick word</span>
-        The <strong>frontend</strong> is the part running on your device — the screen, the buttons, the scrolling. The <strong>backend</strong> is the servers it talks to. Both have to cooperate for the feed to feel seamless.
-      </div>
-
+ 
       <h3>The last enemy: the jump</h3>
       <p>You've felt this one. You go to tap something, an image finishes loading, everything lurches down, and you tap the wrong thing. That lurch is called a <strong>layout shift</strong>, and it's the fastest way to make an app feel cheap.</p>
 
-      <p>The defense is preparation. Before a post's image arrives, the app reserves the exact space it will need — often showing a grey <strong>skeleton</strong> placeholder in the meantime. And it fetches the next batch <em>early</em>, while you're still a screen or two away from the bottom, so the new posts are already sitting there by the time you arrive. Done right, the seam is invisible. That's the target the big platforms hold themselves to: the whole handoff, start to finish, inside roughly <strong>half a second</strong>.</p>
+      <p>The defense is preparation. Before a post's image arrives, the app reserves the exact space it will need, often showing a grey <strong>skeleton</strong> placeholder in the meantime. It also fetches the next batch <em>early</em>, while you are still a screen or two away from the bottom, so the new posts are ready by the time you arrive. Done right, the seam is invisible. The entire handoff finishes before the user notices it.</p>
     </div>
   </section>
 
@@ -579,27 +592,27 @@
       <h2>Same idea, planetary muscle</h2>
     </div>
     <div class="wrap">
-      <p class="opener">Everything so far is the foundation — and every giant stands on it. But at the scale of hundreds of millions of people, they bolt on extra machinery to decide not just <em>where</em> the feed continues, but <em>what</em> deserves to be in it at all. Here's the flavor of each, in plain terms.</p>
+      <p class="opener">Everything so far is the foundation, and every large feed builds on the same core ideas. At the scale of hundreds of millions of people, platforms add more machinery to decide not just <em>where</em> the feed continues, but <em>what</em> deserves to be in it at all. Here is the high level shape of each approach.</p>
 
       <div class="platform" style="--accent:#5ad1c4">
         <div class="p-name">Twitter / X <span class="p-tag">precompute at write time</span></div>
-        <p>X figured that people <em>read</em> far more than they <em>post</em>, so it does the heavy lifting the moment someone posts, not when you scroll. When you tweet, a service fans that tweet out and drops its ID straight into the ready-made timelines of your followers — kept in ultra-fast memory so it's waiting the instant they open the app.</p>
-        <p>The exception is celebrities. Fanning one post out to 100 million followers would jam the system, so posts from the hugely-followed skip the fan-out and get <em>mixed in</em> as you read instead. A blend of "prepared ahead" and "assembled on demand."</p>
+        <p>X figured that people <em>read</em> far more than they <em>post</em>, so it does much of the work when someone publishes, not when a follower scrolls. When a user posts, a service can fan the post ID into ready made follower timelines stored in fast memory, so the feed is already available when those followers open the app.</p>
+        <p>Very large accounts are an exception. Copying one post into tens of millions of timelines would create a huge write burst, so those posts can be fetched and <em>mixed in</em> at read time instead. The result is a hybrid of prepared timelines and on demand assembly.</p>
       </div>
 
       <div class="platform" style="--accent:#ff7a6b">
         <div class="p-name">Instagram <span class="p-tag">a funnel of rankers</span></div>
-        <p>Instagram can't score billions of possible posts for you in half a second, so it narrows the field in stages — a funnel. A cheap, fast model skims the huge pool down to a few thousand maybes; a slower, smarter model studies the finalists and predicts how likely you are to like, click, or hide each one.</p>
-        <p>It also deliberately fights sameness. If it just chased raw engagement, it would flood you with near-identical posts until you got bored. So it applies a <em>diversity</em> penalty, gently pushing down anything too similar to what it just showed you — keeping the river varied.</p>
+        <p>Instagram cannot score billions of possible posts for every request, so it narrows the candidate set in stages. A cheap, fast model reduces the large pool to a few thousand candidates. A slower, more expensive model then ranks the finalists and predicts how likely the user is to like, click, or hide each one.</p>
+        <p>It also fights repetition. If the ranker optimized only for immediate engagement, it could fill the feed with very similar posts. A <em>diversity</em> adjustment can lower the score of candidates that are too similar to recently selected items and keep the feed varied.</p>
       </div>
 
       <div class="platform" style="--accent:#ffb347">
-        <div class="p-name">LinkedIn <span class="p-tag">recency and self-correction</span></div>
-        <p>LinkedIn leans hard on freshness — a system there hard-evicts anything older than 30 days from the main feed index, so stale posts simply can't surface. Its ranking runs in stages too, with a final pass that enforces variety before anything reaches you.</p>
-        <p>Its cleverest trick handles <em>silence</em>. If a post slides past you and you don't react, that no-reaction is treated as a quiet "no thanks." The system dials that post's score down so the next batch you pull skips it and brings something fresher. The feed literally learns from what you scroll past.</p>
+        <div class="p-name">LinkedIn <span class="p-tag">recency and self correction</span></div>
+        <p>LinkedIn places strong weight on freshness and uses staged ranking, followed by a final pass that can enforce variety before posts reach the feed.</p>
+        <p>It can also learn from <em>silence</em>. When a post repeatedly appears without receiving an interaction, that lack of engagement becomes a signal. Future ranking passes can reduce its score and make room for fresher or more relevant candidates.</p>
       </div>
 
-      <p>Notice the shared spine under all three. They precompute what they can, assemble the rest on demand, rank hard, and lean on the exact same cursor foundation we built by hand — just wrapped in far more muscle.</p>
+      <p>Notice the shared foundation under all three. They precompute what they can, assemble the rest on demand, rank candidates in stages, and use a stable pagination contract to continue the feed.</p>
     </div>
   </section>
 
@@ -610,7 +623,7 @@
     </div>
     <h2>What "nothing" is actually made of</h2>
     <p>We started with a feed that felt like nothing to use. Now you know what's underneath: a bookmark instead of a page number, so the database can leap straight to your spot and never trip over a shifting feed. A screen that only ever draws a handful of posts while faking thousands. A frantic little handoff that finishes before you notice it started. And, on top, a ranking brain deciding what's worth your next flick.</p>
-    <p>The next time content just keeps arriving under your thumb, you'll know the truth — that the effortless part is the hardest part, and a lot of careful engineering is working very hard so that you feel absolutely nothing.</p>
+    <p>The next time content keeps arriving under your thumb, you will know what supports that effortless experience. A large amount of careful engineering is working in the background so the feed itself feels simple.</p>
     <div class="end-mark">◆  ◆  ◆</div>
   </section>
 
