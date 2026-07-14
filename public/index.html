@@ -3,149 +3,442 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Daedalus Journal</title>
-    <meta name="description" content="Engineering essays on backend systems, protocols, infrastructure, and the craft of building reliable software.">
-    <link rel="stylesheet" href="assets/styles.css">
+    <title>Daedalus Journal — Systems, explained from the inside out</title>
+    <meta
+      name="description"
+      content="Deep, visual engineering essays on distributed systems, protocols, databases, payments, and the tradeoffs behind reliable software."
+    >
+    <meta name="theme-color" content="#090b0b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Daedalus Journal">
+    <meta
+      property="og:description"
+      content="Systems, explained from the inside out. Visual field notes for engineers building real infrastructure."
+    >
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Daedalus Journal">
+    <meta
+      name="twitter:description"
+      content="Systems, explained from the inside out. Visual field notes for engineers building real infrastructure."
+    >
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Manrope:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="assets/home.css">
+    <script src="assets/home.js" defer></script>
   </head>
-  <body>
-    <header class="site-header">
-      <a class="brand" href="index.html" aria-label="Daedalus Journal home">
-        <span class="brand-mark">DJ</span>
-        <span>Daedalus Journal</span>
-      </a>
-      <nav class="site-nav" aria-label="Primary navigation">
-        <a href="#articles">Articles</a>
-      </nav>
+  <body class="home-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <div class="ambient ambient--gold" aria-hidden="true"></div>
+    <div class="ambient ambient--teal" aria-hidden="true"></div>
+
+    <header class="masthead" data-header>
+      <div class="nav-shell">
+        <a class="brand" href="index.html" aria-label="Daedalus Journal home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 42" role="presentation">
+              <path d="M8 31.5 21 7l13 24.5M12.5 26h17M16 19.5h10"></path>
+              <path d="M8.5 31.5h25"></path>
+            </svg>
+          </span>
+          <span class="brand-copy">
+            <strong>Daedalus</strong>
+            <small>Engineering journal</small>
+          </span>
+        </a>
+
+        <nav class="nav-links" aria-label="Primary navigation">
+          <a href="#articles">Journal</a>
+          <a href="#topics">Topics</a>
+          <a href="#principles">Principles</a>
+        </nav>
+
+        <a class="nav-cta" href="#articles">
+          Start reading
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3 8h10M9 4l4 4-4 4"></path>
+          </svg>
+        </a>
+      </div>
     </header>
 
-    <main>
-      <section class="index-hero">
-        <div class="index-copy">
-          <p class="kicker">Backend systems, protocols, infrastructure</p>
-          <h1>Mythic blueprints for engineers building real systems.</h1>
+    <main id="content">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy reveal">
+          <p class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Engineering field notes
+            <span aria-hidden="true">/</span>
+            07 deep dives
+          </p>
+
+          <h1 id="hero-title">
+            <span>Systems, explained</span>
+            <span>from the <em>inside out.</em></span>
+          </h1>
+
+          <p class="hero-dek">
+            Visual, production-minded essays on the architecture, protocols, and tradeoffs behind software that has to hold when the easy assumptions fail.
+          </p>
+
+          <div class="hero-actions">
+            <a class="button button--primary" href="#articles">
+              Explore field notes
+              <svg viewBox="0 0 18 18" aria-hidden="true">
+                <path d="M4 9h10M10 5l4 4-4 4"></path>
+              </svg>
+            </a>
+            <a class="text-link" href="articles/how-we-build-infinite-scroll.html">
+              Read the latest
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+
+          <dl class="hero-facts" aria-label="Journal at a glance">
+            <div>
+              <dt>07</dt>
+              <dd>Deep dives</dd>
+            </div>
+            <div>
+              <dt>126</dt>
+              <dd>Minutes of reading</dd>
+            </div>
+            <div>
+              <dt>01</dt>
+              <dd>Useful mental model</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="hero-visual-wrap reveal reveal--delay">
+          <div class="system-visual" data-system-visual role="img" aria-label="Animated topology showing traffic moving from an edge client through an API and queue to workers and storage">
+            <div class="visual-header">
+              <span class="visual-status">
+                <i aria-hidden="true"></i>
+                System topology
+              </span>
+              <span>all paths nominal</span>
+            </div>
+
+            <div class="system-map" aria-hidden="true">
+              <svg class="route-map" viewBox="0 0 560 430" preserveAspectRatio="none" role="presentation">
+                <defs>
+                  <linearGradient id="routeGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#73d8c5" stop-opacity="0.65"></stop>
+                    <stop offset="0.52" stop-color="#d6b879" stop-opacity="0.52"></stop>
+                    <stop offset="1" stop-color="#d6b879" stop-opacity="0.16"></stop>
+                  </linearGradient>
+                  <radialGradient id="signalGlow">
+                    <stop offset="0" stop-color="#f6e8c7"></stop>
+                    <stop offset="0.35" stop-color="#d6b879"></stop>
+                    <stop offset="1" stop-color="#d6b879" stop-opacity="0"></stop>
+                  </radialGradient>
+                </defs>
+                <path class="route route--one" d="M82 211 C122 211 136 94 215 94"></path>
+                <path class="route route--two" d="M264 94 C330 94 314 211 378 211"></path>
+                <path class="route route--three" d="M378 211 C326 211 322 337 248 337"></path>
+                <path class="route route--four" d="M283 337 C351 337 376 337 466 337"></path>
+                <path class="route route--muted" d="M82 211 C124 277 160 337 205 337"></path>
+                <circle class="signal signal--one" cx="82" cy="211" r="17" fill="url(#signalGlow)"></circle>
+                <circle class="signal signal--two" cx="378" cy="211" r="13" fill="url(#signalGlow)"></circle>
+              </svg>
+
+              <span class="map-index map-index--one">01</span>
+              <span class="map-index map-index--two">02</span>
+              <span class="map-index map-index--three">03</span>
+
+              <div class="map-node map-node--edge">
+                <span class="node-icon">
+                  <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="10" rx="2"></rect><path d="M7 17h6M10 14v3"></path></svg>
+                </span>
+                <span><small>Input</small>Edge client</span>
+              </div>
+              <div class="map-node map-node--api">
+                <span class="node-icon node-icon--gold">
+                  <svg viewBox="0 0 20 20"><path d="M4 6h12v8H4zM7 3v3M13 3v3M7 14v3M13 14v3"></path></svg>
+                </span>
+                <span><small>Gateway</small>API layer</span>
+              </div>
+              <div class="map-node map-node--queue">
+                <span class="node-icon">
+                  <svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h9"></path><circle cx="16" cy="15" r="1"></circle></svg>
+                </span>
+                <span><small>Buffer</small>Event queue</span>
+              </div>
+              <div class="map-node map-node--workers">
+                <span class="node-icon node-icon--gold">
+                  <svg viewBox="0 0 20 20"><rect x="3" y="3" width="5" height="5" rx="1"></rect><rect x="12" y="3" width="5" height="5" rx="1"></rect><rect x="3" y="12" width="5" height="5" rx="1"></rect><rect x="12" y="12" width="5" height="5" rx="1"></rect></svg>
+                </span>
+                <span><small>Compute</small>Worker pool</span>
+              </div>
+              <div class="map-node map-node--store">
+                <span class="node-icon">
+                  <svg viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="6" ry="2.5"></ellipse><path d="M4 5v5c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5M4 10v5c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-5"></path></svg>
+                </span>
+                <span><small>State</small>Data store</span>
+              </div>
+            </div>
+
+            <div class="visual-footer">
+              <span><i class="legend-dot legend-dot--teal"></i> request path</span>
+              <span><i class="legend-dot legend-dot--gold"></i> durable path</span>
+              <span class="visual-code">dj.sys/007</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="topic-ribbon reveal" id="topics" aria-label="Journal topics">
+        <div class="topic-ribbon-label">
+          <span>Explore the atlas</span>
+          <small>Four recurring territories</small>
+        </div>
+        <a href="#articles" data-topic-jump="system-design">
+          <span>01</span>
+          System design
+          <small>4 notes</small>
+        </a>
+        <a href="#articles" data-topic-jump="payments">
+          <span>02</span>
+          Payments
+          <small>2 notes</small>
+        </a>
+        <a href="#articles" data-topic-jump="database">
+          <span>03</span>
+          Databases
+          <small>1 note</small>
+        </a>
+        <a href="#articles" data-topic-jump="protocols">
+          <span>04</span>
+          Protocols
+          <small>1 note</small>
+        </a>
+      </section>
+
+      <section class="journal" id="articles" aria-labelledby="journal-title">
+        <div class="section-intro reveal">
+          <div>
+            <p class="section-label">The journal</p>
+            <h2 id="journal-title">Field notes for difficult systems.</h2>
+          </div>
           <p>
-            Practical essays on API design, distributed systems, runtime tradeoffs, and cloud architecture, written like a map through the labyrinth.
+            Each essay starts with a real engineering constraint, builds a visual model, and ends with the tradeoffs you would carry into production.
           </p>
         </div>
 
-        <aside class="signal-panel" aria-label="Site signals">
-          <div class="signal-row">
-            <span>Mode</span>
-            <strong>Oracle notes</strong>
-          </div>
-          <div class="signal-row">
-            <span>Stack</span>
-            <strong>HTTP, Java, Cloudflare</strong>
-          </div>
-          <div class="signal-row">
-            <span>Bias</span>
-            <strong>Clear tradeoffs</strong>
-          </div>
-        </aside>
-      </section>
-
-      <section class="article-list" id="articles" aria-labelledby="latest">
-        <div class="section-heading">
-          <p class="kicker">Current notes</p>
-          <h2 id="latest">System blueprints</h2>
+        <div class="filter-bar reveal" role="group" aria-label="Filter articles by topic">
+          <button class="filter-button is-active" type="button" data-filter="all" aria-pressed="true">All notes</button>
+          <button class="filter-button" type="button" data-filter="system-design" aria-pressed="false">System design</button>
+          <button class="filter-button" type="button" data-filter="payments" aria-pressed="false">Payments</button>
+          <button class="filter-button" type="button" data-filter="database" aria-pressed="false">Databases</button>
+          <button class="filter-button" type="button" data-filter="protocols" aria-pressed="false">Protocols</button>
+          <span class="filter-count" data-filter-count>07 notes</span>
+          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 7 notes</span>
         </div>
 
-        <article class="article-card">
-          <div>
-            <p class="article-meta">System design, 15 min read</p>
+        <article class="featured-story reveal" data-article data-categories="system-design">
+          <div class="featured-copy">
+            <div class="story-meta">
+              <span>Latest field note</span>
+              <span>System design</span>
+              <span>15 min read</span>
+            </div>
+            <p class="story-number">No. 01</p>
             <h3>
               <a href="articles/how-we-build-infinite-scroll.html">How We Build Infinite Scroll</a>
             </h3>
             <p>
-              A plain-English look at how endless feeds stay fast and stable, from offset pagination problems to cursor-based pagination, virtualization, prefetching, and ranking at scale.
+              Why endless feeds break, and how cursors, virtualization, prefetching, and ranking keep them fast without lying to the user.
             </p>
+            <span class="story-cta" aria-hidden="true">
+              Read the field note
+              <svg viewBox="0 0 18 18"><path d="M4 9h10M10 5l4 4-4 4"></path></svg>
+            </span>
           </div>
-          <a class="read-link" href="articles/how-we-build-infinite-scroll.html" aria-label="Read infinite scroll article">Read note</a>
+
+          <div class="feed-schematic" aria-hidden="true">
+            <div class="schematic-label"><span>feed.pipeline</span><span>cursor / 9f2a</span></div>
+            <div class="feed-window">
+              <div class="feed-card feed-card--ghost">
+                <i></i><span></span><b></b>
+              </div>
+              <div class="feed-card">
+                <i></i><span></span><b></b>
+              </div>
+              <div class="feed-card feed-card--active">
+                <i></i><span></span><b></b>
+                <em>viewport</em>
+              </div>
+              <div class="feed-card">
+                <i></i><span></span><b></b>
+              </div>
+              <div class="feed-card feed-card--ghost">
+                <i></i><span></span><b></b>
+              </div>
+            </div>
+            <div class="cursor-line"><span>next_cursor</span><i></i><b></b></div>
+          </div>
         </article>
 
-        <article class="article-card">
-          <div>
-            <p class="article-meta">System design, 20 min read</p>
-            <h3>
-              <a href="articles/payment-system-hld.html">Payment System Design: Stripe Like Architecture</a>
-            </h3>
-            <p>
-              A practical high level design of a Stripe like payment system, including card tokenization, idempotency, auditability, reconciliation, Kafka ordering, webhooks, and scaling beyond 10,000 TPS.
-            </p>
-          </div>
-          <a class="read-link" href="articles/payment-system-hld.html" aria-label="Read payment system design article">Read note</a>
-        </article>
+        <div class="article-grid">
+          <article class="article-card reveal" data-article data-categories="system-design payments" style="--card-accent: #d6b879;">
+            <div class="card-topline">
+              <span>System design</span>
+              <span>20 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--payments" aria-hidden="true">
+              <span class="mini-node">API</span><i></i><span class="mini-node">Ledger</span><i></i><span class="mini-node mini-node--accent">Rail</span>
+            </div>
+            <p class="card-number">02 / 07</p>
+            <h3><a href="articles/payment-system-hld.html">Payment System Design: Stripe-like Architecture</a></h3>
+            <p>Idempotency, ledgers, reconciliation, Kafka ordering, webhooks, and the path beyond 10,000 TPS.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
 
-        <article class="article-card">
-          <div>
-            <p class="article-meta">Payments security, 24 min read</p>
-            <h3>
-              <a href="articles/payment-card-security.html">How Stripe Like Payment Systems Keep Card Data Away From Your Servers</a>
-            </h3>
-            <p>
-              A visual guide to hosted payment fields, iframe isolation, tokenization, card vaults, HSMs, PCI scope, network tokens, and the end to end card authorization path.
-            </p>
-          </div>
-          <a class="read-link" href="articles/payment-card-security.html" aria-label="Read payment card security article">Read note</a>
-        </article>
+          <article class="article-card reveal" data-article data-categories="payments" style="--card-accent: #73d8c5;">
+            <div class="card-topline">
+              <span>Payments security</span>
+              <span>24 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--vault" aria-hidden="true">
+              <span class="vault-ring"></span>
+              <span class="vault-core">PAN</span>
+              <i class="vault-line vault-line--left"></i>
+              <i class="vault-line vault-line--right"></i>
+              <small>token boundary</small>
+            </div>
+            <p class="card-number">03 / 07</p>
+            <h3><a href="articles/payment-card-security.html">How Payment Systems Keep Card Data Away From Your Servers</a></h3>
+            <p>Hosted fields, iframe isolation, tokenization, HSMs, PCI scope, and the authorization path.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
 
-        <article class="article-card">
-          <div>
-            <p class="article-meta">Database internals, 22 min read</p>
-            <h3>
-              <a href="articles/postgresql-internals.html">PostgreSQL Internals: From Disk Pages to Replication</a>
-            </h3>
-            <p>
-              A visual guide to heap pages, indexes, shared buffers, WAL, dirty pages, MVCC, checkpoints, vacuum, crash recovery, and replication, with an interactive read and write path animation.
-            </p>
-          </div>
-          <a class="read-link" href="articles/postgresql-internals.html" aria-label="Read PostgreSQL internals article">Read note</a>
-        </article>
+          <article class="article-card reveal" data-article data-categories="database" style="--card-accent: #9eb9ff;">
+            <div class="card-topline">
+              <span>Database internals</span>
+              <span>22 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--database" aria-hidden="true">
+              <div><span></span><span></span><span></span></div>
+              <i></i>
+              <div><span></span><span></span><span></span></div>
+              <small>WAL → replica</small>
+            </div>
+            <p class="card-number">04 / 07</p>
+            <h3><a href="articles/postgresql-internals.html">PostgreSQL Internals: From Disk Pages to Replication</a></h3>
+            <p>Heap pages, indexes, shared buffers, WAL, MVCC, vacuum, recovery, and replication made visible.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
 
-        <article class="article-card">
-          <div>
-            <p class="article-meta">System design, 18 min read</p>
-            <h3>
-              <a href="articles/job-scheduler-hld.html">Job Scheduler System Design: High Level Architecture</a>
-            </h3>
-            <p>
-              A practical high level design of a scalable job scheduler, including time bucket partitioning, delayed queues, worker leases, retries, recurring executions, and user monitoring views.
-            </p>
-          </div>
-          <a class="read-link" href="articles/job-scheduler-hld.html" aria-label="Read job scheduler system design article">Read note</a>
-        </article>
+          <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #e9a98f;">
+            <div class="card-topline">
+              <span>System design</span>
+              <span>18 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--scheduler" aria-hidden="true">
+              <span class="clock-face"><i></i><b></b></span>
+              <em></em><em></em><em></em>
+              <small>lease / retry / run</small>
+            </div>
+            <p class="card-number">05 / 07</p>
+            <h3><a href="articles/job-scheduler-hld.html">Job Scheduler System Design</a></h3>
+            <p>Time buckets, delayed queues, worker leases, retries, recurring execution, and monitoring.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
 
-        <article class="article-card">
-          <div>
-            <p class="article-meta">System design, 15 min read</p>
-            <h3>
-              <a href="articles/whatsapp-hld.html">WhatsApp System Design: High Level Architecture</a>
-            </h3>
-            <p>
-              A practical high level design of WhatsApp style messaging, including chat servers, durable message storage, ordering, fanout, ACKs, offline sync, and push notifications.
-            </p>
-          </div>
-          <a class="read-link" href="articles/whatsapp-hld.html" aria-label="Read WhatsApp system design article">Read note</a>
-        </article>
+          <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #a9dd98;">
+            <div class="card-topline">
+              <span>System design</span>
+              <span>15 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--chat" aria-hidden="true">
+              <span>A</span><i></i><strong>Chat</strong><i></i><span>B</span>
+              <small>ACK 02 · delivered</small>
+            </div>
+            <p class="card-number">06 / 07</p>
+            <h3><a href="articles/whatsapp-hld.html">WhatsApp System Design: High-level Architecture</a></h3>
+            <p>Durable message storage, ordering, fanout, acknowledgements, offline sync, and push.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
 
-        <article class="article-card">
-          <div>
-            <p class="article-meta">Architecture, 12 min read</p>
-            <h3>
-              <a href="articles/rest-vs-grpc.html">REST vs gRPC: Why the Protocol You Choose Defines the System You Build</a>
-            </h3>
-            <p>
-              A practical comparison of REST, HTTP/2, gRPC, Protocol Buffers, gRPC Web, and Connect for modern API design.
-            </p>
-          </div>
-          <a class="read-link" href="articles/rest-vs-grpc.html" aria-label="Read REST vs gRPC article">Read note</a>
-        </article>
+          <article class="article-card reveal" data-article data-categories="protocols" style="--card-accent: #c5a9ef;">
+            <div class="card-topline">
+              <span>Architecture</span>
+              <span>12 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--protocols" aria-hidden="true">
+              <div><span>REST</span><i></i><b>JSON</b></div>
+              <div><span>gRPC</span><i></i><b>PROTO</b></div>
+            </div>
+            <p class="card-number">07 / 07</p>
+            <h3><a href="articles/rest-vs-grpc.html">REST vs gRPC: The Protocol Defines the System</a></h3>
+            <p>HTTP/2, Protocol Buffers, gRPC Web, Connect, and the boundary where each choice wins.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="principles reveal" id="principles" aria-labelledby="principles-title">
+        <div class="principles-heading">
+          <p class="section-label">Editorial principles</p>
+          <h2 id="principles-title">Less hand-waving.<br><em>More mental models.</em></h2>
+          <p>
+            Daedalus is an independent engineering journal for readers who want the machinery, not just the diagram.
+          </p>
+        </div>
+
+        <ol class="principle-list">
+          <li>
+            <span>01</span>
+            <div>
+              <h3>Make the invisible visible</h3>
+              <p>Requests, queues, storage, timing, and failure paths become diagrams you can reason about.</p>
+            </div>
+          </li>
+          <li>
+            <span>02</span>
+            <div>
+              <h3>Name the production tradeoff</h3>
+              <p>Every pattern earns its complexity. The journal tells you where it pays and where it does not.</p>
+            </div>
+          </li>
+          <li>
+            <span>03</span>
+            <div>
+              <h3>Leave with a reusable model</h3>
+              <p>The goal is not recall. It is a framework you can carry into the next design review.</p>
+            </div>
+          </li>
+        </ol>
       </section>
     </main>
 
     <footer class="site-footer">
-      <span>Daedalus Journal</span>
-      <span>Engineering notes hosted on Cloudflare Workers.</span>
+      <div class="footer-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 42 42" role="presentation">
+            <path d="M8 31.5 21 7l13 24.5M12.5 26h17M16 19.5h10"></path>
+            <path d="M8.5 31.5h25"></path>
+          </svg>
+        </span>
+        <div>
+          <strong>Daedalus Journal</strong>
+          <p>Engineering clarity for systems that cannot fail quietly.</p>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="#articles">Journal</a>
+        <a href="#topics">Topics</a>
+        <a href="#principles">Principles</a>
+      </div>
+      <p class="footer-note">© <span data-year>2026</span> Daedalus · Published at the edge</p>
     </footer>
   </body>
 </html>
