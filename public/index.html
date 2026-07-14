@@ -76,7 +76,7 @@
             <span class="eyebrow-dot" aria-hidden="true"></span>
             Engineering field notes
             <span aria-hidden="true">/</span>
-            07 deep dives
+            08 deep dives
           </p>
 
           <h1 id="hero-title">
@@ -103,11 +103,11 @@
 
           <dl class="hero-facts" aria-label="Journal at a glance">
             <div>
-              <dt>07</dt>
+              <dt>08</dt>
               <dd>Deep dives</dd>
             </div>
             <div>
-              <dt>126</dt>
+              <dt>144</dt>
               <dd>Minutes of reading</dd>
             </div>
             <div>
@@ -203,7 +203,7 @@
         <a href="#articles" data-topic-jump="system-design">
           <span>01</span>
           System design
-          <small>4 notes</small>
+          <small>5 notes</small>
         </a>
         <a href="#articles" data-topic-jump="payments">
           <span>02</span>
@@ -239,8 +239,8 @@
           <button class="filter-button" type="button" data-filter="payments" aria-pressed="false">Payments</button>
           <button class="filter-button" type="button" data-filter="database" aria-pressed="false">Databases</button>
           <button class="filter-button" type="button" data-filter="protocols" aria-pressed="false">Protocols</button>
-          <span class="filter-count" data-filter-count>07 notes</span>
-          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 7 notes</span>
+          <span class="filter-count" data-filter-count>08 notes</span>
+          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 8 notes</span>
         </div>
 
         <article class="featured-story reveal" data-article data-categories="system-design">
@@ -296,7 +296,7 @@
             <div class="mini-schematic mini-schematic--payments" aria-hidden="true">
               <span class="mini-node">API</span><i></i><span class="mini-node">Ledger</span><i></i><span class="mini-node mini-node--accent">Rail</span>
             </div>
-            <p class="card-number">02 / 07</p>
+            <p class="card-number">02 / 08</p>
             <h3><a href="articles/payment-system-hld.html">Payment System Design: Stripe-like Architecture</a></h3>
             <p>Idempotency, ledgers, reconciliation, Kafka ordering, webhooks, and the path beyond 10,000 TPS.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -314,7 +314,7 @@
               <i class="vault-line vault-line--right"></i>
               <small>token boundary</small>
             </div>
-            <p class="card-number">03 / 07</p>
+            <p class="card-number">03 / 08</p>
             <h3><a href="articles/payment-card-security.html">How Payment Systems Keep Card Data Away From Your Servers</a></h3>
             <p>Hosted fields, iframe isolation, tokenization, HSMs, PCI scope, and the authorization path.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -331,7 +331,7 @@
               <div><span></span><span></span><span></span></div>
               <small>WAL → replica</small>
             </div>
-            <p class="card-number">04 / 07</p>
+            <p class="card-number">04 / 08</p>
             <h3><a href="articles/postgresql-internals.html">PostgreSQL Internals: From Disk Pages to Replication</a></h3>
             <p>Heap pages, indexes, shared buffers, WAL, MVCC, vacuum, recovery, and replication made visible.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -347,7 +347,7 @@
               <em></em><em></em><em></em>
               <small>lease / retry / run</small>
             </div>
-            <p class="card-number">05 / 07</p>
+            <p class="card-number">05 / 08</p>
             <h3><a href="articles/job-scheduler-hld.html">Job Scheduler System Design</a></h3>
             <p>Time buckets, delayed queues, worker leases, retries, recurring execution, and monitoring.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -362,9 +362,24 @@
               <span>A</span><i></i><strong>Chat</strong><i></i><span>B</span>
               <small>ACK 02 · delivered</small>
             </div>
-            <p class="card-number">06 / 07</p>
+            <p class="card-number">06 / 08</p>
             <h3><a href="articles/whatsapp-hld.html">WhatsApp System Design: High-level Architecture</a></h3>
             <p>Durable message storage, ordering, fanout, acknowledgements, offline sync, and push.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
+
+          <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #60a5fa;">
+            <div class="card-topline">
+              <span>System design</span>
+              <span>18 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--files" aria-hidden="true">
+              <span>Client</span><i></i><strong>Sync</strong><i></i><span>S3</span>
+              <small>chunk · commit · cursor</small>
+            </div>
+            <p class="card-number">07 / 08</p>
+            <h3><a href="articles/dropbox-hld.html">Dropbox System Design: Storage, Sync, and Sharing</a></h3>
+            <p>Multipart uploads, safe version commits, change cursors, conflict handling, sharing, and delta sync.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
           </article>
 
@@ -377,7 +392,7 @@
               <div><span>REST</span><i></i><b>JSON</b></div>
               <div><span>gRPC</span><i></i><b>PROTO</b></div>
             </div>
-            <p class="card-number">07 / 07</p>
+            <p class="card-number">08 / 08</p>
             <h3><a href="articles/rest-vs-grpc.html">REST vs gRPC: The Protocol Defines the System</a></h3>
             <p>HTTP/2, Protocol Buffers, gRPC Web, Connect, and the boundary where each choice wins.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>

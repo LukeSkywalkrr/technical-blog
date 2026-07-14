@@ -1560,6 +1560,38 @@ main {
   padding: 1rem 15%;
 }
 
+.mini-schematic--files {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.mini-schematic--files > span,
+.mini-schematic--files > strong {
+  position: relative;
+  z-index: 1;
+  padding: 0.42rem 0.55rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--bone-soft);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  font-weight: 500;
+}
+
+.mini-schematic--files > strong {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(96, 165, 250, 0.13);
+  color: #bcd5ff;
+}
+
+.mini-schematic--files > i {
+  width: 1.15rem;
+  height: 1px;
+  background: linear-gradient(90deg, var(--muted), #60a5fa);
+}
+
 .mini-schematic--protocols > div {
   display: grid;
   grid-template-columns: 50px 1fr 48px;
