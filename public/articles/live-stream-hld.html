@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How We Send One Live Moment to Millions of Screens</title>
+<meta name="description" content="A visual system design guide to live video streaming, from capture and encoding to manifests, CDNs, adaptive bitrate, buffering, and low latency delivery." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f3ec;
+  --bg-2:#efe9de;
+  --ink:#1a1a1a;
+  --ink-soft:#3d3d3d;
+  --muted:#6b6b6b;
+  --line:#d9d1c2;
+  --accent:#c53030;
+  --accent-2:#e07a3f;
+  --accent-soft:rgba(197,48,48,.08);
+  --code-bg:#231f1c;
+  --code-ink:#f4ede0;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 10px 40px -12px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Newsreader','Iowan Old Style','Georgia',serif;
+  font-size:20px;
+  line-height:1.65;
+  font-weight:400;
+  letter-spacing:-.003em;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  font-variation-settings:"opsz" 24;
+}
+p{
+  font-family:'Newsreader',serif;
+  font-variation-settings:"opsz" 20;
+}
+p em{font-style:italic;font-variation-settings:"opsz" 20}
+blockquote{font-family:'Fraunces',serif}
+ul li{font-family:'Newsreader',serif;font-variation-settings:"opsz" 20}
+
+/* Progress bar */
+#progress{
+  position:fixed;top:0;left:0;height:3px;width:0%;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  z-index:1000;transition:width .05s linear;
+  box-shadow:0 0 12px rgba(197,48,48,.4);
+}
+
+/* Live pill */
+.live-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 14px;border-radius:999px;
+  background:var(--accent);color:#fff;
+  font-family:'Inter',sans-serif;
+  font-size:11px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;
+}
+.live-pill::before{
+  content:'';width:8px;height:8px;border-radius:50%;
+  background:#fff;animation:pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:.4;transform:scale(1.3)}
+}
+
+/* Hero */
+.hero{
+  min-height:100vh;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:80px 40px 60px;
+  max-width:1100px;margin:0 auto;
+  position:relative;
+}
+.hero .kicker{color:var(--muted);font-size:13px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:24px}
+.hero h1{
+  font-family:'Fraunces',serif;
+  font-weight:400;
+  font-size:clamp(42px,7vw,92px);
+  line-height:1.02;
+  letter-spacing:-.02em;
+  margin:24px 0 32px;
+  font-variation-settings:"opsz" 144,"SOFT" 30;
+}
+.hero h1 em{font-style:italic;color:var(--accent);font-variation-settings:"opsz" 144,"SOFT" 100,"WONK" 1}
+.hero .lede{
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-size:clamp(19px,2.2vw,26px);
+  line-height:1.5;
+  color:var(--ink-soft);
+  max-width:720px;
+  margin-bottom:48px;
+}
+.hero .meta{
+  display:flex;gap:32px;flex-wrap:wrap;
+  padding-top:32px;border-top:1px solid var(--line);
+  font-size:14px;color:var(--muted);
+}
+.hero .meta strong{color:var(--ink);font-weight:500;display:block;font-size:11px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:4px}
+
+/* Hero animated dots */
+.hero-viz{
+  position:absolute;top:80px;right:40px;
+  width:260px;height:260px;opacity:.9;
+  display:none;
+}
+@media(min-width:900px){.hero-viz{display:block}}
+
+/* Article */
+article{
+  max-width:720px;margin:0 auto;padding:0 24px 120px;
+}
+section.chapter{padding:80px 0;border-top:1px solid var(--line)}
+section.chapter:first-of-type{border-top:none}
+
+.chapter-num{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;color:var(--accent);
+  letter-spacing:.2em;margin-bottom:12px;
+  display:block;
+}
+h2{
+  font-family:'Fraunces',serif;
+  font-weight:400;
+  font-size:clamp(30px,4vw,44px);
+  line-height:1.15;letter-spacing:-.015em;
+  margin-bottom:14px;
+  font-variation-settings:"opsz" 100,"SOFT" 20;
+}
+h3{
+  font-family:'Fraunces',serif;
+  font-style:italic;font-weight:400;
+  font-size:clamp(20px,2.4vw,26px);
+  color:var(--muted);
+  margin-bottom:40px;
+  font-variation-settings:"opsz" 40,"SOFT" 100;
+}
+h4{
+  font-family:'Fraunces',serif;
+  font-weight:500;
+  font-size:22px;
+  margin:48px 0 16px;
+  letter-spacing:-.01em;
+}
+p{margin-bottom:24px;color:var(--ink-soft)}
+p strong{color:var(--ink);font-weight:600}
+p em{font-style:italic}
+/* Drop cap on first paragraph after the chapter subtitle */
+section.chapter > h3 + p::first-letter{
+  font-family:'Fraunces',serif;
+  font-weight:500;
+  font-size:5.4em;
+  float:left;
+  line-height:.88;
+  padding:6px 12px 0 0;
+  color:var(--accent);
+  font-variation-settings:"opsz" 144,"SOFT" 30;
+}
+
+blockquote{
+  border-left:3px solid var(--accent);
+  padding:8px 0 8px 24px;
+  margin:32px 0;
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-size:22px;
+  line-height:1.5;
+  color:var(--ink);
+}
+blockquote strong{font-style:normal;font-weight:600}
+
+pre.code{
+  background:var(--code-bg);
+  color:var(--code-ink);
+  padding:24px 28px;
+  border-radius:8px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:13.5px;
+  line-height:1.65;
+  overflow-x:auto;
+  margin:28px 0;
+  box-shadow:var(--shadow);
+  white-space:pre;
+}
+
+/* Flow diagram cards — replace ugly terminal blocks */
+.flow{
+  margin:36px -20px;
+  padding:36px 32px;
+  background:linear-gradient(180deg, #fdfaf3 0%, #f2ebdd 100%);
+  border:1px solid var(--line);
+  border-radius:14px;
+  box-shadow:var(--shadow);
+  position:relative;
+  overflow:hidden;
+}
+.flow::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent));
+}
+@media(max-width:700px){.flow{margin:28px -12px;padding:24px 18px}}
+.flow svg{width:100%;height:auto;display:block}
+.flow-title{
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-size:14px;
+  color:var(--muted);
+  text-align:center;
+  margin-top:14px;
+  letter-spacing:.02em;
+}
+
+/* Manifest card — pretends to be a real playlist UI */
+.manifest{
+  margin:36px -20px;
+  background:#1a1a1a;
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+  font-family:'JetBrains Mono',monospace;
+}
+@media(max-width:700px){.manifest{margin:28px -12px}}
+.manifest-head{
+  background:#0f0f0f;
+  padding:14px 20px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.manifest-head .dots{display:flex;gap:6px}
+.manifest-head .dots span{width:10px;height:10px;border-radius:50%;background:#3a3a3a}
+.manifest-head .dots span:first-child{background:var(--accent)}
+.manifest-head .file{
+  color:#a8a8a8;font-size:12px;margin-left:auto;
+  letter-spacing:.05em;
+}
+.manifest-body{padding:24px 28px;color:#e0d9ca;font-size:14px;line-height:2}
+.manifest-body .h{color:var(--accent-2);text-transform:uppercase;letter-spacing:.1em;font-size:11px;margin-top:8px;display:block}
+.manifest-body .h:first-child{margin-top:0}
+.manifest-body .row{display:flex;align-items:center;gap:14px;padding:4px 0}
+.manifest-body .q{color:#fff;font-weight:500;min-width:70px}
+.manifest-body .arr{color:#666}
+.manifest-body .br{color:#f4ede0}
+.manifest-body .tag{
+  margin-left:auto;font-size:10px;padding:2px 8px;border-radius:999px;
+  background:rgba(197,48,48,.2);color:#ff8a8a;letter-spacing:.05em;
+}
+.manifest-body .seg{
+  display:inline-block;padding:2px 10px;margin-right:6px;
+  background:#2a2523;border-radius:4px;color:#f4ede0;font-size:12px;
+}
+.manifest-body .seg.live{background:var(--accent);color:#fff;animation:pulse 1.6s ease-in-out infinite}
+
+/* Two-column tradeoff card */
+.tradeoff{
+  margin:36px -20px;
+  display:grid;grid-template-columns:1fr 1fr;
+  border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow);
+}
+@media(max-width:600px){.tradeoff{grid-template-columns:1fr;margin:28px -12px}}
+.tradeoff > div{padding:32px 28px}
+.tradeoff .left{background:linear-gradient(180deg,#2a2523,#1a1a1a);color:#f4ede0}
+.tradeoff .right{background:linear-gradient(180deg,var(--accent),#8f2020);color:#fff}
+.tradeoff h5{
+  font-family:'Fraunces',serif;font-weight:500;font-size:20px;
+  margin-bottom:16px;letter-spacing:-.01em;
+}
+.tradeoff ul{list-style:none;margin:0;padding:0}
+.tradeoff li{
+  font-family:'Newsreader',serif;font-size:15px;line-height:1.5;
+  padding:8px 0;display:flex;align-items:flex-start;gap:12px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  color:#fff;
+}
+.tradeoff li:last-child{border-bottom:none}
+.tradeoff li::before{
+  content:'→';color:currentColor;opacity:.6;font-family:'JetBrains Mono',monospace;
+  flex-shrink:0;
+}
+code.inline{
+  font-family:'JetBrains Mono',monospace;
+  font-size:.88em;
+  background:var(--bg-2);
+  padding:2px 7px;
+  border-radius:4px;
+  color:var(--ink);
+}
+ul{margin:16px 0 22px 24px;color:var(--ink-soft)}
+ul li{margin-bottom:8px}
+
+/* Fancy diagrams */
+.viz{
+  margin:40px -40px;
+  padding:40px;
+  background:var(--bg-2);
+  border-radius:12px;
+  box-shadow:var(--shadow);
+}
+@media(max-width:700px){.viz{margin:32px -12px;padding:24px 16px}}
+.viz-caption{
+  font-family:'Fraunces',serif;font-style:italic;
+  color:var(--muted);font-size:15px;
+  text-align:center;margin-top:16px;
+}
+.viz svg{width:100%;height:auto;display:block}
+
+/* Fade-in on scroll */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .8s ease,transform .8s ease}
+.reveal.in{opacity:1;transform:none}
+
+/* Section divider */
+.divider{
+  text-align:center;color:var(--line);
+  margin:40px 0;font-size:22px;letter-spacing:1em;
+}
+
+/* TOC */
+.toc{
+  position:fixed;left:24px;top:50%;transform:translateY(-50%);
+  z-index:100;display:none;
+}
+@media(min-width:1200px){.toc{display:block}}
+.toc ol{list-style:none;padding:0}
+.toc li{margin:8px 0}
+.toc a{
+  color:var(--muted);text-decoration:none;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;letter-spacing:.1em;
+  display:flex;align-items:center;gap:10px;
+  transition:color .2s;
+}
+.toc a::before{
+  content:'';width:14px;height:1px;background:var(--muted);
+  transition:width .3s,background .3s;
+}
+.toc a:hover, .toc a.active{color:var(--accent)}
+.toc a:hover::before, .toc a.active::before{width:28px;background:var(--accent)}
+.toc a span.tnum{opacity:.5}
+
+/* Final architecture card */
+.final{
+  background:linear-gradient(180deg,#1a1a1a,#2a2523);
+  color:#f4ede0;
+  padding:60px 40px;
+  border-radius:16px;
+  margin:60px -40px;
+  box-shadow:var(--shadow);
+}
+@media(max-width:700px){.final{margin:40px -12px;padding:36px 20px}}
+.final h2{color:#f4ede0}
+.final p{color:rgba(244,237,224,.75)}
+
+/* Footer */
+footer{
+  text-align:center;padding:60px 24px;
+  color:var(--muted);font-size:13px;letter-spacing:.1em;
+  border-top:1px solid var(--line);
+  max-width:720px;margin:0 auto;
+}
+footer .q{
+  font-family:'Fraunces',serif;font-style:italic;
+  font-size:22px;color:var(--ink);
+  margin-bottom:20px;line-height:1.5;
+}
+
+/* SVG animation helpers */
+@keyframes flow{
+  0%{stroke-dashoffset:20}
+  100%{stroke-dashoffset:0}
+}
+.flow-line{stroke-dasharray:6 4;animation:flow 1.5s linear infinite}
+@keyframes packet{
+  0%{opacity:0;offset-distance:0%}
+  10%{opacity:1}
+  90%{opacity:1}
+  100%{opacity:0;offset-distance:100%}
+}
+@keyframes fadeInScale{
+  from{opacity:0;transform:scale(.9)}
+  to{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<nav class="toc" aria-label="Table of contents">
+  <ol id="toc-list"></ol>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="live-pill">Live</div>
+  <div class="hero-viz">
+    <svg viewBox="0 0 260 260">
+      <defs>
+        <radialGradient id="rg1"><stop offset="0%" stop-color="#c53030" stop-opacity=".3"/><stop offset="100%" stop-color="#c53030" stop-opacity="0"/></radialGradient>
+      </defs>
+      <circle cx="130" cy="130" r="120" fill="url(#rg1)"/>
+      <circle cx="130" cy="130" r="80" fill="none" stroke="#c53030" stroke-width="1" opacity=".4"/>
+      <circle cx="130" cy="130" r="50" fill="none" stroke="#c53030" stroke-width="1" opacity=".6"/>
+      <circle cx="130" cy="130" r="6" fill="#c53030"/>
+      <circle cx="130" cy="130" r="20" fill="none" stroke="#c53030" stroke-width="2">
+        <animate attributeName="r" from="6" to="120" dur="2.4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" from="1" to="0" dur="2.4s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="130" cy="130" r="20" fill="none" stroke="#c53030" stroke-width="2">
+        <animate attributeName="r" from="6" to="120" dur="2.4s" begin="0.8s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" from="1" to="0" dur="2.4s" begin="0.8s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="130" cy="130" r="20" fill="none" stroke="#c53030" stroke-width="2">
+        <animate attributeName="r" from="6" to="120" dur="2.4s" begin="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" from="1" to="0" dur="2.4s" begin="1.6s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+  </div>
+  <div class="kicker">Systems &nbsp;·&nbsp; Deep Dive</div>
+  <h1>How we send<br/>one live <em>moment</em><br/>to millions of screens.</h1>
+  <p class="lede">A fighter lands a punch in Las Vegas. A few seconds later, the same moment appears on phones, laptops, and televisions around the world. This is what happens behind that single Watch Live button.</p>
+  <div class="meta">
+    <div><strong>Read time</strong>22 minutes</div>
+    <div><strong>Chapters</strong>Eleven</div>
+    <div><strong>Topic</strong>Distributed systems, media delivery</div>
+  </div>
+</header>
+
+<article>
+
+<!-- Intro -->
+<section class="chapter reveal" id="intro">
+  <span class="chapter-num">00 — Prologue</span>
+  <h2>The button that hides a system.</h2>
+  <h3>You tap Watch Live. The video starts.</h3>
+  <p>Maybe it is sharp 1080p. Maybe your internet slows down and the picture becomes blurry for a few seconds. Then the quality quietly improves again.</p>
+  <p>You never choose a server. You never download a file. You never tell the application that your Wi-Fi just became slower.</p>
+  <p>The stream simply keeps playing.</p>
+  <p>But behind that small <strong>Watch Live</strong> button is a system solving several difficult problems at the same time:</p>
+  <ul>
+    <li>How does one camera feed reach millions of people?</li>
+    <li>How can the same event work on both fast broadband and unstable mobile internet?</li>
+    <li>How can the video change quality without restarting?</li>
+    <li>And why are you still seeing the action a few seconds after it actually happened?</li>
+  </ul>
+  <p>Let us build the system one problem at a time.</p>
+</section>
+
+<!-- 01 -->
+<section class="chapter reveal" id="c1">
+  <span class="chapter-num">01 — The illusion</span>
+  <h2>It feels like a direct connection.</h2>
+  <h3>The camera captures. The frame travels. Your screen displays.</h3>
+  <p>When you watch a live event, it feels as though your phone is connected directly to the camera. Something like this:</p>
+  <div class="flow">
+    <svg viewBox="0 0 700 130">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c53030"/></marker>
+      </defs>
+      <g>
+        <rect x="60" y="35" width="180" height="60" rx="10" fill="#1a1a1a"/>
+        <circle cx="100" cy="65" r="14" fill="none" stroke="#c53030" stroke-width="2"/>
+        <circle cx="100" cy="65" r="6" fill="#c53030"/>
+        <text x="150" y="60" fill="#f4ede0" font-family="Inter" font-size="14" font-weight="600">Camera</text>
+        <text x="150" y="78" fill="#a8a8a8" font-family="JetBrains Mono" font-size="10">SOURCE</text>
+      </g>
+      <line x1="255" y1="65" x2="445" y2="65" stroke="#c53030" stroke-width="2" class="flow-line" marker-end="url(#a1)"/>
+      <g>
+        <rect x="460" y="35" width="180" height="60" rx="10" fill="#c53030"/>
+        <rect x="482" y="52" width="46" height="30" rx="3" fill="#1a1a1a"/>
+        <rect x="486" y="56" width="38" height="22" rx="1" fill="#f4ede0"/>
+        <text x="548" y="60" fill="#fff" font-family="Inter" font-size="14" font-weight="600">Your screen</text>
+        <text x="548" y="78" fill="rgba(255,255,255,.75)" font-family="JetBrains Mono" font-size="10">VIEWER</text>
+      </g>
+    </svg>
+    <div class="flow-title">The naive design — direct connection.</div>
+  </div>
+  <p>Simple. Except this design breaks almost immediately.</p>
+  <p>A major event may have millions of viewers. If every device received its own copy directly from the source, the source would need to maintain millions of connections and repeatedly send the same video bytes across the internet.</p>
+  <p>Even worse, every viewer has a different network. One person may have a 500 Mbps broadband connection. Another may be watching on unstable mobile data inside a moving train. A single high-quality video feed cannot work well for both.</p>
+  <p>And there is another problem. A live event does not have an ending yet. When you open a movie, the complete file already exists. A live stream is being created <em>while</em> people are watching it.</p>
+  <p>So our real goal is not simply:</p>
+  <blockquote>Send video from a camera to a screen.</blockquote>
+  <p>It is this:</p>
+  <blockquote><strong>Continuously turn one live production feed into millions of reliable viewing experiences across different devices, locations, and network conditions.</strong></blockquote>
+</section>
+
+<!-- 02 -->
+<section class="chapter reveal" id="c2">
+  <span class="chapter-num">02 — The first problem</span>
+  <h2>One stream, many internet speeds.</h2>
+  <h3>You cannot send the same version to everyone.</h3>
+  <p>Suppose the platform sends a single 1080p feed at 5 Mbps to every viewer. Someone on 2 Mbps cannot download the video as quickly as it is being played. Every second, the player falls further behind. Eventually the buffer empties. The video freezes.</p>
+  <p>Send everyone a smaller video instead? Now viewers with fast internet receive poor quality even though their connection could support something much better.</p>
+  <p>We need several versions of the same live event.</p>
+
+  <h4>The fix: create a bitrate ladder</h4>
+  <p>The production feed enters a set of video encoders that continuously create multiple versions of the same stream. This process is called <strong>transcoding</strong>, and each output is called a <strong>rendition</strong>.</p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 340" role="img" aria-label="Bitrate ladder diagram">
+      <defs>
+        <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c53030"/></marker>
+      </defs>
+      <!-- Source -->
+      <rect x="270" y="20" width="160" height="60" rx="8" fill="#1a1a1a"/>
+      <text x="350" y="46" text-anchor="middle" fill="#f4ede0" font-family="Inter" font-size="13" font-weight="600">Production feed</text>
+      <text x="350" y="66" text-anchor="middle" fill="#a8a8a8" font-family="JetBrains Mono" font-size="11">source · 1 input</text>
+      <!-- Encoder -->
+      <rect x="270" y="120" width="160" height="50" rx="8" fill="#c53030"/>
+      <text x="350" y="150" text-anchor="middle" fill="#fff" font-family="Inter" font-size="13" font-weight="600">Encoder / Transcoder</text>
+      <!-- Arrows to encoder -->
+      <line x1="350" y1="80" x2="350" y2="118" stroke="#c53030" stroke-width="2" marker-end="url(#ar1)" class="flow-line"/>
+      <!-- Fan out -->
+      <line x1="350" y1="170" x2="130" y2="220" stroke="#c53030" stroke-width="2" marker-end="url(#ar1)" class="flow-line"/>
+      <line x1="350" y1="170" x2="350" y2="220" stroke="#c53030" stroke-width="2" marker-end="url(#ar1)" class="flow-line"/>
+      <line x1="350" y1="170" x2="570" y2="220" stroke="#c53030" stroke-width="2" marker-end="url(#ar1)" class="flow-line"/>
+      <!-- Renditions -->
+      <g>
+        <rect x="50" y="230" width="160" height="80" rx="8" fill="#efe9de" stroke="#c53030" stroke-width="1.5"/>
+        <text x="130" y="258" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="22" font-weight="500">1080p</text>
+        <text x="130" y="280" text-anchor="middle" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">5 Mbps · H.264</text>
+        <text x="130" y="298" text-anchor="middle" fill="#c53030" font-family="Inter" font-size="10" font-weight="600">HIGH QUALITY</text>
+      </g>
+      <g>
+        <rect x="270" y="230" width="160" height="80" rx="8" fill="#efe9de" stroke="#c53030" stroke-width="1.5"/>
+        <text x="350" y="258" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="22" font-weight="500">720p</text>
+        <text x="350" y="280" text-anchor="middle" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">2.5 Mbps · H.264</text>
+        <text x="350" y="298" text-anchor="middle" fill="#c53030" font-family="Inter" font-size="10" font-weight="600">BALANCED</text>
+      </g>
+      <g>
+        <rect x="490" y="230" width="160" height="80" rx="8" fill="#efe9de" stroke="#c53030" stroke-width="1.5"/>
+        <text x="570" y="258" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="22" font-weight="500">480p</text>
+        <text x="570" y="280" text-anchor="middle" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">1 Mbps · H.264</text>
+        <text x="570" y="298" text-anchor="middle" fill="#c53030" font-family="Inter" font-size="10" font-weight="600">MOBILE / SLOW</text>
+      </g>
+    </svg>
+    <div class="viz-caption">The bitrate ladder — one input, many parallel outputs.</div>
+  </div>
+
+  <p>A rendition is not defined only by resolution. It also has a bitrate, codec, frame rate, and other encoding settings. Modern codecs such as HEVC and AV1 can reach similar visual quality at roughly 30–50 percent lower bitrate, at the cost of more expensive encoding and narrower device support.</p>
+  <p>Now we have a version for almost every viewer. But we have created a new problem. Suppose a viewer starts in 1080p. Thirty seconds later, their Wi-Fi becomes slow. How do we move them to 480p without restarting the video?</p>
+  <p>We cannot treat the stream as one enormous, never-ending file. We need to break it apart.</p>
+</section>
+
+<!-- 03 -->
+<section class="chapter reveal" id="c3">
+  <span class="chapter-num">03 — Segments</span>
+  <h2>Stop thinking of video as one long file.</h2>
+  <h3>Cut the stream into small, interchangeable pieces.</h3>
+  <p>Instead of producing one continuous video file, the system divides each rendition into a sequence of small media segments. Each column below represents the same moment on the timeline, encoded at different qualities.</p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 320" role="img" aria-label="Aligned segments across renditions">
+      <!-- Row labels -->
+      <text x="30" y="70" fill="#1a1a1a" font-family="Fraunces" font-size="18" font-weight="500">1080p</text>
+      <text x="30" y="150" fill="#1a1a1a" font-family="Fraunces" font-size="18" font-weight="500">720p</text>
+      <text x="30" y="230" fill="#1a1a1a" font-family="Fraunces" font-size="18" font-weight="500">480p</text>
+
+      <!-- Segments 1080p -->
+      <g id="row1080"></g>
+      <g id="row720"></g>
+      <g id="row480"></g>
+
+      <!-- Time axis -->
+      <line x1="100" y1="280" x2="670" y2="280" stroke="#6b6b6b" stroke-width="1"/>
+      <text x="100" y="300" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">t</text>
+      <text x="670" y="300" text-anchor="end" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">now →</text>
+
+      <!-- Alignment dashes -->
+      <g stroke="#c53030" stroke-width="1" stroke-dasharray="2 3" opacity=".35">
+        <line x1="200" y1="45" x2="200" y2="270"/>
+        <line x1="290" y1="45" x2="290" y2="270"/>
+        <line x1="380" y1="45" x2="380" y2="270"/>
+        <line x1="470" y1="45" x2="470" y2="270"/>
+        <line x1="560" y1="45" x2="560" y2="270"/>
+      </g>
+    </svg>
+    <div class="viz-caption">Aligned segments across renditions. Segment 103 at any quality contains the same slice of time.</div>
+  </div>
+
+  <p>That alignment is not accidental. Video is compressed by describing most frames as differences from earlier frames. To switch qualities cleanly, the player has to begin decoding a rendition at a frame that stands on its own — an <strong>IDR keyframe</strong>. So every encoder in the ladder is instructed to place a keyframe at exactly the same points on the timeline, and segments are cut on those keyframes.</p>
+
+  <h4>Now watch what happens when the network changes</h4>
+  <p>The alignment lets the player finish one segment and request the next segment at a different quality — with no restart.</p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 240" id="abrSwitch" role="img" aria-label="Adaptive bitrate switching demo">
+      <text x="20" y="30" fill="#1a1a1a" font-family="JetBrains Mono" font-size="12" font-weight="600">PLAYER TIMELINE</text>
+      <g id="abrRow"></g>
+      <!-- Network state indicator -->
+      <text x="20" y="200" fill="#6b6b6b" font-family="JetBrains Mono" font-size="12">Network:</text>
+      <rect id="netBar" x="90" y="188" width="200" height="14" rx="7" fill="#c53030"/>
+      <text id="netLabel" x="300" y="200" fill="#1a1a1a" font-family="Inter" font-size="12" font-weight="600">Fast</text>
+    </svg>
+    <div class="viz-caption">Adaptive bitrate in action — the player picks a quality per segment based on network health.</div>
+  </div>
+
+  <p>The viewer may notice that the picture became softer, but playback continues. This is the foundation of <strong>adaptive bitrate streaming</strong>. The stream is no longer one endless file — it is a timeline made from many small, interchangeable pieces.</p>
+
+  <h4>Why not make the pieces extremely small?</h4>
+  <p>Smaller segments allow the player to react more quickly. If each segment lasts six seconds, the player may need to wait longer before changing quality. Two-second segments adapt sooner. But smaller segments also create more requests, more metadata, and reduce compression efficiency, because keyframes are expensive and shorter segments mean more of them.</p>
+  <p>Segment size is a trade-off. Large segments are efficient but less responsive. Small segments react faster but increase overhead.</p>
+</section>
+
+<!-- 04 -->
+<section class="chapter reveal" id="c4">
+  <span class="chapter-num">04 — The manifest</span>
+  <h2>A small file that describes the stream.</h2>
+  <h3>Before any video moves, the player asks for a map.</h3>
+  <p>When you press <strong>Watch Live</strong>, the application does not immediately download video. It first requests a small text document called a <strong>manifest</strong> or <strong>playlist</strong>. Conceptually, it might say:</p>
+  <div class="manifest">
+    <div class="manifest-head">
+      <div class="dots"><span></span><span></span><span></span></div>
+      <div class="file">stream.m3u8</div>
+    </div>
+    <div class="manifest-body">
+      <span class="h">Available qualities</span>
+      <div class="row"><span class="q">1080p</span><span class="arr">→</span><span class="br">5 Mbps</span><span class="tag">HIGH</span></div>
+      <div class="row"><span class="q">720p</span><span class="arr">→</span><span class="br">2.5 Mbps</span><span class="tag">MID</span></div>
+      <div class="row"><span class="q">480p</span><span class="arr">→</span><span class="br">1 Mbps</span><span class="tag">LOW</span></div>
+      <br/>
+      <span class="h">Latest available segments</span>
+      <div style="margin-top:8px">
+        <span class="seg">101</span><span class="seg">102</span><span class="seg">103</span><span class="seg live">104 ●</span>
+      </div>
+    </div>
+  </div>
+  <p>HLS commonly uses playlists with the <code class="inline">.m3u8</code> extension. MPEG-DASH commonly uses a manifest with the <code class="inline">.mpd</code> extension. Increasingly both are backed by the same underlying media format — <strong>CMAF</strong> — so a single set of segments on the origin can be described by either playlist type. That means one packaging pipeline can serve Apple devices (which historically required HLS) and everything else without duplicating the media.</p>
+  <p>The player reads this map and begins requesting segments. Because this is a live event, new segments keep appearing. The playlist advances as the encoder produces more video. Older segments may eventually disappear from the live window.</p>
+  <p>At this point our architecture looks like this:</p>
+  <div class="flow">
+    <svg viewBox="0 0 700 480">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c53030"/></marker>
+        <linearGradient id="stageGrad" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#2a2523"/><stop offset="100%" stop-color="#1a1a1a"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Production feed -->
+      <rect x="240" y="20" width="220" height="54" rx="10" fill="url(#stageGrad)"/>
+      <circle cx="270" cy="47" r="8" fill="#c53030"/>
+      <circle cx="270" cy="47" r="14" fill="none" stroke="#c53030" stroke-width="1.5" opacity=".5"/>
+      <text x="298" y="43" fill="#f4ede0" font-family="Inter" font-size="13" font-weight="600">Production feed</text>
+      <text x="298" y="60" fill="#a8a8a8" font-family="JetBrains Mono" font-size="10">SOURCE</text>
+      <line x1="350" y1="74" x2="350" y2="110" stroke="#c53030" stroke-width="2" class="flow-line" marker-end="url(#a2)"/>
+
+      <!-- Encoder -->
+      <rect x="240" y="112" width="220" height="54" rx="10" fill="url(#stageGrad)" stroke="#c53030" stroke-width="1.5"/>
+      <text x="350" y="135" text-anchor="middle" fill="#f4ede0" font-family="Inter" font-size="13" font-weight="600">Encoder</text>
+      <text x="350" y="152" text-anchor="middle" fill="#a8a8a8" font-family="JetBrains Mono" font-size="10">TRANSCODE</text>
+
+      <!-- Fan out to renditions -->
+      <line x1="350" y1="166" x2="140" y2="200" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+      <line x1="350" y1="166" x2="350" y2="200" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+      <line x1="350" y1="166" x2="560" y2="200" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+
+      <!-- Renditions -->
+      <rect x="60" y="210" width="160" height="44" rx="8" fill="#fdfaf3" stroke="#c53030"/>
+      <text x="140" y="230" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="16" font-weight="500">1080p</text>
+      <text x="140" y="246" text-anchor="middle" fill="#c53030" font-family="JetBrains Mono" font-size="10">5 Mbps</text>
+
+      <rect x="270" y="210" width="160" height="44" rx="8" fill="#fdfaf3" stroke="#c53030"/>
+      <text x="350" y="230" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="16" font-weight="500">720p</text>
+      <text x="350" y="246" text-anchor="middle" fill="#c53030" font-family="JetBrains Mono" font-size="10">2.5 Mbps</text>
+
+      <rect x="480" y="210" width="160" height="44" rx="8" fill="#fdfaf3" stroke="#c53030"/>
+      <text x="560" y="230" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="16" font-weight="500">480p</text>
+      <text x="560" y="246" text-anchor="middle" fill="#c53030" font-family="JetBrains Mono" font-size="10">1 Mbps</text>
+
+      <!-- Merge to packager -->
+      <line x1="140" y1="254" x2="350" y2="290" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+      <line x1="350" y1="254" x2="350" y2="290" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+      <line x1="560" y1="254" x2="350" y2="290" stroke="#c53030" stroke-width="1.5" class="flow-line" marker-end="url(#a2)"/>
+
+      <!-- Packager -->
+      <rect x="240" y="298" width="220" height="54" rx="10" fill="url(#stageGrad)" stroke="#c53030" stroke-width="1.5"/>
+      <text x="350" y="321" text-anchor="middle" fill="#f4ede0" font-family="Inter" font-size="13" font-weight="600">Packager</text>
+      <text x="350" y="338" text-anchor="middle" fill="#a8a8a8" font-family="JetBrains Mono" font-size="10">SEGMENT · WRAP · SIGN</text>
+      <line x1="350" y1="352" x2="350" y2="388" stroke="#c53030" stroke-width="2" class="flow-line" marker-end="url(#a2)"/>
+
+      <!-- Manifest + segments -->
+      <rect x="200" y="390" width="300" height="42" rx="8" fill="#fdfaf3" stroke="#c53030" stroke-width="1.5"/>
+      <text x="350" y="416" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="14" font-weight="500">Manifest + media segments</text>
+      <line x1="350" y1="432" x2="350" y2="452" stroke="#c53030" stroke-width="2" marker-end="url(#a2)"/>
+
+      <!-- Viewer -->
+      <rect x="270" y="452" width="160" height="24" rx="12" fill="#c53030"/>
+      <text x="350" y="469" text-anchor="middle" fill="#fff" font-family="Inter" font-size="12" font-weight="600">VIEWER</text>
+    </svg>
+    <div class="flow-title">The full delivery pipeline — source to screen.</div>
+  </div>
+  <p>This works for one viewer. Perhaps even a few thousand viewers. Then the event becomes popular. Five million people request the same new segment within a few seconds. And our origin server melts.</p>
+</section>
+
+<!-- 05 -->
+<section class="chapter reveal" id="c5">
+  <span class="chapter-num">05 — The scale problem</span>
+  <h2>Millions of viewers want the same bytes.</h2>
+  <h3>Put copies close to the people who want them.</h3>
+  <p>Imagine that segment 8,421 contains the winning goal. Every viewer watching near the live edge needs that segment. Without another layer, every request travels back to the origin. Its network capacity becomes the bottleneck.</p>
+  <p>The problem is unusual because the system is doing enormous work while serving highly repetitive data. Millions of people are not requesting millions of different videos — they are requesting the same few newly created segments. That repetition gives us the solution.</p>
+
+  <h4>The fix: a Content Delivery Network</h4>
+  <p>A CDN operates servers in many geographic locations, called edge locations or points of presence. When a viewer requests a segment, the request goes to a nearby CDN edge rather than directly to the origin.</p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 400" role="img" aria-label="CDN fan-out">
+      <defs>
+        <radialGradient id="pulseG"><stop offset="0%" stop-color="#c53030" stop-opacity=".4"/><stop offset="100%" stop-color="#c53030" stop-opacity="0"/></radialGradient>
+      </defs>
+      <!-- Origin -->
+      <circle cx="350" cy="60" r="30" fill="#1a1a1a"/>
+      <text x="350" y="65" text-anchor="middle" fill="#f4ede0" font-family="Inter" font-size="11" font-weight="600">ORIGIN</text>
+      <!-- Lines to edges -->
+      <line x1="350" y1="90" x2="140" y2="190" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+      <line x1="350" y1="90" x2="350" y2="190" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+      <line x1="350" y1="90" x2="560" y2="190" stroke="#c53030" stroke-width="1.5" class="flow-line"/>
+      <!-- Edges -->
+      <g>
+        <circle cx="140" cy="215" r="45" fill="url(#pulseG)"/>
+        <circle cx="140" cy="215" r="25" fill="#c53030"/>
+        <text x="140" y="219" text-anchor="middle" fill="#fff" font-family="Inter" font-size="10" font-weight="600">EDGE</text>
+        <text x="140" y="275" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="15" font-weight="500">Mumbai</text>
+      </g>
+      <g>
+        <circle cx="350" cy="215" r="45" fill="url(#pulseG)"/>
+        <circle cx="350" cy="215" r="25" fill="#c53030"/>
+        <text x="350" y="219" text-anchor="middle" fill="#fff" font-family="Inter" font-size="10" font-weight="600">EDGE</text>
+        <text x="350" y="275" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="15" font-weight="500">Frankfurt</text>
+      </g>
+      <g>
+        <circle cx="560" cy="215" r="45" fill="url(#pulseG)"/>
+        <circle cx="560" cy="215" r="25" fill="#c53030"/>
+        <text x="560" y="219" text-anchor="middle" fill="#fff" font-family="Inter" font-size="10" font-weight="600">EDGE</text>
+        <text x="560" y="275" text-anchor="middle" fill="#1a1a1a" font-family="Fraunces" font-size="15" font-weight="500">Ashburn</text>
+      </g>
+      <!-- Viewers -->
+      <g id="viewers"></g>
+    </svg>
+    <div class="viz-caption">One origin, many edges, millions of viewers. Most bytes are served from the nearest edge cache.</div>
+  </div>
+
+  <p>Suppose the first viewer near Mumbai requests segment 8,421. The edge may not have it yet — a <strong>cache miss</strong>. The edge retrieves the segment from the origin and stores a temporary copy. The next thousands of nearby viewers request the same segment. Now the edge already has it. Those are <strong>cache hits</strong>.</p>
+  <p>The CDN absorbs most of the video traffic. The origin remains the source of truth for newly produced segments, but it no longer needs to deliver every byte directly to every viewer.</p>
+  <p>Live streaming has a particularly useful form of locality: most viewers are watching approximately the same moment. When a new segment appears, many people request it within a short time window. That makes newly produced segments extremely valuable to cache.</p>
+  <p>The system now scales. But there is still a difficult question. Who decides whether the next segment should be 1080p, 720p, or 480p? Not the encoder. Not the CDN. The decision is made on the viewer's device.</p>
+</section>
+
+<!-- 06 -->
+<section class="chapter reveal" id="c6">
+  <span class="chapter-num">06 — The player</span>
+  <h2>The player is the control system.</h2>
+  <h3>It is doing much more than displaying video.</h3>
+  <p>A modern video player is not a passive screen. It continuously observes playback and makes decisions. It watches:</p>
+  <ul>
+    <li>how quickly recent segments downloaded;</li>
+    <li>how much playable video is already buffered;</li>
+    <li>whether the network appears stable;</li>
+    <li>which qualities the device can decode.</li>
+  </ul>
+  <p>Before requesting the next segment, the player asks:</p>
+  <blockquote>Which quality gives me the best picture without risking a stall?</blockquote>
+  <p>Suppose the viewer's network currently supports about 8 Mbps. The player may choose 1080p. Then the viewer enters an elevator. Available bandwidth drops. The latest segment takes longer to download. The buffer begins shrinking.</p>
+  <p>The player does not wait for the video to freeze. It requests a smaller version of the next segment. The picture becomes blurry — but the video keeps moving. A few seconds of lower quality is better than a frozen screen. When the connection improves and the buffer becomes healthy, the player climbs back to a higher quality.</p>
+  <p>This process is called <strong>Adaptive Bitrate</strong>, or <strong>ABR</strong>, selection.</p>
+
+  <h4>Why does the player keep a buffer?</h4>
+  <p>The player usually downloads slightly ahead of what you are currently watching. That downloaded video becomes a safety reserve.</p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 140" role="img" aria-label="Buffer visualization">
+      <!-- Timeline -->
+      <rect x="20" y="50" width="660" height="40" rx="6" fill="#efe9de" stroke="#d9d1c2"/>
+      <!-- Already played -->
+      <rect x="20" y="50" width="240" height="40" rx="6" fill="#d9d1c2"/>
+      <!-- Playing now marker -->
+      <rect x="260" y="42" width="4" height="56" fill="#c53030"/>
+      <!-- Buffered -->
+      <rect x="264" y="50" width="180" height="40" fill="#c53030" opacity=".85">
+        <animate attributeName="width" values="180;140;180;200;180" dur="6s" repeatCount="indefinite"/>
+      </rect>
+      <!-- Labels -->
+      <text x="140" y="30" text-anchor="middle" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">ALREADY PLAYED</text>
+      <text x="262" y="120" text-anchor="middle" fill="#c53030" font-family="JetBrains Mono" font-size="11" font-weight="600">▲ PLAYHEAD</text>
+      <text x="354" y="30" text-anchor="middle" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">BUFFERED AHEAD</text>
+      <text x="560" y="30" text-anchor="middle" fill="#6b6b6b" font-family="JetBrains Mono" font-size="11">NOT YET DOWNLOADED</text>
+    </svg>
+    <div class="viz-caption">If the network stalls for a second, the buffer keeps playback smooth. It is a safety reserve.</div>
+  </div>
+
+  <p>Without a buffer, every small network delay would immediately freeze the stream. But buffering creates a trade-off: a larger buffer improves stability, a smaller buffer keeps the viewer closer to the actual event.</p>
+</section>
+
+<!-- 07 -->
+<section class="chapter reveal" id="c7">
+  <span class="chapter-num">07 — Failure</span>
+  <h2>Live events do not have a retry button.</h2>
+  <h3>Reliability has to begin at the source.</h3>
+  <p>A movie can be processed again tomorrow. A live final cannot. If the only network connection from the stadium fails during the winning moment, no downstream CDN can recreate the missing video.</p>
+  <p>Large platforms may use multiple independent contribution paths from the venue, and duplicate the processing pipeline across regions. If one path loses packets or fails, the other continues carrying the feed.</p>
+  <div class="flow">
+    <svg viewBox="0 0 700 320">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c53030"/></marker>
+      </defs>
+
+      <!-- Venue -->
+      <rect x="240" y="20" width="220" height="54" rx="10" fill="#1a1a1a"/>
+      <text x="350" y="43" text-anchor="middle" fill="#f4ede0" font-family="Inter" font-size="13" font-weight="600">Production venue</text>
+      <text x="350" y="60" text-anchor="middle" fill="#a8a8a8" font-family="JetBrains Mono" font-size="10">STADIUM · ARENA · STUDIO</text>
+
+      <!-- Split lines -->
+      <line x1="350" y1="74" x2="350" y2="100" stroke="#c53030" stroke-width="2"/>
+      <line x1="180" y1="100" x2="520" y2="100" stroke="#c53030" stroke-width="2"/>
+      <line x1="180" y1="100" x2="180" y2="140" stroke="#c53030" stroke-width="2" class="flow-line" marker-end="url(#a3)"/>
+      <line x1="520" y1="100" x2="520" y2="140" stroke="#c53030" stroke-width="2" class="flow-line" marker-end="url(#a3)"/>
+
+      <!-- Path A -->
+      <rect x="90" y="148" width="180" height="54" rx="10" fill="#fdfaf3" stroke="#c53030" stroke-width="1.5"/>
+      <circle cx="115" cy="175" r="6" fill="#2f9e44"/>
+      <text x="130" y="172" fill="#1a1a1a" font-family="Fraunces" font-size="16" font-weight="500">Path A</text>
+      <text x="130" y="190" fill="#6b6b6b" font-family="JetBrains Mono" font-size="10">Fiber · Primary</text>
+
+      <!-- Path B -->
+      <rect x="430" y="148" width="180" height="54" rx="10" fill="#fdfaf3" stroke="#c53030" stroke-width="1.5"/>
+      <circle cx="455" cy="175" r="6" fill="#2f9e44"/>
+      <text x="470" y="172" fill="#1a1a1a" font-family="Fraunces" font-size="16" font-weight="500">Path B</text>
+      <text x="470" y="190" fill="#6b6b6b" font-family="JetBrains Mono" font-size="10">Satellite · Backup</text>
+
+      <!-- Merge lines -->
+      <line x1="180" y1="202" x2="180" y2="230" stroke="#c53030" stroke-width="2"/>
+      <line x1="520" y1="202" x2="520" y2="230" stroke="#c53030" stroke-width="2"/>
+      <line x1="180" y1="230" x2="520" y2="230" stroke="#c53030" stroke-width="2"/>
+      <line x1="350" y1="230" x2="350" y2="258" stroke="#c53030" stroke-width="2" class="flow-line" marker-end="url(#a3)"/>
+
+      <!-- Ingest -->
+      <rect x="240" y="266" width="220" height="42" rx="10" fill="#c53030"/>
+      <text x="350" y="292" text-anchor="middle" fill="#fff" font-family="Inter" font-size="13" font-weight="600">Ingest layer</text>
+    </svg>
+    <div class="flow-title">Two independent contribution paths converge at ingest — if one fails, the other carries the feed.</div>
+  </div>
+  <p>But running two pipelines is not enough. Their outputs must remain compatible. If Region A creates one timeline and Region B creates differently timed segments, switching between them could create jumps, missing frames, or playback errors.</p>
+  <p>The redundant pipelines therefore need aligned timing and compatible segment boundaries — the same keyframe discipline that makes ABR switching work also makes cross-region failover work.</p>
+  <p>The goal is not merely:</p>
+  <blockquote>Keep another server running.</blockquote>
+  <p>It is:</p>
+  <blockquote><strong>Make the backup output usable as a seamless replacement.</strong></blockquote>
+  <p>The viewer sees one Play button. The platform sees many independent failure domains — multiple origins, multiple CDN providers, real-time traffic steering, health monitoring from client devices, automatic failover between regions.</p>
+</section>
+
+<!-- 08 -->
+<section class="chapter reveal" id="c8">
+  <span class="chapter-num">08 — Latency</span>
+  <h2>Where the delay comes from.</h2>
+  <h3>A fighter lands a punch. Your friend in the stadium reacts. You see it several seconds later.</h3>
+  <p>That delay did not come from one slow server. It accumulated across the entire pipeline.</p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 320" role="img" aria-label="Latency accumulation">
+      <g id="latStages"></g>
+    </svg>
+    <div class="viz-caption">Each stage adds a little time. Typical HLS/DASH end-to-end delay: 10–45 seconds.</div>
+  </div>
+
+  <p>Together, those delays become the difference between what is happening and what the viewer sees. One major source is waiting for a segment to finish: if segments are six seconds long, the system must collect and encode enough video to complete the segment before the player can download it. Then the player may keep several more seconds buffered for safety.</p>
+
+  <h4>The low-latency idea</h4>
+  <p>Modern low-latency streaming stops treating a segment as an all-or-nothing object. Instead of waiting for an entire six-second segment:</p>
+  <div class="flow" style="padding:24px 32px">
+    <svg viewBox="0 0 700 70">
+      <rect x="20" y="15" width="660" height="40" rx="8" fill="#c53030"/>
+      <text x="350" y="40" text-anchor="middle" fill="#fff" font-family="Inter" font-size="14" font-weight="600" letter-spacing=".08em">FULL SEGMENT — 6 seconds</text>
+    </svg>
+    <div class="flow-title">One monolithic segment. The player must wait for the whole thing.</div>
+  </div>
+  <p>the encoder produces it in smaller pieces (called <strong>parts</strong> in Low-Latency HLS, or <strong>chunks</strong> in CMAF) and publishes them the moment each is ready:</p>
+  <div class="flow" style="padding:24px 32px">
+    <svg viewBox="0 0 700 70" id="partsBar">
+      <g id="parts"></g>
+    </svg>
+    <div class="flow-title">Broken into four parts — each one ships to the player the moment it's ready.</div>
+  </div>
+  <p>Two techniques deliver these pieces to the player before the full segment exists.</p>
+  <p>The first is <strong>HTTP chunked transfer encoding</strong>. The origin begins responding to a segment request as soon as the first chunk is encoded, and continues writing chunks into the same open HTTP response as they arrive from the encoder. The player starts decoding immediately, while the tail of the segment is still being produced upstream.</p>
+  <p>The second is a smarter way of discovering new pieces. Instead of the player repeatedly polling — <em>Is the next part ready? Is it ready now? What about now?</em> — the player can request a future playlist update and allow the server or CDN to hold that HTTP request until new media becomes available. LL-HLS calls this a blocking playlist reload.</p>
+  <p>Together, these can bring end-to-end delay down to around 2–5 seconds while still using ordinary CDNs and HTTP caching.</p>
+
+  <h4>When even that is too slow</h4>
+  <p>Some products — live auctions, interactive game shows, sports betting, remote-camera control — cannot tolerate even a few seconds of delay. For these, platforms reach for <strong>WebRTC</strong>, which can deliver sub-second latency by giving up on segmented HTTP delivery entirely and using a persistent peer connection instead. The trade-off is real: WebRTC does not cache the way HTTP does, so scaling it to millions of viewers requires specialized fan-out infrastructure that most CDNs do not natively provide.</p>
+
+  <h4>Why not reduce latency to almost zero for everyone?</h4>
+  <p>Because lower latency removes safety margin. A player with very little buffered video has less protection from network variation. Live streaming balances two competing goals:</p>
+  <div class="tradeoff">
+    <div class="left">
+      <h5>More buffering</h5>
+      <ul>
+        <li>More stable playback</li>
+        <li>Survives network hiccups</li>
+        <li>Higher end-to-end delay</li>
+      </ul>
+    </div>
+    <div class="right">
+      <h5>Less buffering</h5>
+      <ul>
+        <li>Lower delay, closer to live</li>
+        <li>Feels real-time</li>
+        <li>Greater risk of stalls</li>
+      </ul>
+    </div>
+  </div>
+  <p>A sports broadcast may tolerate five seconds of delay to remain stable for millions of viewers. A live auction may accept a smaller audience in exchange for near-real-time interaction. The correct architecture depends on the product.</p>
+</section>
+
+<!-- 09 -->
+<section class="chapter reveal" id="c9">
+  <span class="chapter-num">09 — The rest of the payload</span>
+  <h2>What the pipeline still has to carry.</h2>
+  <h3>A real commercial live event carries more than pixels.</h3>
+
+  <h4>Content protection</h4>
+  <p>Almost every paid live event — sports, concerts, pay-per-view — is encrypted. The video segments on the CDN are useless without a decryption key, and the key is only handed out to players that prove they are running an approved <strong>DRM</strong> system: Widevine on most Android and Chrome, FairPlay on Apple devices, PlayReady on Windows and many smart TVs.</p>
+  <p>The player performs a license exchange with a DRM server before the first segment can be decoded, and the license may be time-limited so a leaked key stops working quickly. Thanks to CMAF's Common Encryption, the same encrypted segments on the origin can serve all three DRM systems — only the license negotiation differs.</p>
+
+  <h4>Ads</h4>
+  <p>For ad-supported streams, ads must be stitched into the live timeline. The common approach is <strong>server-side ad insertion (SSAI)</strong>: a service rewrites each viewer's manifest so that ad segments appear alongside program segments as one continuous playlist. The player has no idea it just watched an ad — which means ads cannot be blocked at the network layer and the ABR logic continues to work across the boundary. The cost is that every viewer effectively gets a personalized manifest, which changes how aggressively the manifest itself can be cached.</p>
+
+  <h4>Timed metadata</h4>
+  <p>Scoreboards, betting odds, chapter markers, subtitle cues, and interactive overlays all need to fire at exactly the right frame. They ride alongside the video as <strong>timed metadata</strong> — ID3 tags in HLS, <code class="inline">emsg</code> boxes in CMAF — attached to specific points on the media timeline. The player extracts them during playback and hands them to the application layer, which is why the score you see on screen stays synchronized with the goal even if your stream is running eight seconds behind reality.</p>
+</section>
+
+<!-- 10 -->
+<section class="chapter reveal" id="c10">
+  <span class="chapter-num">10 — Hyperscale</span>
+  <h2>The simple boxes become systems of their own.</h2>
+  <h3>Zooming in, every stage in the pipeline is itself a distributed system.</h3>
+
+  <h4>The origin becomes media-aware</h4>
+  <p>Millions of viewers often ask for the newest segment at nearly the same time. Some players may even request a segment slightly before the encoder has finished publishing it. A basic server may return repeated <code class="inline">404 Not Found</code> responses. The players retry. The retries create even more traffic.</p>
+  <p>A media-aware origin can recognize that the requested segment belongs to the live timeline and is expected soon. Instead of immediately returning an error, it can briefly hold the request and respond when the segment becomes available. Large platforms may also place distributed caches in front of durable storage so extreme read traffic does not interfere with the continuous write path from the encoder.</p>
+
+  <h4>One CDN may not be enough</h4>
+  <p>A platform serving viewers across many countries may use multiple CDN providers. One CDN may perform well for one internet provider but poorly for another. A regional outage or congestion event may affect only part of the audience. The platform can observe playback failures, buffering, and network latency from real client devices and shift future viewers toward a healthier CDN.</p>
+
+  <h4>Not every second of video costs the same</h4>
+  <p>A static interview scene is easier to compress than confetti falling across an entire stadium. Modern encoders vary bitrate according to visual complexity. This saves bandwidth while preserving quality — but it creates a subtle capacity problem. During a simple scene, a delivery server may appear underutilized, and a naive traffic router sends more viewers to it. Then the scene suddenly becomes complex, the bitrate rises for every viewer at once, and the server becomes overloaded.</p>
+  <p>So large delivery systems reserve capacity using the expected or nominal bitrate rather than trusting only the traffic visible at that exact moment. Even a bandwidth optimization changes how the rest of the system must scale.</p>
+</section>
+
+<!-- 11 -->
+<section class="chapter reveal" id="c11">
+  <span class="chapter-num">11 — Replay</span>
+  <h2>Replaying the entire journey.</h2>
+  <h3>You open the application and tap Watch Live. What actually happens?</h3>
+  <p>The event is captured at the venue. A high-quality production feed travels through redundant contribution paths into the streaming platform. The encoder continuously creates several renditions, all keyframe-aligned. The packager wraps them into CMAF segments, encrypts them under Common Encryption, and publishes manifests describing what is available. The latest segments arrive at the live origin.</p>
+  <p>CDN edge servers pull those segments on demand and serve cached copies to nearby viewers. Your player downloads the manifest, exchanges a DRM license, selects an initial quality, buffers a few seconds of video, and begins playback.</p>
+  <p>For every new segment, the player measures how the session is behaving. If the network is fast and the buffer is healthy, it may request a higher-quality rendition. If the network slows and the buffer begins shrinking, it requests a smaller segment. Timed metadata rides along, keeping on-screen scores and overlays in sync with the video frame they belong to.</p>
+  <p>Meanwhile, the system continues producing new video. The manifest moves forward. The CDN spreads new segments around the world. The player stays close to the live edge while keeping enough buffered video to survive small network disruptions.</p>
+  <p>And if a contribution link, encoder, region, origin, or CDN begins failing, redundant systems attempt to take over before the viewer notices.</p>
+  <p>All of that happens while you watch the same screen.</p>
+</section>
+
+<!-- Final architecture -->
+<div class="final reveal">
+  <span class="chapter-num" style="color:var(--accent-2)">FINAL ARCHITECTURE</span>
+  <h2 style="font-family:'Fraunces',serif">The full pipeline.</h2>
+  <p style="margin-top:16px">From a moment at the venue to a screen in your hand.</p>
+
+  <svg viewBox="0 0 700 720" style="margin:40px auto;display:block;max-width:100%">
+    <defs>
+      <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e07a3f"/></marker>
+    </defs>
+    <g font-family="Inter" font-size="13" font-weight="600">
+      <rect x="230" y="10" width="240" height="46" rx="6" fill="#c53030"/><text x="350" y="38" text-anchor="middle" fill="#fff">LIVE EVENT</text>
+      <line x1="350" y1="56" x2="350" y2="80" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
+
+      <rect x="200" y="80" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="108" text-anchor="middle" fill="#f4ede0">High-quality production feed</text>
+      <line x1="350" y1="126" x2="350" y2="150" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
+
+      <rect x="200" y="150" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="178" text-anchor="middle" fill="#f4ede0">Redundant contribution / ingest</text>
+      <line x1="350" y1="196" x2="350" y2="220" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
+
+      <rect x="200" y="220" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="248" text-anchor="middle" fill="#f4ede0">Transcoding pipeline</text>
+
+      <!-- Renditions fan -->
+      <line x1="350" y1="266" x2="130" y2="300" stroke="#e07a3f" stroke-width="1.5"/>
+      <line x1="350" y1="266" x2="270" y2="300" stroke="#e07a3f" stroke-width="1.5"/>
+      <line x1="350" y1="266" x2="430" y2="300" stroke="#e07a3f" stroke-width="1.5"/>
+      <line x1="350" y1="266" x2="570" y2="300" stroke="#e07a3f" stroke-width="1.5"/>
+
+      <rect x="90" y="300" width="80" height="34" rx="4" fill="#3a322e"/><text x="130" y="322" text-anchor="middle" fill="#f4ede0" font-size="12">1080p</text>
+      <rect x="230" y="300" width="80" height="34" rx="4" fill="#3a322e"/><text x="270" y="322" text-anchor="middle" fill="#f4ede0" font-size="12">720p</text>
+      <rect x="390" y="300" width="80" height="34" rx="4" fill="#3a322e"/><text x="430" y="322" text-anchor="middle" fill="#f4ede0" font-size="12">480p</text>
+      <rect x="530" y="300" width="80" height="34" rx="4" fill="#3a322e"/><text x="570" y="322" text-anchor="middle" fill="#f4ede0" font-size="12">360p</text>
+
+      <line x1="130" y1="334" x2="350" y2="370" stroke="#e07a3f" stroke-width="1.5"/>
+      <line x1="270" y1="334" x2="350" y2="370" stroke="#e07a3f" stroke-width="1.5"/>
+      <line x1="430" y1="334" x2="350" y2="370" stroke="#e07a3f" stroke-width="1.5"/>
+      <line x1="570" y1="334" x2="350" y2="370" stroke="#e07a3f" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+      <rect x="200" y="370" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="398" text-anchor="middle" fill="#f4ede0">Packager + encryption</text>
+      <line x1="350" y1="416" x2="350" y2="440" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
+
+      <rect x="200" y="440" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="468" text-anchor="middle" fill="#f4ede0">Manifest + aligned CMAF segments</text>
+      <line x1="350" y1="486" x2="350" y2="510" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
+
+      <rect x="200" y="510" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="538" text-anchor="middle" fill="#f4ede0">Live origin</text>
+      <line x1="350" y1="556" x2="350" y2="580" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
+
+      <rect x="200" y="580" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="608" text-anchor="middle" fill="#f4ede0">CDN edge locations</text>
+      <line x1="350" y1="626" x2="350" y2="650" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
+
+      <rect x="150" y="650" width="400" height="46" rx="6" fill="#c53030"/><text x="350" y="678" text-anchor="middle" fill="#fff">Adaptive player + DRM + timed metadata → Viewer</text>
+    </g>
+  </svg>
+
+  <p style="font-family:'Fraunces',serif;font-style:italic;font-size:20px;line-height:1.6;color:#f4ede0;margin-top:20px">Live streaming is not one giant video travelling from a camera to millions of screens. It is a continuously moving pipeline.</p>
+  <p>The encoder creates choices. Keyframe-aligned segments make those choices switchable. The manifest describes them. Encryption protects them. The CDN distributes them. The player decides which one is safe to request. The buffer hides network instability. Low-latency techniques reduce the distance from reality. Timed metadata keeps the rest of the experience in sync. And redundancy keeps the event alive when parts of the system fail.</p>
+</div>
+
+</article>
+
+<footer>
+  <div class="q">"How do we deliver the best possible version of a moment that did not exist a few seconds ago?"</div>
+  <div>You press one button. Behind it, a system is continuously answering.</div>
+  <div style="margin-top:24px;opacity:.6">— FIN —</div>
+</footer>
+
+<script>
+// Animated four-part segment bar
+function buildParts(){
+  const g = document.getElementById('parts');
+  if(!g) return;
+  const colors = ['#c53030','#d94545','#e07a3f','#e89555'];
+  for(let i=0;i<4;i++){
+    const x = 20 + i*167;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', x); rect.setAttribute('y', 15);
+    rect.setAttribute('width', 0); rect.setAttribute('height', 40);
+    rect.setAttribute('rx', 6);
+    rect.setAttribute('fill', colors[i]);
+    g.appendChild(rect);
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x', x + 82); t.setAttribute('y', 40);
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('fill','#fff');
+    t.setAttribute('font-family','Inter');
+    t.setAttribute('font-size','13');
+    t.setAttribute('font-weight','700');
+    t.setAttribute('letter-spacing','.05em');
+    t.setAttribute('opacity','0');
+    t.textContent = 'PART '+(i+1);
+    g.appendChild(t);
+    setTimeout(()=>{
+      rect.style.transition = 'width .5s ease';
+      rect.setAttribute('width', 163);
+      t.style.transition = 'opacity .3s ease .3s';
+      t.setAttribute('opacity','1');
+    }, 400*i + 300);
+  }
+}
+const partsEl = document.getElementById('partsBar');
+if(partsEl){
+  const partsObs = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ buildParts(); partsObs.disconnect(); }});
+  },{threshold:.4});
+  partsObs.observe(partsEl);
+}
+
+// Progress bar
+const progress = document.getElementById('progress');
+function updateProgress(){
+  const h = document.documentElement;
+  const scrolled = h.scrollTop;
+  const total = h.scrollHeight - h.clientHeight;
+  progress.style.width = (scrolled/total*100)+'%';
+}
+window.addEventListener('scroll', updateProgress, {passive:true});
+updateProgress();
+
+// Reveal on scroll
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }});
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+// TOC build
+const chapters = [
+  {id:'intro', label:'Prologue', n:'00'},
+  {id:'c1', label:'The illusion', n:'01'},
+  {id:'c2', label:'Bitrate ladder', n:'02'},
+  {id:'c3', label:'Segments', n:'03'},
+  {id:'c4', label:'The manifest', n:'04'},
+  {id:'c5', label:'Scale', n:'05'},
+  {id:'c6', label:'The player', n:'06'},
+  {id:'c7', label:'Failure', n:'07'},
+  {id:'c8', label:'Latency', n:'08'},
+  {id:'c9', label:'Payload', n:'09'},
+  {id:'c10', label:'Hyperscale', n:'10'},
+  {id:'c11', label:'Replay', n:'11'},
+];
+const tocList = document.getElementById('toc-list');
+chapters.forEach(c=>{
+  const li = document.createElement('li');
+  li.innerHTML = `<a href="#${c.id}" data-target="${c.id}"><span class="tnum">${c.n}</span><span>${c.label}</span></a>`;
+  tocList.appendChild(li);
+});
+
+// TOC active state
+const secs = chapters.map(c=>document.getElementById(c.id)).filter(Boolean);
+window.addEventListener('scroll',()=>{
+  const y = window.scrollY + window.innerHeight*0.3;
+  let active = secs[0];
+  for(const s of secs){ if(s.offsetTop <= y) active = s; }
+  document.querySelectorAll('.toc a').forEach(a=>{
+    a.classList.toggle('active', a.dataset.target === active.id);
+  });
+},{passive:true});
+
+// Build aligned segment grid
+function buildSegments(){
+  const rows = [
+    {id:'row1080', y:50, color:'#c53030', qual:'1080p'},
+    {id:'row720', y:130, color:'#e07a3f', qual:'720p'},
+    {id:'row480', y:210, color:'#3d3d3d', qual:'480p'},
+  ];
+  rows.forEach(row=>{
+    const g = document.getElementById(row.id);
+    if(!g) return;
+    for(let i=0;i<6;i++){
+      const x = 110 + i*90;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', x); rect.setAttribute('y', row.y);
+      rect.setAttribute('width', 80); rect.setAttribute('height', 45);
+      rect.setAttribute('rx', 4);
+      rect.setAttribute('fill', row.color); rect.setAttribute('opacity','.85');
+      rect.style.animation = `fadeInScale .5s ease ${i*.1}s both`;
+      g.appendChild(rect);
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', x+40); t.setAttribute('y', row.y+28);
+      t.setAttribute('text-anchor','middle');
+      t.setAttribute('fill','#fff');
+      t.setAttribute('font-family','JetBrains Mono');
+      t.setAttribute('font-size','12');
+      t.setAttribute('font-weight','600');
+      t.textContent = 101+i;
+      g.appendChild(t);
+    }
+  });
+}
+buildSegments();
+
+// ABR switching animation
+function buildAbr(){
+  const g = document.getElementById('abrRow');
+  if(!g) return;
+  const seq = [
+    {q:'1080p', c:'#c53030'},
+    {q:'1080p', c:'#c53030'},
+    {q:'720p', c:'#e07a3f'},
+    {q:'480p', c:'#3d3d3d'},
+    {q:'480p', c:'#3d3d3d'},
+    {q:'720p', c:'#e07a3f'},
+    {q:'1080p', c:'#c53030'},
+  ];
+  seq.forEach((s,i)=>{
+    const x = 40 + i*92;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', x); rect.setAttribute('y', 60);
+    rect.setAttribute('width', 82); rect.setAttribute('height', 60);
+    rect.setAttribute('rx', 6);
+    rect.setAttribute('fill', s.c); rect.setAttribute('opacity','0');
+    g.appendChild(rect);
+    const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x', x+41); label.setAttribute('y', 88);
+    label.setAttribute('text-anchor','middle');
+    label.setAttribute('fill','#fff');
+    label.setAttribute('font-family','Inter');
+    label.setAttribute('font-size','13');
+    label.setAttribute('font-weight','700');
+    label.textContent = s.q;
+    label.setAttribute('opacity','0');
+    g.appendChild(label);
+    const num = document.createElementNS('http://www.w3.org/2000/svg','text');
+    num.setAttribute('x', x+41); num.setAttribute('y', 108);
+    num.setAttribute('text-anchor','middle');
+    num.setAttribute('fill','rgba(255,255,255,.7)');
+    num.setAttribute('font-family','JetBrains Mono');
+    num.setAttribute('font-size','10');
+    num.textContent = 'seg '+(201+i);
+    num.setAttribute('opacity','0');
+    g.appendChild(num);
+
+    setTimeout(()=>{
+      rect.style.transition='opacity .5s';
+      label.style.transition='opacity .5s';
+      num.style.transition='opacity .5s';
+      rect.setAttribute('opacity','1');
+      label.setAttribute('opacity','1');
+      num.setAttribute('opacity','1');
+    }, 400*i + 300);
+  });
+
+  // Network state
+  const netBar = document.getElementById('netBar');
+  const netLabel = document.getElementById('netLabel');
+  const states = [
+    {w:200,c:'#2f9e44',t:'Fast'},
+    {w:200,c:'#2f9e44',t:'Fast'},
+    {w:120,c:'#e07a3f',t:'Slower'},
+    {w:60,c:'#c53030',t:'Poor'},
+    {w:60,c:'#c53030',t:'Poor'},
+    {w:130,c:'#e07a3f',t:'Recovering'},
+    {w:200,c:'#2f9e44',t:'Fast again'},
+  ];
+  states.forEach((s,i)=>{
+    setTimeout(()=>{
+      netBar.style.transition='width .5s, fill .5s';
+      netBar.setAttribute('width', s.w);
+      netBar.setAttribute('fill', s.c);
+      netLabel.textContent = s.t;
+    }, 400*i + 300);
+  });
+}
+
+// Trigger ABR when in view
+const abrEl = document.getElementById('abrSwitch');
+if(abrEl){
+  const abrObs = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ buildAbr(); abrObs.disconnect(); }});
+  },{threshold:.4});
+  abrObs.observe(abrEl);
+}
+
+// Viewers around edges
+function buildViewers(){
+  const g = document.getElementById('viewers');
+  if(!g) return;
+  const edges = [{x:140,y:215},{x:350,y:215},{x:560,y:215}];
+  edges.forEach((e,ei)=>{
+    for(let i=0;i<7;i++){
+      const angle = (Math.PI * (i/6)) + Math.PI*0.1;
+      const r = 75;
+      const vx = e.x + Math.cos(angle) * r;
+      const vy = e.y + Math.abs(Math.sin(angle)) * r + 20;
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', vx); c.setAttribute('cy', vy);
+      c.setAttribute('r', 4);
+      c.setAttribute('fill','#1a1a1a');
+      c.setAttribute('opacity','0');
+      c.style.animation = `fadeInScale .4s ease ${(ei*7+i)*0.05}s both`;
+      g.appendChild(c);
+    }
+  });
+}
+buildViewers();
+
+// Latency stages
+function buildLatency(){
+  const g = document.getElementById('latStages');
+  if(!g) return;
+  const stages = [
+    {label:'Camera captures', ms:'0s', w:20},
+    {label:'Feed reaches platform', ms:'+0.5s', w:40},
+    {label:'Video encoded', ms:'+2s', w:80},
+    {label:'Segments created', ms:'+6s', w:180},
+    {label:'Reach CDN', ms:'+7s', w:220},
+    {label:'Player downloads', ms:'+10s', w:340},
+    {label:'Buffer', ms:'+14s', w:480},
+    {label:'Displayed on screen', ms:'+18s', w:620},
+  ];
+  stages.forEach((s,i)=>{
+    const y = 20 + i*35;
+    const bar = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    bar.setAttribute('x', 20); bar.setAttribute('y', y);
+    bar.setAttribute('width', 0); bar.setAttribute('height', 22);
+    bar.setAttribute('rx', 4);
+    bar.setAttribute('fill', i < 4 ? '#e07a3f' : '#c53030');
+    g.appendChild(bar);
+    const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x', 22 + Math.max(s.w, 100) + 12); label.setAttribute('y', y+15);
+    label.setAttribute('fill','#1a1a1a');
+    label.setAttribute('font-family','Inter');
+    label.setAttribute('font-size','12');
+    label.setAttribute('font-weight','600');
+    label.textContent = s.label + '  ';
+    g.appendChild(label);
+    const t = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+    t.setAttribute('fill','#c53030');
+    t.setAttribute('font-family','JetBrains Mono');
+    t.textContent = s.ms;
+    label.appendChild(t);
+
+    setTimeout(()=>{
+      bar.style.transition='width 1s ease';
+      bar.setAttribute('width', s.w);
+    }, 150*i + 200);
+  });
+}
+const latEl = document.getElementById('latStages');
+if(latEl){
+  const latObs = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ buildLatency(); latObs.disconnect(); }});
+  },{threshold:.3});
+  latObs.observe(latEl.parentElement.parentElement);
+}
+</script>
+
+</body>
+</html>
