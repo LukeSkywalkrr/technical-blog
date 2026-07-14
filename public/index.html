@@ -76,7 +76,7 @@
             <span class="eyebrow-dot" aria-hidden="true"></span>
             Engineering field notes
             <span aria-hidden="true">/</span>
-            08 deep dives
+            09 deep dives
           </p>
 
           <h1 id="hero-title">
@@ -95,7 +95,7 @@
                 <path d="M4 9h10M10 5l4 4-4 4"></path>
               </svg>
             </a>
-            <a class="text-link" href="articles/how-we-build-infinite-scroll.html">
+            <a class="text-link" href="articles/live-stream-hld.html">
               Read the latest
               <span aria-hidden="true">↗</span>
             </a>
@@ -103,11 +103,11 @@
 
           <dl class="hero-facts" aria-label="Journal at a glance">
             <div>
-              <dt>08</dt>
+              <dt>09</dt>
               <dd>Deep dives</dd>
             </div>
             <div>
-              <dt>150</dt>
+              <dt>170</dt>
               <dd>Minutes of reading</dd>
             </div>
             <div>
@@ -203,7 +203,7 @@
         <a href="#articles" data-topic-jump="system-design">
           <span>01</span>
           System design
-          <small>5 notes</small>
+          <small>6 notes</small>
         </a>
         <a href="#articles" data-topic-jump="payments">
           <span>02</span>
@@ -239,8 +239,8 @@
           <button class="filter-button" type="button" data-filter="payments" aria-pressed="false">Payments</button>
           <button class="filter-button" type="button" data-filter="database" aria-pressed="false">Databases</button>
           <button class="filter-button" type="button" data-filter="protocols" aria-pressed="false">Protocols</button>
-          <span class="filter-count" data-filter-count>08 notes</span>
-          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 8 notes</span>
+          <span class="filter-count" data-filter-count>09 notes</span>
+          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 9 notes</span>
         </div>
 
         <article class="featured-story reveal" data-article data-categories="system-design">
@@ -248,14 +248,14 @@
             <div class="story-meta">
               <span>Latest field note</span>
               <span>System design</span>
-              <span>15 min read</span>
+              <span>20 min read</span>
             </div>
             <p class="story-number">No. 01</p>
             <h3>
-              <a href="articles/how-we-build-infinite-scroll.html">How We Build Infinite Scroll</a>
+              <a href="articles/live-stream-hld.html">How We Send One Live Moment to Millions of Screens</a>
             </h3>
             <p>
-              Why endless feeds break, and how cursors, virtualization, prefetching, and ranking keep them fast without lying to the user.
+              How capture, encoding, manifests, CDNs, adaptive bitrate, buffering, and low latency delivery turn one live moment into a stream for millions.
             </p>
             <span class="story-cta" aria-hidden="true">
               Read the field note
@@ -264,7 +264,7 @@
           </div>
 
           <div class="feed-schematic" aria-hidden="true">
-            <div class="schematic-label"><span>feed.pipeline</span><span>cursor / 9f2a</span></div>
+            <div class="schematic-label"><span>live.pipeline</span><span>segment / 003</span></div>
             <div class="feed-window">
               <div class="feed-card feed-card--ghost">
                 <i></i><span></span><b></b>
@@ -274,7 +274,7 @@
               </div>
               <div class="feed-card feed-card--active">
                 <i></i><span></span><b></b>
-                <em>viewport</em>
+                <em>live edge</em>
               </div>
               <div class="feed-card">
                 <i></i><span></span><b></b>
@@ -283,11 +283,26 @@
                 <i></i><span></span><b></b>
               </div>
             </div>
-            <div class="cursor-line"><span>next_cursor</span><i></i><b></b></div>
+            <div class="cursor-line"><span>next_segment</span><i></i><b></b></div>
           </div>
         </article>
 
         <div class="article-grid">
+          <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #ffb347;">
+            <div class="card-topline">
+              <span>System design</span>
+              <span>15 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--files" aria-hidden="true">
+              <span>Feed</span><i></i><strong>Rank</strong><i></i><span>View</span>
+              <small>cursor · prefetch · render</small>
+            </div>
+            <p class="card-number">02 / 09</p>
+            <h3><a href="articles/how-we-build-infinite-scroll.html">How We Build Infinite Scroll</a></h3>
+            <p>Why endless feeds break, and how cursors, virtualization, prefetching, and ranking keep them fast without lying to the user.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
+
           <article class="article-card reveal" data-article data-categories="system-design payments" style="--card-accent: #d6b879;">
             <div class="card-topline">
               <span>System design</span>
@@ -296,7 +311,7 @@
             <div class="mini-schematic mini-schematic--payments" aria-hidden="true">
               <span class="mini-node">API</span><i></i><span class="mini-node">Ledger</span><i></i><span class="mini-node mini-node--accent">Rail</span>
             </div>
-            <p class="card-number">02 / 08</p>
+            <p class="card-number">03 / 09</p>
             <h3><a href="articles/payment-system-hld.html">Payment System Design: Stripe-like Architecture</a></h3>
             <p>Idempotency, ledgers, reconciliation, Kafka ordering, webhooks, and the path beyond 10,000 TPS.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -314,7 +329,7 @@
               <i class="vault-line vault-line--right"></i>
               <small>token boundary</small>
             </div>
-            <p class="card-number">03 / 08</p>
+            <p class="card-number">04 / 09</p>
             <h3><a href="articles/payment-card-security.html">How Payment Systems Keep Card Data Away From Your Servers</a></h3>
             <p>Hosted fields, iframe isolation, tokenization, HSMs, PCI scope, and the authorization path.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -331,7 +346,7 @@
               <div><span></span><span></span><span></span></div>
               <small>WAL → replica</small>
             </div>
-            <p class="card-number">04 / 08</p>
+            <p class="card-number">05 / 09</p>
             <h3><a href="articles/postgresql-internals.html">PostgreSQL Internals: From Disk Pages to Replication</a></h3>
             <p>Heap pages, indexes, shared buffers, WAL, MVCC, vacuum, recovery, and replication made visible.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -347,7 +362,7 @@
               <em></em><em></em><em></em>
               <small>lease / retry / run</small>
             </div>
-            <p class="card-number">05 / 08</p>
+            <p class="card-number">06 / 09</p>
             <h3><a href="articles/job-scheduler-hld.html">Job Scheduler System Design</a></h3>
             <p>Time buckets, delayed queues, worker leases, retries, recurring execution, and monitoring.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -362,7 +377,7 @@
               <span>A</span><i></i><strong>Chat</strong><i></i><span>B</span>
               <small>ACK 02 · delivered</small>
             </div>
-            <p class="card-number">06 / 08</p>
+            <p class="card-number">07 / 09</p>
             <h3><a href="articles/whatsapp-hld.html">WhatsApp System Design: High-level Architecture</a></h3>
             <p>Durable message storage, ordering, fanout, acknowledgements, offline sync, and push.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -377,7 +392,7 @@
               <span>Client</span><i></i><strong>Sync</strong><i></i><span>S3</span>
               <small>chunk · commit · cursor</small>
             </div>
-            <p class="card-number">07 / 08</p>
+            <p class="card-number">08 / 09</p>
             <h3><a href="articles/dropbox-hld.html">Dropbox System Design: Storage, Sync, and Sharing</a></h3>
             <p>Multipart uploads, safe version commits, change cursors, conflict handling, sharing, and delta sync.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
@@ -392,7 +407,7 @@
               <div><span>REST</span><i></i><b>JSON</b></div>
               <div><span>gRPC</span><i></i><b>PROTO</b></div>
             </div>
-            <p class="card-number">08 / 08</p>
+            <p class="card-number">09 / 09</p>
             <h3><a href="articles/rest-vs-grpc.html">REST vs gRPC: The Protocol Defines the System</a></h3>
             <p>HTTP/2, Protocol Buffers, gRPC Web, Connect, and the boundary where each choice wins.</p>
             <span class="card-arrow" aria-hidden="true">↗</span>
