@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Design a Dropbox or Google Drive style file storage and synchronization system, from multipart uploads to change cursors and content defined chunking.">
+<meta name="description" content="Design a Dropbox or Google Drive style file storage and synchronization system, from multipart uploads and change cursors to production grade chunk manifests and content defined chunking.">
 <title>Dropbox System Design: Storage, Sync, and Sharing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
   .hero-inner{position:relative;max-width:1120px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:66px;align-items:center}.eyebrow{font:500 11px JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:.12em;color:#9bbaf6;margin-bottom:20px}.eyebrow i{display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:#67e8f9;box-shadow:0 0 16px #67e8f9}.hero h1{font:650 clamp(40px,5.3vw,68px)/1.03 Fraunces,serif;letter-spacing:-.025em;max-width:700px}.hero h1 em{font-weight:300;color:#a9c3f7}.lead{font-size:17px;color:rgba(255,255,255,.68);max-width:620px;margin-top:22px}.stats{display:flex;gap:34px;flex-wrap:wrap;margin-top:34px}.stat strong{display:block;font:400 24px JetBrains Mono,monospace}.stat span{display:block;margin-top:3px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.42)}
   .sync-orbit{position:relative;height:360px;border:1px solid rgba(255,255,255,.09);border-radius:24px;background:rgba(255,255,255,.035);box-shadow:inset 0 1px rgba(255,255,255,.05);overflow:hidden}.sync-orbit::before,.sync-orbit::after{content:"";position:absolute;left:50%;top:50%;border:1px solid rgba(96,165,250,.21);border-radius:50%;transform:translate(-50%,-50%)}.sync-orbit::before{width:280px;height:280px}.sync-orbit::after{width:185px;height:185px}.cloud{position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:108px;height:76px;border-radius:15px;display:grid;place-items:center;background:#1d4ed8;box-shadow:0 0 45px rgba(37,99,235,.36);font:500 12px JetBrains Mono,monospace}.device{position:absolute;z-index:2;padding:10px 13px;border:1px solid rgba(255,255,255,.13);border-radius:9px;background:#101e35;font:500 10px JetBrains Mono,monospace;color:#c9d8f6}.device.a{top:35px;left:42px}.device.b{top:61px;right:36px}.device.c{bottom:43px;left:42px}.device.d{right:39px;bottom:50px}.orbit-line{position:absolute;left:50%;top:50%;width:145px;height:1px;transform-origin:left;background:linear-gradient(90deg,#60a5fa,transparent)}.orbit-line.l1{transform:rotate(218deg)}.orbit-line.l2{transform:rotate(315deg)}.orbit-line.l3{transform:rotate(140deg)}.orbit-line.l4{transform:rotate(40deg)}.pulse{position:absolute;width:8px;height:8px;border-radius:50%;background:#67e8f9;box-shadow:0 0 12px #67e8f9;animation:travel 3s ease-in-out infinite}.pulse.p1{left:23%;top:30%}.pulse.p2{right:22%;bottom:29%;animation-delay:1.2s}@keyframes travel{50%{transform:scale(1.8);opacity:.45}}
   .shell{max-width:1120px;margin:auto;padding:52px 30px 86px}.layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:46px;align-items:start}.sidebar{position:sticky;top:84px}.toc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:#98a2b3;margin-bottom:11px}.toc{list-style:none}.toc a{display:block;padding:6px 9px;border-left:2px solid transparent;border-radius:0 7px 7px 0;text-decoration:none;font-size:12.5px;color:var(--muted);line-height:1.35}.toc a:hover{color:var(--blue);border-color:var(--blue);background:var(--blueSoft)}
-  .article{min-width:0}.section{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:27px;overflow:hidden;box-shadow:var(--shadow)}.section-header{display:flex;gap:15px;padding:25px 29px 19px;border-bottom:1px solid var(--line)}.section-num{flex:none;margin-top:4px;padding:3px 7px;border-radius:5px;background:var(--blueSoft);color:var(--blue);font:500 10px JetBrains Mono,monospace}.section-header h2{font:650 22px/1.25 Fraunces,serif;letter-spacing:-.01em}.section-header p{font-size:13px;color:var(--muted);margin-top:4px}.section-body{padding:26px 29px}.prose>p{font-size:15px;color:var(--ink2);margin-bottom:15px}.prose>p:last-child{margin-bottom:0}.prose strong{color:var(--ink);font-weight:650}.prose code{font:12px JetBrains Mono,monospace;color:var(--violet);background:#f2f3f7;border:1px solid #e7e9ef;padding:1px 5px;border-radius:4px}
+  .article{min-width:0}.section{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:27px;overflow:hidden;box-shadow:var(--shadow)}.section-header{display:flex;gap:15px;padding:25px 29px 19px;border-bottom:1px solid var(--line)}.section-num{flex:none;margin-top:4px;padding:3px 7px;border-radius:5px;background:var(--blueSoft);color:var(--blue);font:500 10px JetBrains Mono,monospace}.section-header h2{font:650 22px/1.25 Fraunces,serif;letter-spacing:-.01em}.section-header p{font-size:13px;color:var(--muted);margin-top:4px}.section-body{padding:26px 29px}.prose>p{font-size:15px;color:var(--ink2);margin-bottom:15px}.prose>p:last-child{margin-bottom:0}.prose strong{color:var(--ink);font-weight:650}.prose code{font:12px JetBrains Mono,monospace;color:var(--violet);background:#f2f3f7;border:1px solid #e7e9ef;padding:1px 5px;border-radius:4px}.subhead{font:650 17px/1.3 Fraunces,serif;letter-spacing:-.005em;margin:25px 0 10px}.subhead:first-child{margin-top:0}.muted-note{font-size:12.5px;color:var(--muted);margin-top:-4px;margin-bottom:14px}
   .quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:27px}.quick{background:white;border:1px solid var(--line);border-top:3px solid var(--blue);border-radius:11px;padding:17px;box-shadow:var(--shadow)}.quick:nth-child(2){border-top-color:var(--cyan)}.quick:nth-child(3){border-top-color:var(--violet)}.quick small{font:500 9px JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}.quick strong{display:block;font:650 16px Fraunces,serif;margin:7px 0 4px}.quick p{font-size:12px;color:var(--muted);line-height:1.5}
   .callout{display:flex;gap:12px;margin:18px 0;padding:15px 17px;border-left:3px solid;border-radius:8px;font-size:13.5px;line-height:1.55}.callout.blue{background:var(--blueSoft);border-color:var(--blue);color:#1e40af}.callout.green{background:var(--greenSoft);border-color:var(--green);color:#066b4c}.callout.amber{background:var(--amberSoft);border-color:var(--amber);color:#92400e}.callout.violet{background:var(--violetSoft);border-color:var(--violet);color:#5b21b6}.callout-mark{font:600 11px JetBrains Mono,monospace;padding-top:2px}.pill-row{display:flex;flex-wrap:wrap;gap:7px;margin:17px 0}.pill{font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--blueSoft);color:#1e40af;border:1px solid #c8dbff}.pill.cyan{background:var(--cyanSoft);color:#0e7490;border-color:#bcecf3}.pill.violet{background:var(--violetSoft);color:#6d28d9;border-color:#d8caff}.pill.green{background:var(--greenSoft);color:#047857;border-color:#b9ead6}
   .diagram{position:relative;margin:20px 0;padding:25px;border-radius:11px;overflow:hidden;background:#091425;border:1px solid rgba(255,255,255,.06)}.diagram::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:24px 24px}.arch{position:relative;display:grid;grid-template-columns:1fr 34px 1.3fr 34px 1fr;gap:7px;align-items:center}.arch-col{display:grid;gap:8px}.node{padding:11px 9px;border:1px solid rgba(255,255,255,.12);border-radius:8px;text-align:center;background:#111f34;color:#d7e2f7;font:500 10.5px JetBrains Mono,monospace}.node.blue{background:rgba(37,99,235,.2);border-color:rgba(96,165,250,.45);color:#bfdbfe}.node.cyan{background:rgba(8,145,178,.17);border-color:rgba(34,211,238,.35);color:#a5f3fc}.node.violet{background:rgba(124,58,237,.17);border-color:rgba(167,139,250,.35);color:#ddd6fe}.arr{text-align:center;color:#557094;font-family:monospace}.diagram-caption{position:relative;margin-top:16px;text-align:center;color:#70829f;font:10px JetBrains Mono,monospace}
@@ -43,7 +43,7 @@
     <div>
       <p class="eyebrow"><i></i>System design field note</p>
       <h1>Dropbox<br><em>Storage and Sync</em></h1>
-      <p class="lead">How a file moves from one laptop to object storage, appears safely on every other device, survives a broken network, and becomes shareable without sending its bytes through your application servers.</p>
+      <p class="lead">How a file moves from one laptop to object storage, appears safely on every other device, survives a broken network, and later synchronizes only the chunks that actually changed.</p>
       <div class="stats"><div class="stat"><strong>50 GB</strong><span>Maximum file</span></div><div class="stat"><strong>2</strong><span>Data planes</span></div><div class="stat"><strong>O(1)</strong><span>Resume cost</span></div><div class="stat"><strong>AP</strong><span>System bias</span></div></div>
     </div>
     <div class="sync-orbit" role="img" aria-label="Four devices synchronizing through a cloud file service"><div class="orbit-line l1"></div><div class="orbit-line l2"></div><div class="orbit-line l3"></div><div class="orbit-line l4"></div><div class="cloud">FILE CLOUD</div><span class="device a">LAPTOP A</span><span class="device b">PHONE B</span><span class="device c">WEB C</span><span class="device d">DESKTOP D</span><i class="pulse p1"></i><i class="pulse p2"></i></div>
@@ -53,7 +53,7 @@
 <main class="shell">
   <div class="quick-grid" aria-label="Design summary"><div class="quick"><small>Core boundary</small><strong>Control is not content</strong><p>Metadata stays in the database. File bytes move directly between clients and object storage.</p></div><div class="quick"><small>Safety rule</small><strong>Object first, pointer second</strong><p>A new version becomes visible only after storage confirms that the complete object exists.</p></div><div class="quick"><small>Sync contract</small><strong>Signal, then reconcile</strong><p>Notifications wake a device. A durable change cursor tells it what actually changed.</p></div></div>
   <div class="layout">
-    <aside class="sidebar"><p class="toc-label">On this page</p><ol class="toc"><li><a href="#requirements">01 · Requirements</a></li><li><a href="#architecture">02 · Architecture</a></li><li><a href="#model">03 · Data model</a></li><li><a href="#uploads">04 · Resumable uploads</a></li><li><a href="#consistency">05 · Safe commit</a></li><li><a href="#downloads">06 · Download path</a></li><li><a href="#sync">07 · Local sync agent</a></li><li><a href="#changes">08 · Cloud changes</a></li><li><a href="#conflicts">09 · Version conflicts</a></li><li><a href="#delta">10 · Delta sync</a></li><li><a href="#reliability">11 · Reliability</a></li><li><a href="#apis">12 · APIs</a></li><li><a href="#summary">13 · Interview summary</a></li></ol></aside>
+    <aside class="sidebar"><p class="toc-label">On this page</p><ol class="toc"><li><a href="#requirements">01 · Requirements</a></li><li><a href="#architecture">02 · Architecture</a></li><li><a href="#model">03 · Data model</a></li><li><a href="#uploads">04 · Resumable uploads</a></li><li><a href="#consistency">05 · Safe commit</a></li><li><a href="#downloads">06 · Download path</a></li><li><a href="#sync">07 · Local sync agent</a></li><li><a href="#changes">08 · Cloud changes</a></li><li><a href="#conflicts">09 · Version conflicts</a></li><li><a href="#delta">10 · Delta sync architecture</a></li><li><a href="#reliability">11 · Reliability</a></li><li><a href="#apis">12 · APIs</a></li><li><a href="#summary">13 · Interview summary</a></li></ol></aside>
     <article class="article">
 
       <section class="section" id="requirements"><header class="section-header"><span class="section-num">§ 01</span><div><h2>Requirements and the Consistency Choice</h2><p>Define what must be fast, durable, and allowed to lag</p></div></header><div class="section-body prose">
@@ -69,10 +69,19 @@
         <div class="compare"><div class="compare-card"><small>Control plane</small><h3>Small, authoritative records</h3><p>File name, owner, version, status, access list, upload session, object key, and change cursor.</p></div><div class="compare-card"><small>Data plane</small><h3>Large, immutable objects</h3><p>Clients upload to S3 and download through S3 or a CDN using short lived signed URLs.</p></div></div>
       </div></section>
 
-      <section class="section" id="model"><header class="section-header"><span class="section-num">§ 03</span><div><h2>The Core Data Model</h2><p>One stable file identity, many temporary transfer records</p></div></header><div class="section-body prose">
-        <p>One row in <code>t_file</code> represents one logical file. Updating a file does not change its identity. It changes the version and the object key that the row currently points to.</p>
-        <div class="table-wrap"><table><thead><tr><th>Table</th><th>Important fields</th><th>Responsibility</th></tr></thead><tbody><tr><td>t_file</td><td>file_id, owner_id, current_version, object_key, status, is_deleted</td><td>Current visible state of a logical file</td></tr><tr><td>t_upload_session</td><td>session_id, file_id, s3_upload_id, status, expires_at</td><td>One resumable upload attempt</td></tr><tr><td>t_upload_part</td><td>session_id, part_number, etag, status</td><td>Progress and receipts for temporary parts</td></tr><tr><td>t_file_access</td><td>file_id, user_id, permission</td><td>Sharing permissions</td></tr><tr><td>t_file_version</td><td>file_id, version, object_key, size</td><td>Optional version history</td></tr></tbody></table></div>
-        <div class="callout violet"><span class="callout-mark">NOTE</span><div><strong>Do not confuse identities.</strong> A file ID names the logical user file. An S3 upload ID names one temporary multipart operation.</div></div>
+      <section class="section" id="model"><header class="section-header"><span class="section-num">§ 03</span><div><h2>The Core Data Model</h2><p>One stable file identity, immutable versions, and temporary transfer records</p></div></header><div class="section-body prose">
+        <p>One row in <code>t_file</code> represents one logical file. Updating a file does not change its identity. The row points to the currently visible version. In the baseline design that version may point to one complete object. In the delta sync design it points to an ordered manifest of persistent chunks.</p>
+        <div class="table-wrap"><table><thead><tr><th>Table</th><th>Important fields</th><th>Responsibility</th></tr></thead><tbody>
+          <tr><td>t_file</td><td>file_id, owner_id, current_version_id, status, is_deleted</td><td>Stable logical identity and pointer to the current visible version</td></tr>
+          <tr><td>t_file_version</td><td>version_id, file_id, base_version_id, file_hash, size, created_at</td><td>Immutable file version. Optional in the simple full object design; required when manifests or history are retained</td></tr>
+          <tr><td>t_file_chunk</td><td>version_id, chunk_order, chunk_hash, chunk_size</td><td>Ordered manifest describing which chunks compose one file version</td></tr>
+          <tr><td>t_chunk</td><td>chunk_hash, object_key, size, status, reference_count</td><td>Content addressed chunk metadata; the bytes live in object storage</td></tr>
+          <tr><td>t_upload_session</td><td>session_id, file_id, s3_upload_id, status, expires_at</td><td>One resumable S3 multipart upload attempt for a complete object transfer</td></tr>
+          <tr><td>t_upload_part</td><td>session_id, part_number, etag, status</td><td>Progress and receipts for temporary multipart parts</td></tr>
+          <tr><td>t_file_access</td><td>file_id, user_id, permission</td><td>Sharing permissions</td></tr>
+        </tbody></table></div>
+        <div class="callout violet"><span class="callout-mark">NOTE</span><div><strong>Do not confuse three identities.</strong> A file ID names the user's logical file. A version ID names one immutable state of that file. An S3 upload ID names one temporary multipart operation.</div></div>
+        <div class="callout blue"><span class="callout-mark">MODE</span><div><strong>Choose one storage mode deliberately.</strong> The simpler design stores each version as one complete object. The advanced design stores persistent content chunks and a manifest. Do not accidentally combine their tables without explaining why.</div></div>
       </div></section>
 
       <section class="section" id="uploads"><header class="section-header"><span class="section-num">§ 04</span><div><h2>Resumable Multipart Uploads</h2><p>Parallel parts make a 50 GB transfer practical</p></div></header><div class="section-body prose">
@@ -126,22 +135,103 @@ next_cursor = <span class="ok">503</span></pre></div>
         <div class="callout amber"><span class="callout-mark">CLOCKS</span><div>Device timestamps are unreliable because clocks drift. The server owns both version assignment and commit order.</div></div>
       </div></section>
 
-      <section class="section" id="delta"><header class="section-header"><span class="section-num">§ 10</span><div><h2>From Full Uploads to Delta Sync</h2><p>Multipart upload is not persistent chunk storage</p></div></header><div class="section-body prose">
-        <p>The baseline design uploads a complete immutable object for every version. S3 multipart parts only help transfer that object. After completion, they are not independently replaceable blocks.</p>
-        <p>Advanced delta sync stores reusable chunks and an ordered manifest. When one region changes, the client uploads only the new chunks and the new version references both old and new content.</p>
-        <div class="chunk-row" aria-label="Version one chunks"><span class="chunk">A</span><span class="chunk">B</span><span class="chunk">C</span><span class="chunk">D</span><span class="chunk">E</span></div><div class="chunk-row" aria-label="Version two reuses most chunks"><span class="chunk">A</span><span class="chunk">B</span><span class="chunk changed">X</span><span class="chunk">C</span><span class="chunk">D</span><span class="chunk">E</span></div>
-        <p>Fixed size boundaries shift after an insertion and can make every later chunk look new. Content defined chunking uses a rolling hash so boundaries usually realign after the edited region.</p>
-        <div class="pill-row"><span class="pill violet">Chunk hashes</span><span class="pill violet">File manifests</span><span class="pill violet">Deduplication</span><span class="pill violet">Reference counts</span><span class="pill violet">Garbage collection</span></div>
-        <div class="callout blue"><span class="callout-mark">TRADE</span><div>Delta sync saves bandwidth but creates a new storage architecture. Earn that complexity only when large files change frequently in small regions.</div></div>
+      <section class="section" id="delta"><header class="section-header"><span class="section-num">§ 10</span><div><h2>Production Delta Synchronization Architecture</h2><p>Persistent chunks, manifests, preflight checks, and safe reconstruction</p></div></header><div class="section-body prose">
+        <p>The baseline design uploads a complete immutable object for every version. That is often the right interview starting point. True delta synchronization is a separate storage architecture: the logical file becomes an <strong>ordered manifest of immutable, content addressed chunks</strong>, and only chunks missing from the backend are transferred.</p>
+
+        <h3 class="subhead">Multipart upload and persistent chunking solve different problems</h3>
+        <div class="compare"><div class="compare-card"><small>Transport mechanism</small><h3>S3 multipart upload</h3><p>Temporarily splits one large object so parts can upload in parallel and resume independently. After completion, S3 exposes one object. The temporary parts are not later patchable blocks.</p></div><div class="compare-card"><small>Storage architecture</small><h3>Persistent content chunks</h3><p>Keeps chunks as independent immutable objects and stores an ordered manifest for every file version. This is what allows future edits to reuse unchanged data.</p></div></div>
+        <div class="callout amber"><span class="callout-mark">DO NOT</span><div>Do not say that S3 multipart parts automatically enable delta synchronization. A system may use both mechanisms, but they operate at different layers.</div></div>
+
+        <h3 class="subhead">The content addressed representation</h3>
+        <p>Each chunk receives a strong content hash such as SHA 256 or BLAKE3. The hash acts as the chunk ID and can also determine its object storage key. Chunks are immutable: changing the bytes creates a new hash and therefore a new object.</p>
+        <div class="code"><div class="code-head">Logical file version</div><pre><span class="kw">file</span> F100
+<span class="kw">current_version</span> V2
+
+<span class="kw">manifest V1</span>  [ A, B, C, D ]
+<span class="kw">manifest V2</span>  [ A, B, <span class="val">X</span>, D ]
+
+<span class="kw">object storage</span>
+/chunks/A
+/chunks/B
+/chunks/C
+/chunks/D
+/chunks/X</pre></div>
+        <p>The user still sees one normal file. The manifest is the internal recipe that says, “concatenate A, then B, then X, then D.”</p>
+
+        <h3 class="subhead">Initial upload: propose, transfer, commit</h3>
+        <div class="diagram"><div class="flow">
+          <div class="flow-step"><b>1</b><span>Client chunks the local file and computes a strong hash for every chunk</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>2</b><span>Client sends the proposed ordered manifest [A, B, C, D] to the metadata service</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>3</b><span>Backend checks its chunk index and returns only the missing hashes</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>4</b><span>Client uploads missing chunks directly to object storage using signed URLs</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>5</b><span>Client commits the version. The backend verifies every referenced chunk exists</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>6</b><span>One metadata transaction creates the immutable version and moves t_file.current_version_id</span></div>
+        </div></div>
+        <div class="callout green"><span class="callout-mark">VISIBILITY</span><div>The new version becomes visible only after every required chunk is durable and the manifest commit succeeds. A partially uploaded manifest must never be published.</div></div>
+
+        <h3 class="subhead">Small edit: upload only the new content</h3>
+        <p>Suppose version 1 is composed of four chunks:</p>
+        <div class="chunk-row" aria-label="Version one chunks"><span class="chunk">A</span><span class="chunk">B</span><span class="chunk">C</span><span class="chunk">D</span></div>
+        <p>The user modifies content around chunk C. After creating new boundaries and hashes, the client obtains:</p>
+        <div class="chunk-row" aria-label="Version two reuses most chunks"><span class="chunk">A</span><span class="chunk">B</span><span class="chunk changed">X</span><span class="chunk">D</span></div>
+        <p>The backend already owns A, B, and D, so it asks the client to upload only X. The commit creates version 2 with manifest <code>[A, B, X, D]</code>. No existing chunk is overwritten.</p>
+
+        <h3 class="subhead">How the client discovers changed regions</h3>
+        <p>There are two related but distinct families of techniques. Do not merge them into one algorithm:</p>
+        <div class="table-wrap"><table><thead><tr><th>Approach</th><th>How it works</th><th>Best mental model</th></tr></thead><tbody>
+          <tr><td>Content defined chunking</td><td>The client scans the file with a rolling boundary function, then computes a strong hash for each resulting chunk and compares those hashes with the previous manifest</td><td>Stable chunk boundaries despite insertions and deletions</td></tr>
+          <tr><td>Rsync style delta matching</td><td>The receiver exposes weak and strong block signatures. The sender slides a rolling checksum across the new file and emits COPY references plus INSERT data</td><td>Construct a delta instruction stream against a known base</td></tr>
+        </tbody></table></div>
+        <p>A production system may use one approach, combine ideas, or optimize differently by file type. For an interview, content defined chunking plus strong chunk hashes is the cleaner architecture to explain.</p>
+
+        <h3 class="subhead">Why fixed size chunks fail after insertions</h3>
+        <p>Fixed size chunks work well for an in place overwrite, but a byte insertion near the beginning shifts every later boundary:</p>
+        <div class="code"><div class="code-head">Boundary shift</div><pre><span class="kw">before</span>  ABCD | EFGH | IJKL
+<span class="kw">insert X</span>
+<span class="kw">after</span>   XABC | DEFG | HIJK | L</pre></div>
+        <p>Almost every later chunk now has different bytes and therefore a different hash, even though most of the file content is unchanged.</p>
+
+        <h3 class="subhead">Content defined chunking</h3>
+        <p>Content defined chunking chooses boundaries from local byte patterns rather than fixed offsets. A rolling function scans the file and declares a boundary when its value satisfies a rule. Minimum and maximum chunk sizes prevent pathological tiny or huge chunks.</p>
+        <div class="callout blue"><span class="callout-mark">INTUITION</span><div>A small insertion disturbs boundaries near the edit, but once the rolling window moves past the changed region, boundaries usually realign. Most old chunk hashes remain reusable.</div></div>
+        <p>Rabin fingerprints are the classic explanation, while faster modern implementations may use Gear hash techniques such as FastCDC. The interview level point is the boundary behavior, not the polynomial mathematics.</p>
+
+        <h3 class="subhead">Download and local reconstruction</h3>
+        <p>When another device learns that F100 now points to V2, it fetches the new manifest. It compares the required chunk hashes with its local cache or previous file version, downloads only missing chunks, and reconstructs the file locally.</p>
+        <div class="diagram"><div class="flow">
+          <div class="flow-step"><b>1</b><span>Change feed says F100 now points to V2</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>2</b><span>Client fetches manifest [A, B, X, D]</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>3</b><span>Local cache already contains A, B, and D. Client downloads only X</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>4</b><span>Client writes A + B + X + D into a hidden temporary file</span></div><div class="flow-arrow">↓</div>
+          <div class="flow-step"><b>5</b><span>Verify chunk hashes and optional full file hash, then atomically rename over the old file</span></div>
+        </div></div>
+        <div class="callout violet"><span class="callout-mark">SEPARATE</span><div>The change feed answers <strong>which logical file version changed</strong>. The manifest answers <strong>which bytes compose that version</strong>. The two data structures solve different problems.</div></div>
+
+        <h3 class="subhead">Chunk lifecycle and cleanup</h3>
+        <p>Updating or deleting a file removes manifest references. It should not synchronously delete shared chunks. A chunk may still belong to another version or another file. Reference counts can identify likely unused chunks, but production systems commonly add asynchronous mark and sweep reconciliation before physical deletion.</p>
+        <div class="pill-row"><span class="pill violet">Immutable chunks</span><span class="pill violet">Ordered manifests</span><span class="pill violet">Deduplication</span><span class="pill violet">Reference tracking</span><span class="pill violet">Mark and sweep</span></div>
+        <div class="callout amber"><span class="callout-mark">SECURITY</span><div>Cross user deduplication can leak whether content already exists and becomes difficult with per user client side encryption. Treat global deduplication, convergent encryption, and proof of ownership as advanced security topics, not free optimizations.</div></div>
       </div></section>
 
-      <section class="section" id="reliability"><header class="section-header"><span class="section-num">§ 11</span><div><h2>Reliability, Security, and Cleanup</h2><p>Design every partial failure as a resumable state</p></div></header><div class="section-body prose">
-        <div class="table-wrap"><table><thead><tr><th>Failure</th><th>Response</th></tr></thead><tbody><tr><td>Part upload fails</td><td>Retry only that part with bounded backoff</td></tr><tr><td>Signed URL expires</td><td>Authorize again and issue a fresh URL for the same part</td></tr><tr><td>Finalize called twice</td><td>Return the existing result through an idempotent completion API</td></tr><tr><td>S3 succeeds, DB fails</td><td>Keep the old version visible and reconcile the orphan object</td></tr><tr><td>Device misses SSE</td><td>Catch up from the durable cursor or periodic poll</td></tr><tr><td>Delete requested</td><td>Write a tombstone first, remove bytes asynchronously</td></tr></tbody></table></div>
+      <section class="section" id="reliability"><header class="section-header"><span class="section-num">§ 11</span><div><h2>Reliability, Security, and Cleanup</h2><p>Design every partial failure as a resumable or collectible state</p></div></header><div class="section-body prose">
+        <div class="table-wrap"><table><thead><tr><th>Failure</th><th>Response</th></tr></thead><tbody>
+          <tr><td>Multipart part upload fails</td><td>Retry only that part with bounded backoff</td></tr>
+          <tr><td>Signed URL expires</td><td>Authorize again and issue a fresh URL for the same part or chunk</td></tr>
+          <tr><td>Finalize called twice</td><td>Return the existing result through an idempotent completion or manifest commit API</td></tr>
+          <tr><td>S3 complete object succeeds, DB fails</td><td>Keep the old version visible and reconcile the orphan object</td></tr>
+          <tr><td>Chunk upload succeeds, manifest commit fails</td><td>The chunk remains invisible and can be reused by a retry or reclaimed later as unreferenced</td></tr>
+          <tr><td>Manifest references a missing chunk</td><td>Reject the commit. Verify existence and integrity before moving the current version pointer</td></tr>
+          <tr><td>Device misses SSE</td><td>Catch up from the durable cursor or periodic poll</td></tr>
+          <tr><td>Delete requested</td><td>Write a tombstone first, remove unreferenced bytes asynchronously after retention</td></tr>
+          <tr><td>Reference count drifts</td><td>Reconcile with an asynchronous mark and sweep traversal of reachable manifests</td></tr>
+        </tbody></table></div>
         <p>All network paths use TLS. Object storage uses encryption at rest. Signed URLs are short lived bearer credentials and are issued only after ownership or sharing permission checks.</p>
-        <div class="callout green"><span class="callout-mark">DELETE</span><div>Logical deletion must happen before physical cleanup. Otherwise an offline device can never discover that the file disappeared.</div></div>
+        <p>With chunked storage, integrity is checked at two levels: verify every chunk against its content hash, then optionally verify the reconstructed file against a full file hash stored on the version.</p>
+        <div class="callout green"><span class="callout-mark">DELETE</span><div>Logical deletion and version retention happen in metadata first. Physical chunk cleanup is asynchronous because the same immutable chunk may still be referenced elsewhere.</div></div>
       </div></section>
 
-      <section class="section" id="apis"><header class="section-header"><span class="section-num">§ 12</span><div><h2>The Main API Surface</h2><p>Small control requests around a direct data path</p></div></header><div class="section-body prose">
+      <section class="section" id="apis"><header class="section-header"><span class="section-num">§ 12</span><div><h2>The Main API Surface</h2><p>Small control requests around direct object and chunk transfer paths</p></div></header><div class="section-body prose">
+        <h3 class="subhead">Baseline complete object flow</h3>
         <div class="code"><div class="code-head">Control plane</div><pre><span class="kw">POST</span>   /files/uploads
 <span class="kw">POST</span>   /uploads/{sessionId}/parts/{partNumber}/complete
 <span class="kw">POST</span>   /uploads/{sessionId}/complete
@@ -149,10 +239,32 @@ next_cursor = <span class="ok">503</span></pre></div>
 <span class="kw">GET</span>    /files/changes?cursor={cursor}
 <span class="kw">POST</span>   /files/{fileId}/share
 <span class="kw">DELETE</span> /files/{fileId}</pre></div>
-        <p>These APIs move metadata and authorization decisions. The large upload and download bodies travel on presigned object storage or CDN URLs.</p>
+
+        <h3 class="subhead">Delta synchronization extension</h3>
+        <div class="code"><div class="code-head">Manifest and chunk control plane</div><pre><span class="kw">POST</span> /files/{fileId}/versions/preflight
+      body: base_version + ordered chunk hashes
+      returns: missing chunk hashes + signed upload URLs
+
+<span class="kw">POST</span> /files/{fileId}/versions/commit
+      body: proposed manifest + idempotency key
+      action: verify chunks, create version, move current pointer
+
+<span class="kw">GET</span>  /files/{fileId}/versions/{versionId}/manifest
+      returns: ordered chunk hashes, sizes, optional full_file_hash
+
+<span class="kw">POST</span> /chunks/download-urls
+      body: missing chunk hashes
+      returns: short lived signed URLs</pre></div>
+        <p>Exact endpoint names are flexible. The important protocol is <strong>preflight → upload only missing chunks → atomic manifest commit → fetch manifest → download only missing chunks</strong>. Large bodies still travel directly between clients and object storage.</p>
       </div></section>
 
-      <section class="summary" id="summary"><h2>Final Interview Summary</h2><p><strong>Separate metadata from file bytes.</strong> File, sharing, and sync services own identities, versions, permissions, and signed URLs. Clients send large objects directly to S3 and download through S3 or a CDN.</p><p><strong>Make transfers resumable.</strong> Large files use client side multipart upload. The backend records the S3 upload ID, part numbers, and ETags, verifies with S3, and makes a version visible only after object completion succeeds.</p><p><strong>Make synchronization recoverable.</strong> A local agent watches the filesystem and queues edits with their base version. The server assigns new versions and preserves conflicts. SSE or long polling wakes remote devices, while a durable change cursor and deletion tombstones guarantee catch up.</p><p><strong>Keep delta sync separate.</strong> Multipart parts are temporary. True bandwidth efficient sync requires persistent content chunks, manifests, rolling hash boundaries, reference counting, and garbage collection.</p></section>
+      <section class="summary" id="summary"><h2>Final Interview Summary</h2>
+        <p><strong>Separate metadata from file bytes.</strong> File, sharing, and sync services own identities, versions, permissions, manifests, and signed URLs. Clients send large objects or persistent chunks directly to object storage.</p>
+        <p><strong>Start with the simpler complete object design.</strong> Large files use client side S3 multipart upload. The backend records the S3 upload ID, part numbers, and ETags, verifies completion, and moves the metadata pointer only after the complete object exists.</p>
+        <p><strong>Make synchronization recoverable.</strong> A local agent watches the filesystem and queues edits with their base version. The server assigns new versions and preserves conflicts. SSE or long polling wakes remote devices, while a durable change cursor and deletion tombstones guarantee catch up.</p>
+        <p><strong>Add delta synchronization only when bandwidth justifies the storage complexity.</strong> The client chunks and hashes the file, proposes an ordered manifest, uploads only missing chunks, and atomically commits a new immutable version. Another device fetches the manifest, reuses chunks it already has, downloads only missing content, reconstructs into a temporary file, verifies it, and atomically replaces the old local file.</p>
+        <p><strong>Keep the abstractions separate.</strong> S3 multipart parts are temporary transport units. Persistent content chunks and manifests are the long lived representation that enable deduplication and delta synchronization. The change feed identifies which file version changed. The manifest identifies which bytes compose that version.</p>
+      </section>
     </article>
   </div>
 </main>
