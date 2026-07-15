@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How We Build a Blocking Queue That Knows When to Wait</title>
+<meta name="description" content="A narrative, interview-focused low-level design of a generic bounded blocking queue in Java using a circular buffer, ReentrantLock, and Conditions." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f2eb;
+  --bg-2:#ece7dc;
+  --paper:#fffdf8;
+  --ink:#171918;
+  --ink-soft:#3c423f;
+  --muted:#6c746f;
+  --line:#d6d0c3;
+  --accent:#0f766e;
+  --accent-2:#d97706;
+  --accent-3:#2563eb;
+  --accent-soft:rgba(15,118,110,.09);
+  --danger:#b42318;
+  --code-bg:#1f2523;
+  --code-ink:#f1eee6;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 14px 42px -16px rgba(0,0,0,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Newsreader','Iowan Old Style','Georgia',serif;
+  font-size:20px;
+  line-height:1.65;
+  letter-spacing:-.003em;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  font-variation-settings:"opsz" 24;
+}
+p,li{font-family:'Newsreader',serif;font-variation-settings:"opsz" 20}
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));z-index:1000;box-shadow:0 0 12px rgba(15,118,110,.4)}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:82px 40px 62px;max-width:1120px;margin:0 auto;position:relative}
+.pill{display:inline-flex;align-items:center;gap:9px;width:max-content;padding:7px 14px;border-radius:999px;background:var(--accent);color:#fff;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+.pill::before{content:'';width:8px;height:8px;border-radius:50%;background:#fff;animation:pulse 1.7s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.38;transform:scale(1.35)}}
+.hero .kicker{color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;letter-spacing:.2em;text-transform:uppercase;margin:26px 0 18px}
+.hero h1{font-family:'Fraunces',serif;font-weight:400;font-size:clamp(44px,7vw,92px);line-height:1.015;letter-spacing:-.025em;max-width:920px;font-variation-settings:"opsz" 144,"SOFT" 25}
+.hero h1 em{font-style:italic;color:var(--accent);font-variation-settings:"opsz" 144,"SOFT" 100,"WONK" 1}
+.hero .lede{font-family:'Fraunces',serif;font-style:italic;font-size:clamp(19px,2.2vw,26px);line-height:1.5;color:var(--ink-soft);max-width:760px;margin:30px 0 46px}
+.hero .meta{display:flex;gap:34px;flex-wrap:wrap;padding-top:30px;border-top:1px solid var(--line);font-family:'Inter',sans-serif;font-size:13px;color:var(--muted)}
+.hero .meta strong{display:block;color:var(--ink);font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}
+.hero-viz{position:absolute;right:28px;top:72px;width:310px;height:310px;display:none}
+@media(min-width:930px){.hero-viz{display:block}}
+
+/* ARTICLE */
+article{max-width:760px;margin:0 auto;padding:0 24px 120px}
+section.chapter{padding:82px 0;border-top:1px solid var(--line)}
+section.chapter:first-of-type{border-top:none}
+.chapter-num{display:block;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.18em;color:var(--accent);margin-bottom:12px}
+h2{font-family:'Fraunces',serif;font-weight:400;font-size:clamp(31px,4vw,46px);line-height:1.13;letter-spacing:-.018em;margin-bottom:14px;font-variation-settings:"opsz" 100,"SOFT" 20}
+h3{font-family:'Fraunces',serif;font-style:italic;font-weight:400;font-size:clamp(20px,2.4vw,27px);line-height:1.35;color:var(--muted);margin-bottom:38px;font-variation-settings:"opsz" 40,"SOFT" 100}
+h4{font-family:'Fraunces',serif;font-weight:520;font-size:23px;line-height:1.25;margin:48px 0 16px;letter-spacing:-.01em}
+p{margin-bottom:24px;color:var(--ink-soft)}
+p strong{color:var(--ink);font-weight:650}
+section.chapter>h3+p::first-letter{font-family:'Fraunces',serif;font-weight:500;font-size:5.3em;float:left;line-height:.88;padding:6px 12px 0 0;color:var(--accent);font-variation-settings:"opsz" 144,"SOFT" 30}
+ul{margin:15px 0 25px 25px;color:var(--ink-soft)}
+li{margin-bottom:9px}
+blockquote{border-left:3px solid var(--accent);padding:8px 0 8px 24px;margin:33px 0;font-family:'Fraunces',serif;font-style:italic;font-size:22px;line-height:1.5;color:var(--ink)}
+code.inline{font-family:'JetBrains Mono',monospace;font-size:.84em;background:var(--bg-2);padding:2px 7px;border-radius:4px;color:var(--ink)}
+
+/* CODE */
+.code-wrap{margin:30px -24px;border-radius:14px;overflow:hidden;background:var(--code-bg);box-shadow:var(--shadow)}
+@media(max-width:760px){.code-wrap{margin:28px -10px}}
+.code-head{display:flex;align-items:center;gap:8px;padding:13px 18px;background:#151a18;border-bottom:1px solid rgba(255,255,255,.07);font-family:'JetBrains Mono',monospace;font-size:11px;color:#aeb8b2}
+.code-head .dots{display:flex;gap:6px}.code-head .dots span{width:9px;height:9px;border-radius:50%;background:#35403b}.code-head .dots span:first-child{background:var(--accent)}.code-head .file{margin-left:auto;letter-spacing:.05em}
+pre.code{color:var(--code-ink);padding:25px 28px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.65;overflow-x:auto;white-space:pre;tab-size:4}
+.kw{color:#79c0ff}.ty{color:#ffa657}.fn{color:#d2a8ff}.st{color:#a5d6ff}.cm{color:#8b949e}.nu{color:#f2cc60}.op{color:#ff7b72}
+
+/* CARDS / DIAGRAMS */
+.flow,.viz,.card{margin:38px -24px;padding:34px 30px;background:linear-gradient(180deg,var(--paper),#f0ebdf);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.flow::before,.viz::before,.card::before{content:'';position:absolute;left:0;top:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent-2),var(--accent))}
+@media(max-width:760px){.flow,.viz,.card{margin:30px -10px;padding:24px 17px}}
+.flow svg,.viz svg{display:block;width:100%;height:auto}
+.caption{font-family:'Fraunces',serif;font-style:italic;color:var(--muted);text-align:center;font-size:15px;margin-top:15px}
+
+/* QUEUE DEMO */
+.queue-stage{margin:38px -34px;padding:38px 28px;background:#17201d;border-radius:16px;box-shadow:var(--shadow);color:#f3eee4;overflow:hidden}
+@media(max-width:760px){.queue-stage{margin:30px -10px;padding:28px 14px}}
+.queue-stage .label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:#89b8ad;text-transform:uppercase;margin-bottom:18px}
+.queue-row{display:flex;gap:9px;justify-content:center;align-items:center;flex-wrap:nowrap}
+.slot{width:78px;height:72px;border:1px solid rgba(255,255,255,.2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:15px;background:#242e2a;position:relative;transition:.4s ease}
+.slot.filled{background:var(--accent);border-color:#40b9ab;box-shadow:0 0 22px rgba(15,118,110,.32)}
+.slot .idx{position:absolute;bottom:-20px;color:#70827a;font-size:9px}
+.queue-controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:38px}
+.queue-controls button{appearance:none;border:0;border-radius:999px;padding:10px 15px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:.05em;cursor:pointer;background:#f4eee2;color:#1b211e;transition:.2s}
+.queue-controls button:hover{transform:translateY(-1px)}
+.queue-controls button.primary{background:var(--accent);color:#fff}
+.queue-log{margin:24px auto 0;max-width:600px;min-height:62px;padding:14px 16px;border-radius:9px;background:#0f1512;border:1px solid rgba(255,255,255,.08);font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:#cbd8d2}
+
+/* COMPARISON */
+.compare{display:grid;grid-template-columns:1fr 1fr;margin:36px -24px;border-radius:15px;overflow:hidden;box-shadow:var(--shadow)}
+.compare>div{padding:31px 27px}.compare .bad{background:#241d1c;color:#f6eee8}.compare .good{background:linear-gradient(180deg,#0f766e,#0b5f59);color:#fff}
+.compare h5{font-family:'Fraunces',serif;font-size:20px;font-weight:550;margin-bottom:14px}.compare ul{list-style:none;padding:0;margin:0;color:inherit}.compare li{font-family:'Newsreader',serif;font-size:16px;line-height:1.45;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.1)}.compare li:last-child{border-bottom:0}
+@media(max-width:650px){.compare{grid-template-columns:1fr;margin:30px -10px}}
+
+/* API GRID */
+.api-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin:30px -10px}
+.api{padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--paper);box-shadow:0 8px 24px -18px rgba(0,0,0,.25)}
+.api .name{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;color:var(--accent);margin-bottom:8px}.api p{font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;margin:0;color:var(--muted)}
+@media(max-width:620px){.api-grid{grid-template-columns:1fr}}
+
+/* CALLOUTS */
+.note{margin:28px 0;padding:22px 24px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(15,118,110,.24);color:var(--ink-soft)}
+.note strong{font-family:'Inter',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:7px}
+.warning{background:rgba(180,35,24,.07);border-color:rgba(180,35,24,.25)}.warning strong{color:var(--danger)}
+
+/* TOC */
+.toc{position:fixed;left:22px;top:50%;transform:translateY(-50%);z-index:100;display:none}
+@media(min-width:1220px){.toc{display:block}}
+.toc ol{list-style:none;margin:0;padding:0}.toc li{margin:7px 0}.toc a{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--muted);text-decoration:none;display:flex;align-items:center;gap:9px;transition:.25s}.toc a::before{content:'';width:13px;height:1px;background:var(--muted);transition:.25s}.toc a:hover,.toc a.active{color:var(--accent)}.toc a:hover::before,.toc a.active::before{width:26px;background:var(--accent)}
+
+/* FINAL */
+.final{margin:62px -38px;padding:58px 40px;border-radius:17px;background:linear-gradient(180deg,#141b18,#202a26);color:#f3eee4;box-shadow:var(--shadow)}
+.final h2{color:#f3eee4}.final p{color:rgba(243,238,228,.76)}
+@media(max-width:760px){.final{margin:42px -10px;padding:36px 20px}}
+.cheat{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:28px}.cheat>div{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:16px;border-radius:10px}.cheat b{font-family:'JetBrains Mono',monospace;color:#7de2d6;font-size:11px;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:6px}.cheat span{font-family:'Inter',sans-serif;font-size:13px;color:#ddd9d0;line-height:1.45}@media(max-width:620px){.cheat{grid-template-columns:1fr}}
+
+/* ANIMATIONS */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .75s ease,transform .75s ease}.reveal.in{opacity:1;transform:none}
+@keyframes dash{to{stroke-dashoffset:-18}}.dash{stroke-dasharray:6 5;animation:dash 1.2s linear infinite}
+@keyframes drift{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+footer{max-width:760px;margin:0 auto;border-top:1px solid var(--line);padding:58px 24px 75px;text-align:center;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;letter-spacing:.08em}
+footer .quote{font-family:'Fraunces',serif;font-size:22px;font-style:italic;color:var(--ink);line-height:1.5;margin-bottom:18px;letter-spacing:0}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<nav class="toc" aria-label="Table of contents"><ol id="toc-list"></ol></nav>
+
+<header class="hero">
+  <div class="pill">Concurrency LLD</div>
+  <div class="hero-viz" aria-hidden="true">
+    <svg viewBox="0 0 310 310">
+      <defs>
+        <radialGradient id="heroGlow"><stop offset="0%" stop-color="#0f766e" stop-opacity=".26"/><stop offset="100%" stop-color="#0f766e" stop-opacity="0"/></radialGradient>
+      </defs>
+      <circle cx="155" cy="155" r="145" fill="url(#heroGlow)"/>
+      <g fill="none" stroke="#0f766e">
+        <rect x="34" y="119" width="54" height="54" rx="8" opacity=".32"/>
+        <rect x="96" y="119" width="54" height="54" rx="8" opacity=".52"/>
+        <rect x="158" y="119" width="54" height="54" rx="8" opacity=".72"/>
+        <rect x="220" y="119" width="54" height="54" rx="8" opacity=".92"/>
+      </g>
+      <g fill="#0f766e">
+        <circle cx="62" cy="70" r="8"><animate attributeName="cy" values="70;99;70" dur="2.2s" repeatCount="indefinite"/></circle>
+        <circle cx="248" cy="220" r="8"><animate attributeName="cy" values="220;190;220" dur="2.2s" begin=".7s" repeatCount="indefinite"/></circle>
+      </g>
+      <path d="M62 84 C62 105 86 108 96 119" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="5 4">
+        <animate attributeName="stroke-dashoffset" from="18" to="0" dur="1.1s" repeatCount="indefinite"/>
+      </path>
+      <path d="M220 173 C224 190 240 194 248 206" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="5 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.1s" repeatCount="indefinite"/>
+      </path>
+      <text x="62" y="48" text-anchor="middle" fill="#0f766e" font-family="JetBrains Mono" font-size="10">PRODUCER</text>
+      <text x="248" y="246" text-anchor="middle" fill="#0f766e" font-family="JetBrains Mono" font-size="10">CONSUMER</text>
+    </svg>
+  </div>
+  <div class="kicker">Java &nbsp;·&nbsp; Low-Level Design &nbsp;·&nbsp; 90-Minute Interview</div>
+  <h1>How we build a queue<br/>that knows when to <em>wait.</em></h1>
+  <p class="lede">A normal queue stores data. A blocking queue coordinates people competing to produce and consume it. The hard part is not FIFO. The hard part is putting threads to sleep without losing work — and waking exactly the right ones.</p>
+  <div class="meta">
+    <div><strong>Read time</strong>18 minutes</div>
+    <div><strong>Core design</strong>Circular buffer + lock + two conditions</div>
+    <div><strong>Target</strong>SDE-2 / FAANG-style machine coding</div>
+  </div>
+</header>
+
+<article>
+<section class="chapter reveal" id="intro">
+  <span class="chapter-num">00 — The interview</span>
+  <h2>The problem sounds smaller than it is.</h2>
+  <h3>“Implement a queue” is not the question.</h3>
+  <p>The interviewer gives us one shared queue. Multiple producer threads will add items. Multiple consumer threads will remove them. The queue has a fixed capacity.</p>
+  <p>At first, this sounds like a wrapper around <code class="inline">ArrayDeque</code>. Add at the back. Remove from the front. Done.</p>
+  <p>Then the constraints arrive:</p>
+  <ul>
+    <li>If the queue is full, a producer must <strong>wait</strong>.</li>
+    <li>If the queue is empty, a consumer must <strong>wait</strong>.</li>
+    <li>No thread may corrupt the queue.</li>
+    <li>No thread may burn CPU repeatedly checking the same condition.</li>
+    <li>When the state changes, the correct waiting thread must wake up.</li>
+  </ul>
+  <blockquote><strong>The queue is no longer only a data structure.</strong> It is a coordination point between threads.</blockquote>
+
+  <div class="card">
+    <span class="chapter-num">INTERVIEW CONTRACT</span>
+    <p style="margin-bottom:12px"><strong>Design and implement a generic, bounded, thread-safe FIFO blocking queue in Java.</strong></p>
+    <ul style="margin-bottom:0">
+      <li><code class="inline">put(E)</code> blocks when full.</li>
+      <li><code class="inline">take()</code> blocks when empty.</li>
+      <li>Multiple producers and consumers are supported.</li>
+      <li>Do not use Java's existing <code class="inline">BlockingQueue</code>.</li>
+      <li>Target O(1) insertion and removal.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="chapter reveal" id="c1">
+  <span class="chapter-num">01 — The naive queue</span>
+  <h2>A normal queue solves storage, not coordination.</h2>
+  <h3>FIFO is easy. Concurrent waiting is the real design.</h3>
+  <p>Start with the simplest possible implementation:</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">NaiveQueue.java</div></div><pre class="code"><span class="kw">class</span> <span class="ty">NaiveQueue</span>&lt;E&gt; {
+    <span class="ty">Queue</span>&lt;E&gt; queue = <span class="kw">new</span> <span class="ty">ArrayDeque</span>&lt;&gt;();
+    <span class="ty">int</span> capacity;
+
+    <span class="kw">void</span> <span class="fn">put</span>(E item) {
+        queue.add(item);
+    }
+
+    E <span class="fn">take</span>() {
+        <span class="kw">return</span> queue.poll();
+    }
+}</pre></div>
+  <p>This breaks in two ways.</p>
+  <p>First, <code class="inline">ArrayDeque</code> is not thread-safe. Two threads may mutate its internal state at the same time.</p>
+  <p>Second, there is no useful behavior at the boundaries. When the queue is full, what should a producer do? When it is empty, what should a consumer do?</p>
+
+  <div class="compare">
+    <div class="bad">
+      <h5>What we must avoid</h5>
+      <ul>
+        <li>Return failure immediately when the contract says “wait”.</li>
+        <li>Keep looping and checking capacity.</li>
+        <li>Sleep for arbitrary time and retry.</li>
+        <li>Let multiple threads mutate the queue without a lock.</li>
+      </ul>
+    </div>
+    <div class="good">
+      <h5>What the queue should do</h5>
+      <ul>
+        <li>Protect shared state atomically.</li>
+        <li>Suspend producers when full.</li>
+        <li>Suspend consumers when empty.</li>
+        <li>Wake them when their required condition becomes true.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="chapter reveal" id="c2">
+  <span class="chapter-num">02 — Backpressure</span>
+  <h2>When producers outrun consumers.</h2>
+  <h3>A bounded queue turns overload into waiting.</h3>
+  <p>Imagine a queue with capacity four. Producers are faster than consumers. The queue fills:</p>
+
+  <div class="queue-stage" id="queue-demo">
+    <div class="label">Interactive queue — capacity 4</div>
+    <div class="queue-row">
+      <div class="slot" data-slot="0"><span class="idx">0</span></div>
+      <div class="slot" data-slot="1"><span class="idx">1</span></div>
+      <div class="slot" data-slot="2"><span class="idx">2</span></div>
+      <div class="slot" data-slot="3"><span class="idx">3</span></div>
+    </div>
+    <div class="queue-controls">
+      <button class="primary" id="produceBtn">Producer: put()</button>
+      <button id="consumeBtn">Consumer: take()</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+    <div class="queue-log" id="queueLog">Queue is empty. A consumer calling take() would wait on <b>notEmpty</b>.</div>
+  </div>
+
+  <p>Once all four positions are occupied, another producer cannot safely insert. But dropping the item may violate the API contract, and busy-waiting wastes CPU.</p>
+  <p>The producer should become dormant until a consumer creates space. This is <strong>backpressure</strong>: the queue slows producers down instead of allowing unbounded memory growth.</p>
+  <blockquote>A bounded blocking queue converts “the consumer is behind” into a controlled wait.</blockquote>
+</section>
+
+<section class="chapter reveal" id="c3">
+  <span class="chapter-num">03 — One lock</span>
+  <h2>Protect the state as one transaction.</h2>
+  <h3>Queue contents, indexes, and count must move together.</h3>
+  <p>Our queue has shared mutable state:</p>
+  <ul>
+    <li>the stored items;</li>
+    <li>the index of the next item to remove;</li>
+    <li>the index of the next position to insert;</li>
+    <li>the number of elements currently present.</li>
+  </ul>
+  <p>These values form one invariant. If we add an item, we must update the array, move the tail, and increment the count as one atomic operation.</p>
+
+  <div class="flow">
+    <svg viewBox="0 0 700 250" role="img" aria-label="One lock protecting queue state">
+      <defs><marker id="arrLock" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/></marker></defs>
+      <rect x="230" y="18" width="240" height="52" rx="10" fill="#17201d"/>
+      <text x="350" y="49" text-anchor="middle" fill="#f3eee4" font-family="Inter" font-size="14" font-weight="700">ReentrantLock</text>
+      <line x1="350" y1="70" x2="350" y2="108" stroke="#0f766e" stroke-width="2" marker-end="url(#arrLock)" class="dash"/>
+      <rect x="80" y="122" width="540" height="92" rx="14" fill="#fffdf8" stroke="#0f766e" stroke-width="1.5"/>
+      <text x="350" y="148" text-anchor="middle" fill="#0f766e" font-family="JetBrains Mono" font-size="11">PROTECTED CRITICAL SECTION</text>
+      <g font-family="Inter" font-size="13" fill="#171918">
+        <text x="130" y="182">items[]</text><text x="255" y="182">head</text><text x="365" y="182">tail</text><text x="475" y="182">count</text>
+      </g>
+      <g fill="#0f766e"><circle cx="150" cy="195" r="5"/><circle cx="270" cy="195" r="5"/><circle cx="380" cy="195" r="5"/><circle cx="490" cy="195" r="5"/></g>
+    </svg>
+    <div class="caption">One lock protects the complete queue invariant, not just the underlying container.</div>
+  </div>
+
+  <p>The standard pattern is:</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Lock pattern</div></div><pre class="code">lock.lock();
+<span class="kw">try</span> {
+    <span class="cm">// read or modify shared queue state</span>
+} <span class="kw">finally</span> {
+    lock.unlock();
+}</pre></div>
+  <div class="note"><strong>Why lock before try?</strong>The lock is acquired first. The <code class="inline">finally</code> block guarantees release after a normal return or an exception. A return inside <code class="inline">try</code> still executes <code class="inline">finally</code> before the value leaves the method.</div>
+</section>
+
+<section class="chapter reveal" id="c4">
+  <span class="chapter-num">04 — Conditions</span>
+  <h2>Threads are waiting for different truths.</h2>
+  <h3>One condition belongs to consumers. The other belongs to producers.</h3>
+  <p>A lock answers: <em>Who may touch the queue right now?</em></p>
+  <p>A condition answers: <em>What must become true before this thread can continue?</em></p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 330" role="img" aria-label="Producer and consumer condition queues">
+      <defs><marker id="arrCond" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/></marker></defs>
+      <rect x="255" y="18" width="190" height="48" rx="10" fill="#17201d"/>
+      <text x="350" y="47" text-anchor="middle" fill="#f3eee4" font-family="Inter" font-size="14" font-weight="700">One ReentrantLock</text>
+      <line x1="350" y1="66" x2="350" y2="95" stroke="#0f766e" stroke-width="2"/>
+      <line x1="160" y1="95" x2="540" y2="95" stroke="#0f766e" stroke-width="2"/>
+      <line x1="160" y1="95" x2="160" y2="125" stroke="#0f766e" stroke-width="2" marker-end="url(#arrCond)"/>
+      <line x1="540" y1="95" x2="540" y2="125" stroke="#0f766e" stroke-width="2" marker-end="url(#arrCond)"/>
+      <rect x="65" y="132" width="190" height="82" rx="12" fill="#fffdf8" stroke="#d97706" stroke-width="1.5"/>
+      <text x="160" y="162" text-anchor="middle" fill="#d97706" font-family="JetBrains Mono" font-size="13" font-weight="700">notFull</text>
+      <text x="160" y="187" text-anchor="middle" fill="#3c423f" font-family="Inter" font-size="12">Producers wait here</text>
+      <text x="160" y="204" text-anchor="middle" fill="#6c746f" font-family="Inter" font-size="11">“I need one empty slot.”</text>
+      <rect x="445" y="132" width="190" height="82" rx="12" fill="#fffdf8" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="540" y="162" text-anchor="middle" fill="#2563eb" font-family="JetBrains Mono" font-size="13" font-weight="700">notEmpty</text>
+      <text x="540" y="187" text-anchor="middle" fill="#3c423f" font-family="Inter" font-size="12">Consumers wait here</text>
+      <text x="540" y="204" text-anchor="middle" fill="#6c746f" font-family="Inter" font-size="11">“I need one item.”</text>
+      <rect x="235" y="250" width="230" height="48" rx="10" fill="#0f766e"/>
+      <text x="350" y="279" text-anchor="middle" fill="#fff" font-family="Inter" font-size="13" font-weight="700">Shared bounded queue</text>
+      <path d="M160 214 C160 250 230 260 235 271" fill="none" stroke="#d97706" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <path d="M540 214 C540 250 470 260 465 271" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5 4"/>
+    </svg>
+    <div class="caption">Two conditions prevent producers from waking producers and consumers from waking consumers.</div>
+  </div>
+
+  <p>The producer waits on <code class="inline">notFull</code>, but after inserting it signals <code class="inline">notEmpty</code>.</p>
+  <p>The consumer waits on <code class="inline">notEmpty</code>, but after removing it signals <code class="inline">notFull</code>.</p>
+
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Condition direction</div></div><pre class="code"><span class="cm">// Producer</span>
+<span class="kw">while</span> (count == capacity) {
+    notFull.await();
+}
+enqueue(item);
+notEmpty.signal();
+
+<span class="cm">// Consumer</span>
+<span class="kw">while</span> (count == <span class="nu">0</span>) {
+    notEmpty.await();
+}
+E item = dequeue();
+notFull.signal();</pre></div>
+</section>
+
+<section class="chapter reveal" id="c5">
+  <span class="chapter-num">05 — The subtle bug</span>
+  <h2>Why the condition belongs inside a while loop.</h2>
+  <h3>The condition was true before sleeping. It may not be true after waking.</h3>
+  <p>While a thread owns the lock, no other correctly implemented queue operation can change the queue. So the first check is trustworthy.</p>
+  <p>But <code class="inline">await()</code> changes the situation. It atomically releases the lock and suspends the thread.</p>
+
+  <div class="flow">
+    <svg viewBox="0 0 700 420" role="img" aria-label="Timeline showing why await needs a while loop">
+      <g font-family="JetBrains Mono" font-size="11">
+        <text x="40" y="35" fill="#0f766e">P1</text><text x="40" y="145" fill="#d97706">C1</text><text x="40" y="255" fill="#2563eb">P2</text>
+      </g>
+      <g stroke="#d6d0c3" stroke-width="2"><line x1="90" y1="30" x2="660" y2="30"/><line x1="90" y1="140" x2="660" y2="140"/><line x1="90" y1="250" x2="660" y2="250"/></g>
+      <g font-family="Inter" font-size="11">
+        <rect x="110" y="12" width="145" height="36" rx="7" fill="#0f766e"/><text x="182" y="35" text-anchor="middle" fill="#fff">sees FULL</text>
+        <rect x="270" y="12" width="145" height="36" rx="7" fill="#5f6d67"/><text x="342" y="35" text-anchor="middle" fill="#fff">await → unlock</text>
+        <rect x="185" y="122" width="155" height="36" rx="7" fill="#d97706"/><text x="262" y="145" text-anchor="middle" fill="#fff">take → signal</text>
+        <rect x="360" y="232" width="150" height="36" rx="7" fill="#2563eb"/><text x="435" y="255" text-anchor="middle" fill="#fff">gets lock, fills</text>
+        <rect x="520" y="12" width="130" height="36" rx="7" fill="#b42318"/><text x="585" y="35" text-anchor="middle" fill="#fff">P1 reacquires</text>
+      </g>
+      <path d="M415 48 C430 84 510 80 520 48" fill="none" stroke="#b42318" stroke-width="2" stroke-dasharray="6 5" class="dash"/>
+      <text x="350" y="325" text-anchor="middle" fill="#171918" font-family="Fraunces" font-size="19">P1 was signalled — but the queue is full again before P1 owns the lock.</text>
+      <text x="350" y="357" text-anchor="middle" fill="#0f766e" font-family="JetBrains Mono" font-size="13">while → recheck → wait again</text>
+      <text x="350" y="385" text-anchor="middle" fill="#b42318" font-family="JetBrains Mono" font-size="13">if → continue blindly → exceed capacity</text>
+    </svg>
+    <div class="caption">A signal means “try again,” not “the condition is guaranteed forever.”</div>
+  </div>
+
+  <p>The awakened thread does not receive the lock immediately. It only becomes eligible to compete for it. Another producer may acquire the lock first and fill the newly created slot.</p>
+  <p>Java also allows <strong>spurious wakeups</strong>. Therefore the correct condition pattern is always:</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">The condition loop</div></div><pre class="code"><span class="kw">while</span> (!requiredCondition()) {
+    condition.await();
+}</pre></div>
+  <div class="note"><strong>Precise mental model</strong>The initial condition check is protected by the lock. The uncertainty begins because <code class="inline">await()</code> releases that lock. After waking, the thread must reacquire the lock and validate the condition again.</div>
+</section>
+
+<section class="chapter reveal" id="c6">
+  <span class="chapter-num">06 — The buffer</span>
+  <h2>A circular array gives predictable O(1) operations.</h2>
+  <h3>Head removes. Tail inserts. Modulo wraps both around.</h3>
+  <p>We could wrap an <code class="inline">ArrayDeque&lt;E&gt;</code>. That is a reasonable first implementation. But for the final interview design, a fixed array makes the bounded nature explicit and avoids node allocation.</p>
+
+  <div class="viz">
+    <svg viewBox="0 0 700 290" role="img" aria-label="Circular buffer head and tail">
+      <defs><marker id="arrBuf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/></marker></defs>
+      <g font-family="JetBrains Mono" font-size="12">
+        <rect x="90" y="115" width="100" height="72" rx="9" fill="#0f766e"/><text x="140" y="157" text-anchor="middle" fill="#fff">A</text>
+        <rect x="200" y="115" width="100" height="72" rx="9" fill="#0f766e"/><text x="250" y="157" text-anchor="middle" fill="#fff">B</text>
+        <rect x="310" y="115" width="100" height="72" rx="9" fill="#0f766e"/><text x="360" y="157" text-anchor="middle" fill="#fff">C</text>
+        <rect x="420" y="115" width="100" height="72" rx="9" fill="#fffdf8" stroke="#0f766e"/><text x="470" y="157" text-anchor="middle" fill="#6c746f">_</text>
+        <rect x="530" y="115" width="100" height="72" rx="9" fill="#fffdf8" stroke="#0f766e"/><text x="580" y="157" text-anchor="middle" fill="#6c746f">_</text>
+        <g fill="#6c746f"><text x="140" y="210" text-anchor="middle">0</text><text x="250" y="210" text-anchor="middle">1</text><text x="360" y="210" text-anchor="middle">2</text><text x="470" y="210" text-anchor="middle">3</text><text x="580" y="210" text-anchor="middle">4</text></g>
+      </g>
+      <text x="140" y="72" text-anchor="middle" fill="#2563eb" font-family="Inter" font-size="13" font-weight="700">HEAD</text>
+      <line x1="140" y1="80" x2="140" y2="108" stroke="#2563eb" stroke-width="2" marker-end="url(#arrBuf)"/>
+      <text x="470" y="72" text-anchor="middle" fill="#d97706" font-family="Inter" font-size="13" font-weight="700">TAIL</text>
+      <line x1="470" y1="80" x2="470" y2="108" stroke="#d97706" stroke-width="2" marker-end="url(#arrBuf)"/>
+      <path d="M620 232 C660 240 660 70 595 75" fill="none" stroke="#0f766e" stroke-width="2" stroke-dasharray="6 4" class="dash" marker-end="url(#arrBuf)"/>
+      <text x="350" y="258" text-anchor="middle" fill="#0f766e" font-family="JetBrains Mono" font-size="12">nextIndex = (index + 1) % capacity</text>
+    </svg>
+    <div class="caption">When an index reaches the end, modulo brings it back to zero.</div>
+  </div>
+
+  <h4>Generics: where the type parameter goes</h4>
+  <p>The interface declares <code class="inline">&lt;E&gt;</code>. The implementation declares the same <code class="inline">&lt;E&gt;</code> and passes it to the interface.</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Generic declaration</div></div><pre class="code"><span class="kw">interface</span> <span class="ty">BoundedBlockingQueue</span>&lt;E&gt; {
+    <span class="kw">void</span> <span class="fn">put</span>(E item) <span class="kw">throws</span> <span class="ty">InterruptedException</span>;
+    E <span class="fn">take</span>() <span class="kw">throws</span> <span class="ty">InterruptedException</span>;
+}
+
+<span class="kw">class</span> <span class="ty">MyArrayBlockingQueue</span>&lt;E&gt;
+        <span class="kw">implements</span> <span class="ty">BoundedBlockingQueue</span>&lt;E&gt; {
+    <span class="cm">// ...</span>
+}</pre></div>
+  <p>Java does not allow <code class="inline">new E[capacity]</code>. Therefore the internal storage is an <code class="inline">Object[]</code>. Only values of type <code class="inline">E</code> can enter through the public methods, so casting back during removal is controlled.</p>
+</section>
+
+<section class="chapter reveal" id="c7">
+  <span class="chapter-num">07 — The core implementation</span>
+  <h2>Put and take are mirror images.</h2>
+  <h3>Wait on your own condition. Signal the opposite side.</h3>
+
+  <h4>The public interface</h4>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">BoundedBlockingQueue.java</div></div><pre class="code"><span class="kw">import</span> java.util.concurrent.TimeUnit;
+
+<span class="kw">interface</span> <span class="ty">BoundedBlockingQueue</span>&lt;E&gt; {
+    <span class="kw">void</span> <span class="fn">put</span>(E item) <span class="kw">throws</span> <span class="ty">InterruptedException</span>;
+    E <span class="fn">take</span>() <span class="kw">throws</span> <span class="ty">InterruptedException</span>;
+
+    <span class="ty">boolean</span> <span class="fn">offer</span>(E item);
+    E <span class="fn">poll</span>();
+
+    <span class="ty">boolean</span> <span class="fn">offer</span>(E item, <span class="ty">long</span> timeout, <span class="ty">TimeUnit</span> unit)
+            <span class="kw">throws</span> <span class="ty">InterruptedException</span>;
+
+    E <span class="fn">poll</span>(<span class="ty">long</span> timeout, <span class="ty">TimeUnit</span> unit)
+            <span class="kw">throws</span> <span class="ty">InterruptedException</span>;
+
+    E <span class="fn">peek</span>();
+    <span class="ty">int</span> <span class="fn">size</span>();
+    <span class="ty">int</span> <span class="fn">remainingCapacity</span>();
+}</pre></div>
+
+  <h4>The complete implementation</h4>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">MyArrayBlockingQueue.java</div></div><pre class="code"><span class="kw">import</span> java.util.Objects;
+<span class="kw">import</span> java.util.concurrent.TimeUnit;
+<span class="kw">import</span> java.util.concurrent.locks.Condition;
+<span class="kw">import</span> java.util.concurrent.locks.ReentrantLock;
+
+<span class="kw">class</span> <span class="ty">MyArrayBlockingQueue</span>&lt;E&gt;
+        <span class="kw">implements</span> <span class="ty">BoundedBlockingQueue</span>&lt;E&gt; {
+
+    <span class="kw">private final</span> <span class="ty">Object</span>[] items;
+    <span class="kw">private final int</span> capacity;
+
+    <span class="kw">private int</span> head;
+    <span class="kw">private int</span> tail;
+    <span class="kw">private int</span> count;
+
+    <span class="kw">private final</span> <span class="ty">ReentrantLock</span> lock;
+    <span class="kw">private final</span> <span class="ty">Condition</span> notEmpty;
+    <span class="kw">private final</span> <span class="ty">Condition</span> notFull;
+
+    <span class="fn">MyArrayBlockingQueue</span>(<span class="ty">int</span> capacity) {
+        <span class="kw">this</span>(capacity, <span class="kw">false</span>);
+    }
+
+    <span class="fn">MyArrayBlockingQueue</span>(<span class="ty">int</span> capacity, <span class="ty">boolean</span> fair) {
+        <span class="kw">if</span> (capacity &lt;= <span class="nu">0</span>) {
+            <span class="kw">throw new</span> <span class="ty">IllegalArgumentException</span>(
+                    <span class="st">"capacity must be greater than zero"</span>);
+        }
+
+        <span class="kw">this</span>.capacity = capacity;
+        <span class="kw">this</span>.items = <span class="kw">new</span> <span class="ty">Object</span>[capacity];
+        <span class="kw">this</span>.lock = <span class="kw">new</span> <span class="ty">ReentrantLock</span>(fair);
+        <span class="kw">this</span>.notEmpty = lock.newCondition();
+        <span class="kw">this</span>.notFull = lock.newCondition();
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public void</span> <span class="fn">put</span>(E item) <span class="kw">throws</span> <span class="ty">InterruptedException</span> {
+        Objects.requireNonNull(item, <span class="st">"null items are not supported"</span>);
+
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">while</span> (count == capacity) {
+                notFull.await();
+            }
+
+            enqueue(item);
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public</span> E <span class="fn">take</span>() <span class="kw">throws</span> <span class="ty">InterruptedException</span> {
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">while</span> (count == <span class="nu">0</span>) {
+                notEmpty.await();
+            }
+
+            <span class="kw">return</span> dequeue();
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public boolean</span> <span class="fn">offer</span>(E item) {
+        Objects.requireNonNull(item, <span class="st">"null items are not supported"</span>);
+
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">if</span> (count == capacity) {
+                <span class="kw">return false</span>;
+            }
+
+            enqueue(item);
+            <span class="kw">return true</span>;
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public</span> E <span class="fn">poll</span>() {
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">if</span> (count == <span class="nu">0</span>) {
+                <span class="kw">return null</span>;
+            }
+
+            <span class="kw">return</span> dequeue();
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public boolean</span> <span class="fn">offer</span>(
+            E item,
+            <span class="ty">long</span> timeout,
+            <span class="ty">TimeUnit</span> unit
+    ) <span class="kw">throws</span> <span class="ty">InterruptedException</span> {
+
+        Objects.requireNonNull(item, <span class="st">"null items are not supported"</span>);
+        Objects.requireNonNull(unit, <span class="st">"TimeUnit cannot be null"</span>);
+
+        <span class="ty">long</span> nanos = unit.toNanos(timeout);
+
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">while</span> (count == capacity) {
+                <span class="kw">if</span> (nanos &lt;= <span class="nu">0</span>) {
+                    <span class="kw">return false</span>;
+                }
+
+                nanos = notFull.awaitNanos(nanos);
+            }
+
+            enqueue(item);
+            <span class="kw">return true</span>;
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public</span> E <span class="fn">poll</span>(
+            <span class="ty">long</span> timeout,
+            <span class="ty">TimeUnit</span> unit
+    ) <span class="kw">throws</span> <span class="ty">InterruptedException</span> {
+
+        Objects.requireNonNull(unit, <span class="st">"TimeUnit cannot be null"</span>);
+
+        <span class="ty">long</span> nanos = unit.toNanos(timeout);
+
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">while</span> (count == <span class="nu">0</span>) {
+                <span class="kw">if</span> (nanos &lt;= <span class="nu">0</span>) {
+                    <span class="kw">return null</span>;
+                }
+
+                nanos = notEmpty.awaitNanos(nanos);
+            }
+
+            <span class="kw">return</span> dequeue();
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public</span> E <span class="fn">peek</span>() {
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">return</span> count == <span class="nu">0</span>
+                    ? <span class="kw">null</span>
+                    : elementAt(head);
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public int</span> <span class="fn">size</span>() {
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">return</span> count;
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">@Override</span>
+    <span class="kw">public int</span> <span class="fn">remainingCapacity</span>() {
+        lock.lock();
+        <span class="kw">try</span> {
+            <span class="kw">return</span> capacity - count;
+        } <span class="kw">finally</span> {
+            lock.unlock();
+        }
+    }
+
+    <span class="kw">private void</span> <span class="fn">enqueue</span>(E item) {
+        items[tail] = item;
+        tail = (tail + <span class="nu">1</span>) % capacity;
+        count++;
+
+        <span class="cm">// One new item exists. Wake one consumer.</span>
+        notEmpty.signal();
+    }
+
+    <span class="kw">private</span> E <span class="fn">dequeue</span>() {
+        E item = elementAt(head);
+        items[head] = <span class="kw">null</span>; <span class="cm">// release reference for GC</span>
+        head = (head + <span class="nu">1</span>) % capacity;
+        count--;
+
+        <span class="cm">// One new slot exists. Wake one producer.</span>
+        notFull.signal();
+        <span class="kw">return</span> item;
+    }
+
+    <span class="kw">@SuppressWarnings</span>(<span class="st">"unchecked"</span>)
+    <span class="kw">private</span> E <span class="fn">elementAt</span>(<span class="ty">int</span> index) {
+        <span class="kw">return</span> (E) items[index];
+    }
+}</pre></div>
+
+  <div class="note"><strong>Why helpers?</strong><code class="inline">put()</code>, <code class="inline">offer()</code>, and timed <code class="inline">offer()</code> all reuse <code class="inline">enqueue()</code>. The three removal variants reuse <code class="inline">dequeue()</code>. The public methods decide <em>whether to wait</em>; the helpers perform the actual state transition and signalling.</div>
+</section>
+
+<section class="chapter reveal" id="c8">
+  <span class="chapter-num">08 — The API families</span>
+  <h2>The same operation, three different waiting contracts.</h2>
+  <h3>Blocking, immediate, and timed behavior share the same queue mechanics.</h3>
+  <div class="api-grid">
+    <div class="api"><div class="name">put(E)</div><p>Insert. If full, wait until space exists.</p></div>
+    <div class="api"><div class="name">take()</div><p>Remove. If empty, wait until an item exists.</p></div>
+    <div class="api"><div class="name">offer(E)</div><p>Insert immediately or return <b>false</b>. Never waits.</p></div>
+    <div class="api"><div class="name">poll()</div><p>Remove immediately or return <b>null</b>. Never waits.</p></div>
+    <div class="api"><div class="name">offer(E, timeout)</div><p>Wait for space only until the timeout expires.</p></div>
+    <div class="api"><div class="name">poll(timeout)</div><p>Wait for an item only until the timeout expires.</p></div>
+    <div class="api"><div class="name">peek()</div><p>Read the head item without removing it.</p></div>
+    <div class="api"><div class="name">remainingCapacity()</div><p>Return <b>capacity − count</b>.</p></div>
+  </div>
+  <p>The interesting concurrency logic remains in the same two conditions. The additional APIs mostly choose a different policy when the required condition is currently false.</p>
+
+  <h4>Timed waiting must preserve the remaining budget</h4>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Timed wait</div></div><pre class="code"><span class="ty">long</span> nanos = unit.toNanos(timeout);
+
+<span class="kw">while</span> (count == capacity) {
+    <span class="kw">if</span> (nanos &lt;= <span class="nu">0</span>) {
+        <span class="kw">return false</span>;
+    }
+
+    nanos = notFull.awaitNanos(nanos);
+}</pre></div>
+  <p><code class="inline">awaitNanos()</code> returns the remaining time. We reuse that value because a wake-up may not make the condition valid, and the total timeout must not restart from the beginning.</p>
+</section>
+
+<section class="chapter reveal" id="c9">
+  <span class="chapter-num">09 — Interruptions</span>
+  <h2>Waiting threads need a way to be asked to stop.</h2>
+  <h3>Interruption is cooperative cancellation, not forced termination.</h3>
+  <p>A producer may be sleeping because the queue is full. A consumer may be sleeping because the queue is empty. During application shutdown, we may not want them to wait forever.</p>
+  <p>Another thread can call:</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Cancellation request</div></div><pre class="code">workerThread.interrupt();</pre></div>
+  <p>This does not forcibly kill the worker. It records an interrupt request. Interruptible waiting operations such as <code class="inline">Condition.await()</code> respond by throwing <code class="inline">InterruptedException</code>.</p>
+
+  <div class="flow">
+    <svg viewBox="0 0 700 250" role="img" aria-label="Interrupt propagation">
+      <defs><marker id="arrInt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/></marker></defs>
+      <rect x="35" y="92" width="170" height="62" rx="11" fill="#17201d"/><text x="120" y="118" text-anchor="middle" fill="#f3eee4" font-family="Inter" font-size="13" font-weight="700">Controller</text><text x="120" y="138" text-anchor="middle" fill="#9eb2aa" font-family="JetBrains Mono" font-size="10">interrupt()</text>
+      <line x1="205" y1="123" x2="275" y2="123" stroke="#0f766e" stroke-width="2" marker-end="url(#arrInt)" class="dash"/>
+      <rect x="286" y="75" width="170" height="95" rx="11" fill="#fffdf8" stroke="#0f766e" stroke-width="1.5"/><text x="371" y="105" text-anchor="middle" fill="#0f766e" font-family="Inter" font-size="13" font-weight="700">Waiting worker</text><text x="371" y="129" text-anchor="middle" fill="#3c423f" font-family="JetBrains Mono" font-size="10">notEmpty.await()</text><text x="371" y="151" text-anchor="middle" fill="#b42318" font-family="JetBrains Mono" font-size="10">throws InterruptedException</text>
+      <line x1="456" y1="123" x2="525" y2="123" stroke="#0f766e" stroke-width="2" marker-end="url(#arrInt)" class="dash"/>
+      <rect x="535" y="92" width="130" height="62" rx="11" fill="#0f766e"/><text x="600" y="118" text-anchor="middle" fill="#fff" font-family="Inter" font-size="13" font-weight="700">Caller</text><text x="600" y="139" text-anchor="middle" fill="#d9fffa" font-family="JetBrains Mono" font-size="10">decides policy</text>
+    </svg>
+    <div class="caption">The queue propagates interruption. The worker or application decides whether to stop, retry, or clean up.</div>
+  </div>
+
+  <p>That is why blocking methods declare:</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Propagate interruption</div></div><pre class="code"><span class="kw">public void</span> <span class="fn">put</span>(E item)
+        <span class="kw">throws</span> <span class="ty">InterruptedException</span> {
+    <span class="cm">// await() may throw; let the caller decide</span>
+}</pre></div>
+  <p>The caller handles it:</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Worker policy</div></div><pre class="code"><span class="kw">try</span> {
+    queue.put(task);
+} <span class="kw">catch</span> (<span class="ty">InterruptedException</span> exception) {
+    <span class="cm">// Restore the interrupt flag for higher-level code.</span>
+    Thread.currentThread().interrupt();
+}</pre></div>
+
+  <div class="warning note"><strong>Do not swallow interruption</strong>An empty catch block turns a cancellation request into nothing. The worker continues as though nobody asked it to stop.</div>
+
+  <h4>What about lockInterruptibly()?</h4>
+  <p><code class="inline">lock.lock()</code> acquires the lock normally. <code class="inline">lock.lockInterruptibly()</code> additionally allows interruption while the thread is waiting to acquire the lock itself.</p>
+  <p>For the first interview implementation, normal <code class="inline">lock()</code> plus interruptible <code class="inline">await()</code> is easier to explain. Mention <code class="inline">lockInterruptibly()</code> as an extension when stronger cancellation responsiveness is required.</p>
+</section>
+
+<section class="chapter reveal" id="c10">
+  <span class="chapter-num">10 — Signal or signalAll?</span>
+  <h2>Wake only the amount of work that became possible.</h2>
+  <h3>One insertion creates one item. One removal creates one slot.</h3>
+  <p>Suppose ten consumers are waiting and one producer inserts one item.</p>
+  <p>Calling <code class="inline">signalAll()</code> wakes all ten. They all compete for the lock. One consumes the item. The other nine discover an empty queue and return to sleep.</p>
+  <p>With two dedicated conditions, normal queue operations can use:</p>
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">Targeted signalling</div></div><pre class="code"><span class="cm">// One item became available.</span>
+notEmpty.signal();
+
+<span class="cm">// One slot became available.</span>
+notFull.signal();</pre></div>
+  <p>This does not reduce the system to one producer and one consumer. Every successful enqueue signals another consumer; every successful dequeue signals another producer. Consumers process work outside the queue lock, so many consumers can execute tasks concurrently.</p>
+
+  <div class="compare">
+    <div class="bad">
+      <h5>signalAll()</h5>
+      <ul>
+        <li>Correct when guarded by while loops.</li>
+        <li>May wake many threads for one item.</li>
+        <li>Creates extra context switching and lock contention.</li>
+        <li>Useful for shutdown or broad state changes.</li>
+      </ul>
+    </div>
+    <div class="good">
+      <h5>signal()</h5>
+      <ul>
+        <li>Matches one-item / one-slot state changes.</li>
+        <li>Wakes one useful waiter.</li>
+        <li>Works cleanly because conditions are separated.</li>
+        <li>Preferred for normal put and take.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="chapter reveal" id="c11">
+  <span class="chapter-num">11 — Runnable proof</span>
+  <h2>The design should demonstrate waiting, not only compile.</h2>
+  <h3>Use a small capacity so blocking becomes visible.</h3>
+  <p>The queue does not own producer or consumer threads. They are external clients. A lambda submitted to an <code class="inline">ExecutorService</code> is already a <code class="inline">Runnable</code>; we do not need separate classes unless we want reusable worker objects.</p>
+
+  <div class="code-wrap"><div class="code-head"><div class="dots"><span></span><span></span><span></span></div><div class="file">BlockingQueueDemo.java</div></div><pre class="code"><span class="kw">import</span> java.util.concurrent.ExecutorService;
+<span class="kw">import</span> java.util.concurrent.Executors;
+<span class="kw">import</span> java.util.concurrent.TimeUnit;
+
+<span class="kw">public class</span> <span class="ty">BlockingQueueDemo</span> {
+
+    <span class="kw">public static void</span> <span class="fn">main</span>(<span class="ty">String</span>[] args)
+            <span class="kw">throws</span> <span class="ty">InterruptedException</span> {
+
+        <span class="ty">BoundedBlockingQueue</span>&lt;<span class="ty">Integer</span>&gt; queue =
+                <span class="kw">new</span> <span class="ty">MyArrayBlockingQueue</span>&lt;&gt;(<span class="nu">3</span>);
+
+        <span class="ty">ExecutorService</span> executor =
+                Executors.newFixedThreadPool(<span class="nu">4</span>);
+
+        <span class="cm">// Two producers</span>
+        executor.submit(() -&gt; produce(queue, <span class="nu">0</span>));
+        executor.submit(() -&gt; produce(queue, <span class="nu">100</span>));
+
+        <span class="cm">// Two consumers</span>
+        executor.submit(() -&gt; consume(queue, <span class="st">"C1"</span>));
+        executor.submit(() -&gt; consume(queue, <span class="st">"C2"</span>));
+
+        executor.shutdown();
+        executor.awaitTermination(<span class="nu">30</span>, TimeUnit.SECONDS);
+    }
+
+    <span class="kw">private static void</span> <span class="fn">produce</span>(
+            <span class="ty">BoundedBlockingQueue</span>&lt;<span class="ty">Integer</span>&gt; queue,
+            <span class="ty">int</span> start
+    ) {
+        <span class="kw">try</span> {
+            <span class="kw">for</span> (<span class="ty">int</span> i = <span class="nu">0</span>; i &lt; <span class="nu">5</span>; i++) {
+                <span class="ty">int</span> value = start + i;
+                queue.put(value);
+                System.out.println(<span class="st">"put "</span> + value);
+            }
+        } <span class="kw">catch</span> (<span class="ty">InterruptedException</span> exception) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    <span class="kw">private static void</span> <span class="fn">consume</span>(
+            <span class="ty">BoundedBlockingQueue</span>&lt;<span class="ty">Integer</span>&gt; queue,
+            <span class="ty">String</span> name
+    ) {
+        <span class="kw">try</span> {
+            <span class="kw">for</span> (<span class="ty">int</span> i = <span class="nu">0</span>; i &lt; <span class="nu">5</span>; i++) {
+                <span class="ty">Integer</span> value = queue.take();
+                System.out.println(name + <span class="st">" took "</span> + value);
+
+                <span class="cm">// Simulate work outside the queue lock.</span>
+                Thread.sleep(<span class="nu">120</span>);
+            }
+        } <span class="kw">catch</span> (<span class="ty">InterruptedException</span> exception) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}</pre></div>
+
+  <p>The capacity is deliberately small. Producers will occasionally fill the queue and wait. Consumers will create space and wake them. If consumers start first, they wait on <code class="inline">notEmpty</code> until the first item arrives.</p>
+</section>
+
+<section class="chapter reveal" id="c12">
+  <span class="chapter-num">12 — Interview trade-offs</span>
+  <h2>What makes this an SDE-2 answer.</h2>
+  <h3>The code matters. The reasoning around the code matters more.</h3>
+  <p>The final design is intentionally simple: one lock, two conditions, one circular array. It is not the highest-throughput queue possible. It is a correct, explainable baseline with clear extension points.</p>
+
+  <h4>Array vs linked storage</h4>
+  <ul>
+    <li><strong>Circular array:</strong> fixed memory, cache-friendly, no per-item node allocation.</li>
+    <li><strong>Linked nodes:</strong> flexible capacity, but more allocations and GC pressure.</li>
+  </ul>
+
+  <h4>One lock vs two locks</h4>
+  <ul>
+    <li><strong>One lock:</strong> simpler invariants and easier interview implementation.</li>
+    <li><strong>Separate put/take locks:</strong> can allow producer and consumer operations to progress with less contention, but requires more careful coordination.</li>
+  </ul>
+
+  <h4>Fair vs non-fair lock</h4>
+  <ul>
+    <li><strong>Non-fair:</strong> usually better throughput.</li>
+    <li><strong>Fair:</strong> reduces starvation risk by generally honoring wait order, at a throughput cost.</li>
+  </ul>
+
+  <h4>Shutdown as a follow-up</h4>
+  <p>A production queue may add a <code class="inline">closed</code> flag. Shutdown would reject new items and use <code class="inline">signalAll()</code> on both conditions so every waiting thread can wake, inspect the closed state, and terminate.</p>
+  <div class="note"><strong>Interview positioning</strong>Implement <code class="inline">put()</code>, <code class="inline">take()</code>, the circular buffer, and a demo first. Then add immediate and timed variants. Discuss two-lock optimization and graceful shutdown rather than letting extensions prevent a complete runnable core.</div>
+</section>
+
+<div class="final reveal">
+  <span class="chapter-num" style="color:#f0a33a">FINAL DESIGN</span>
+  <h2>The queue in one screen.</h2>
+  <p>The implementation is small because every piece has one precise responsibility.</p>
+
+  <svg viewBox="0 0 700 590" style="display:block;width:100%;height:auto;margin:36px auto 25px" role="img" aria-label="Final blocking queue architecture">
+    <defs><marker id="arrFinal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f0a33a"/></marker></defs>
+    <g font-family="Inter" font-size="13" font-weight="700">
+      <rect x="80" y="20" width="220" height="48" rx="9" fill="#0f766e"/><text x="190" y="49" text-anchor="middle" fill="#fff">Producer threads</text>
+      <rect x="400" y="20" width="220" height="48" rx="9" fill="#2563eb"/><text x="510" y="49" text-anchor="middle" fill="#fff">Consumer threads</text>
+      <line x1="190" y1="68" x2="190" y2="115" stroke="#f0a33a" stroke-width="2" marker-end="url(#arrFinal)"/>
+      <line x1="510" y1="68" x2="510" y2="115" stroke="#f0a33a" stroke-width="2" marker-end="url(#arrFinal)"/>
+      <rect x="80" y="125" width="220" height="72" rx="10" fill="#29332f" stroke="#f0a33a"/><text x="190" y="155" text-anchor="middle" fill="#f3eee4">while FULL</text><text x="190" y="178" text-anchor="middle" fill="#a9bbb4" font-family="JetBrains Mono" font-size="11">notFull.await()</text>
+      <rect x="400" y="125" width="220" height="72" rx="10" fill="#29332f" stroke="#f0a33a"/><text x="510" y="155" text-anchor="middle" fill="#f3eee4">while EMPTY</text><text x="510" y="178" text-anchor="middle" fill="#a9bbb4" font-family="JetBrains Mono" font-size="11">notEmpty.await()</text>
+      <line x1="300" y1="161" x2="330" y2="161" stroke="#f0a33a" stroke-width="2" marker-end="url(#arrFinal)"/>
+      <line x1="400" y1="161" x2="370" y2="161" stroke="#f0a33a" stroke-width="2" marker-end="url(#arrFinal)"/>
+      <rect x="250" y="235" width="200" height="52" rx="10" fill="#151c19" stroke="#7de2d6"/><text x="350" y="266" text-anchor="middle" fill="#f3eee4">One ReentrantLock</text>
+      <line x1="350" y1="287" x2="350" y2="330" stroke="#f0a33a" stroke-width="2" marker-end="url(#arrFinal)"/>
+      <rect x="100" y="340" width="500" height="105" rx="13" fill="#242e2a" stroke="#7de2d6"/>
+      <text x="350" y="372" text-anchor="middle" fill="#7de2d6">GENERIC CIRCULAR BUFFER &lt;E&gt;</text>
+      <g font-family="JetBrains Mono" font-size="12" fill="#f3eee4"><text x="170" y="410">Object[] items</text><text x="330" y="410">head / tail</text><text x="480" y="410">count</text></g>
+      <line x1="220" y1="445" x2="220" y2="490" stroke="#f0a33a" stroke-width="2" marker-end="url(#arrFinal)"/>
+      <line x1="480" y1="445" x2="480" y2="490" stroke="#f0a33a" stroke-width="2" marker-end="url(#arrFinal)"/>
+      <rect x="85" y="500" width="270" height="55" rx="10" fill="#0f766e"/><text x="220" y="524" text-anchor="middle" fill="#fff">enqueue → signal notEmpty</text><text x="220" y="543" text-anchor="middle" fill="#cffff8" font-family="JetBrains Mono" font-size="10">wake one consumer</text>
+      <rect x="365" y="500" width="270" height="55" rx="10" fill="#2563eb"/><text x="500" y="524" text-anchor="middle" fill="#fff">dequeue → signal notFull</text><text x="500" y="543" text-anchor="middle" fill="#dbeafe" font-family="JetBrains Mono" font-size="10">wake one producer</text>
+    </g>
+  </svg>
+
+  <div class="cheat">
+    <div><b>Producer rule</b><span>while full → await notFull → enqueue → signal notEmpty</span></div>
+    <div><b>Consumer rule</b><span>while empty → await notEmpty → dequeue → signal notFull</span></div>
+    <div><b>Generic rule</b><span>Declare &lt;E&gt; on interface and class; use Object[] internally.</span></div>
+    <div><b>Interrupt rule</b><span>Propagate InterruptedException; callers restore the interrupt flag.</span></div>
+    <div><b>Signal rule</b><span>Use signal for one-item state changes; signalAll for shutdown/broad changes.</span></div>
+    <div><b>Complexity</b><span>put, take, offer, poll, peek, size: O(1). Space: O(capacity).</span></div>
+  </div>
+
+  <p style="font-family:'Fraunces',serif;font-style:italic;font-size:21px;line-height:1.55;color:#f3eee4;margin-top:34px">A blocking queue is a small system with a surprisingly complete concurrency story: mutual exclusion, condition waiting, backpressure, signalling, interruption, fairness, and bounded memory.</p>
+</div>
+</article>
+
+<footer>
+  <div class="quote">“A signal does not mean the condition is yours. It means: wake up, reacquire the lock, and check again.”</div>
+  <div>BOUNDING THE DATA. COORDINATING THE THREADS.</div>
+  <div style="margin-top:22px;opacity:.55">— END —</div>
+</footer>
+
+<script>
+// Reading progress
+const progress = document.getElementById('progress');
+function updateProgress(){
+  const h = document.documentElement;
+  const total = h.scrollHeight - h.clientHeight;
+  progress.style.width = total > 0 ? ((h.scrollTop / total) * 100) + '%' : '0%';
+}
+window.addEventListener('scroll', updateProgress, {passive:true});
+updateProgress();
+
+// Reveal on scroll
+const revealObserver = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if(entry.isIntersecting){
+      entry.target.classList.add('in');
+      revealObserver.unobserve(entry.target);
+    }
+  });
+},{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+// TOC
+const chapters = [
+  ['intro','The interview'],['c1','Naive queue'],['c2','Backpressure'],
+  ['c3','One lock'],['c4','Conditions'],['c5','Why while'],
+  ['c6','Circular buffer'],['c7','Implementation'],['c8','API families'],
+  ['c9','Interruptions'],['c10','Signals'],['c11','Demo'],['c12','Trade-offs']
+];
+const toc = document.getElementById('toc-list');
+chapters.forEach(([id,label],i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<a href="#${id}" data-target="${id}"><span>${String(i).padStart(2,'0')} ${label}</span></a>`;
+  toc.appendChild(li);
+});
+const sections = chapters.map(([id]) => document.getElementById(id)).filter(Boolean);
+window.addEventListener('scroll', () => {
+  const y = window.scrollY + window.innerHeight * .3;
+  let active = sections[0];
+  sections.forEach(section => { if(section.offsetTop <= y) active = section; });
+  document.querySelectorAll('.toc a').forEach(a => a.classList.toggle('active', a.dataset.target === active.id));
+},{passive:true});
+
+// Interactive queue demo
+const slots = [...document.querySelectorAll('[data-slot]')];
+const log = document.getElementById('queueLog');
+let demoQueue = [];
+let nextValue = 1;
+function renderQueue(){
+  slots.forEach((slot, i) => {
+    const value = demoQueue[i];
+    slot.classList.toggle('filled', value !== undefined);
+    const idx = slot.querySelector('.idx');
+    slot.innerHTML = `${value !== undefined ? value : ''}<span class="idx">${i}</span>`;
+  });
+}
+function writeLog(html){ log.innerHTML = html; }
+document.getElementById('produceBtn').addEventListener('click', () => {
+  if(demoQueue.length === slots.length){
+    writeLog('<b>Queue FULL.</b> Producer cannot insert. It calls <b>notFull.await()</b>, releases the lock, and sleeps.');
+    return;
+  }
+  const value = nextValue++;
+  demoQueue.push(value);
+  renderQueue();
+  if(demoQueue.length === 1){
+    writeLog(`Producer inserted <b>${value}</b>. Queue became non-empty → <b>notEmpty.signal()</b> wakes one consumer.`);
+  } else if(demoQueue.length === slots.length){
+    writeLog(`Producer inserted <b>${value}</b>. Queue is now <b>FULL</b>. The next producer will wait on <b>notFull</b>.`);
+  } else {
+    writeLog(`Producer inserted <b>${value}</b>. It signals <b>notEmpty</b>. Current size: ${demoQueue.length}.`);
+  }
+});
+document.getElementById('consumeBtn').addEventListener('click', () => {
+  if(demoQueue.length === 0){
+    writeLog('<b>Queue EMPTY.</b> Consumer cannot remove. It calls <b>notEmpty.await()</b>, releases the lock, and sleeps.');
+    return;
+  }
+  const value = demoQueue.shift();
+  renderQueue();
+  if(demoQueue.length === slots.length - 1){
+    writeLog(`Consumer removed <b>${value}</b>. One slot became free → <b>notFull.signal()</b> wakes one producer.`);
+  } else if(demoQueue.length === 0){
+    writeLog(`Consumer removed <b>${value}</b>. Queue is now <b>EMPTY</b>. The next consumer will wait on <b>notEmpty</b>.`);
+  } else {
+    writeLog(`Consumer removed <b>${value}</b>. It signals <b>notFull</b>. Current size: ${demoQueue.length}.`);
+  }
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  demoQueue = []; nextValue = 1; renderQueue();
+  writeLog('Queue is empty. A consumer calling take() would wait on <b>notEmpty</b>.');
+});
+renderQueue();
+</script>
+</body>
+</html>
