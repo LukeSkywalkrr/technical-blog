@@ -266,18 +266,19 @@ pre.code{
 }
 @media(max-width:600px){.tradeoff{grid-template-columns:1fr;margin:28px -12px}}
 .tradeoff > div{padding:32px 28px}
-.tradeoff .left{background:linear-gradient(180deg,#2a2523,#1a1a1a);color:#f4ede0}
+.tradeoff h5,.tradeoff li{color:inherit}
+.tradeoff .left{background:linear-gradient(180deg,#2a2523,#1a1a1a);color:#fff}
 .tradeoff .right{background:linear-gradient(180deg,var(--accent),#8f2020);color:#fff}
 .tradeoff h5{
   font-family:'Fraunces',serif;font-weight:500;font-size:20px;
   margin-bottom:16px;letter-spacing:-.01em;
 }
-.tradeoff ul{list-style:none;margin:0;padding:0}
+.tradeoff ul{list-style:none;margin:0;padding:0;color:inherit}
+.tradeoff li{color:inherit}
 .tradeoff li{
   font-family:'Newsreader',serif;font-size:15px;line-height:1.5;
   padding:8px 0;display:flex;align-items:flex-start;gap:12px;
   border-bottom:1px solid rgba(255,255,255,.08);
-  color:#fff;
 }
 .tradeoff li:last-child{border-bottom:none}
 .tradeoff li::before{
@@ -292,6 +293,29 @@ code.inline{
   border-radius:4px;
   color:var(--ink);
 }
+
+/* Supporting concept notes */
+.concept-note{
+  margin:30px -12px;
+  padding:24px 26px;
+  background:var(--accent-soft);
+  border:1px solid rgba(197,48,48,.22);
+  border-left:4px solid var(--accent);
+  border-radius:10px;
+}
+.concept-note .note-label{
+  display:block;
+  margin-bottom:10px;
+  color:var(--accent);
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.concept-note p{margin-bottom:12px}
+.concept-note p:last-child{margin-bottom:0}
+@media(max-width:700px){.concept-note{margin:26px -6px;padding:20px}}
 ul{margin:16px 0 22px 24px;color:var(--ink-soft)}
 ul li{margin-bottom:8px}
 
@@ -424,7 +448,7 @@ footer .q{
   </div>
   <div class="kicker">Systems &nbsp;·&nbsp; Deep Dive</div>
   <h1>How we send<br/>one live <em>moment</em><br/>to millions of screens.</h1>
-  <p class="lede">A fighter lands a punch in Las Vegas. A few seconds later, the same moment appears on phones, laptops, and televisions around the world. This is what happens behind that single Watch Live button.</p>
+  <p class="lede">After years of anticipation, Conor McGregor’s return lasted just 70 seconds. He launched a kick, landed awkwardly on his right knee, and his fight against Max Holloway ended almost before it had begun. It was a deeply disappointing moment. But within seconds, millions of us watched it unfold on phones, laptops, and televisions around the world. So how did one moment inside an arena in Las Vegas travel across the world and reach our screens almost instantly? Let us look behind that single Watch Live button.</p>
   <div class="meta">
     <div><strong>Read time</strong>22 minutes</div>
     <div><strong>Chapters</strong>Eleven</div>
@@ -436,11 +460,11 @@ footer .q{
 
 <!-- Intro -->
 <section class="chapter reveal" id="intro">
-  <span class="chapter-num">00 — Prologue</span>
+  <span class="chapter-num">00 · Prologue</span>
   <h2>The button that hides a system.</h2>
   <h3>You tap Watch Live. The video starts.</h3>
   <p>Maybe it is sharp 1080p. Maybe your internet slows down and the picture becomes blurry for a few seconds. Then the quality quietly improves again.</p>
-  <p>You never choose a server. You never download a file. You never tell the application that your Wi-Fi just became slower.</p>
+  <p>You never choose a server. You never download a file. You never tell the application that your WiFi just became slower.</p>
   <p>The stream simply keeps playing.</p>
   <p>But behind that small <strong>Watch Live</strong> button is a system solving several difficult problems at the same time:</p>
   <ul>
@@ -454,7 +478,7 @@ footer .q{
 
 <!-- 01 -->
 <section class="chapter reveal" id="c1">
-  <span class="chapter-num">01 — The illusion</span>
+  <span class="chapter-num">01 · The illusion</span>
   <h2>It feels like a direct connection.</h2>
   <h3>The camera captures. The frame travels. Your screen displays.</h3>
   <p>When you watch a live event, it feels as though your phone is connected directly to the camera. Something like this:</p>
@@ -479,11 +503,11 @@ footer .q{
         <text x="548" y="78" fill="rgba(255,255,255,.75)" font-family="JetBrains Mono" font-size="10">VIEWER</text>
       </g>
     </svg>
-    <div class="flow-title">The naive design — direct connection.</div>
+    <div class="flow-title">The naive design: direct connection.</div>
   </div>
   <p>Simple. Except this design breaks almost immediately.</p>
   <p>A major event may have millions of viewers. If every device received its own copy directly from the source, the source would need to maintain millions of connections and repeatedly send the same video bytes across the internet.</p>
-  <p>Even worse, every viewer has a different network. One person may have a 500 Mbps broadband connection. Another may be watching on unstable mobile data inside a moving train. A single high-quality video feed cannot work well for both.</p>
+  <p>Even worse, every viewer has a different network. One person may have a 500 Mbps broadband connection. Another may be watching on unstable mobile data inside a moving train. A single high quality video feed cannot work well for both.</p>
   <p>And there is another problem. A live event does not have an ending yet. When you open a movie, the complete file already exists. A live stream is being created <em>while</em> people are watching it.</p>
   <p>So our real goal is not simply:</p>
   <blockquote>Send video from a camera to a screen.</blockquote>
@@ -493,7 +517,7 @@ footer .q{
 
 <!-- 02 -->
 <section class="chapter reveal" id="c2">
-  <span class="chapter-num">02 — The first problem</span>
+  <span class="chapter-num">02 · The first problem</span>
   <h2>One stream, many internet speeds.</h2>
   <h3>You cannot send the same version to everyone.</h3>
   <p>Suppose the platform sends a single 1080p feed at 5 Mbps to every viewer. Someone on 2 Mbps cannot download the video as quickly as it is being played. Every second, the player falls further behind. Eventually the buffer empties. The video freezes.</p>
@@ -541,17 +565,22 @@ footer .q{
         <text x="570" y="298" text-anchor="middle" fill="#c53030" font-family="Inter" font-size="10" font-weight="600">MOBILE / SLOW</text>
       </g>
     </svg>
-    <div class="viz-caption">The bitrate ladder — one input, many parallel outputs.</div>
+    <div class="viz-caption">The bitrate ladder: one input, many parallel outputs.</div>
   </div>
 
-  <p>A rendition is not defined only by resolution. It also has a bitrate, codec, frame rate, and other encoding settings. Modern codecs such as HEVC and AV1 can reach similar visual quality at roughly 30–50 percent lower bitrate, at the cost of more expensive encoding and narrower device support.</p>
-  <p>Now we have a version for almost every viewer. But we have created a new problem. Suppose a viewer starts in 1080p. Thirty seconds later, their Wi-Fi becomes slow. How do we move them to 480p without restarting the video?</p>
-  <p>We cannot treat the stream as one enormous, never-ending file. We need to break it apart.</p>
+  <p>A rendition is not defined only by resolution. It also has a bitrate, codec, frame rate, and other encoding settings.</p>
+  <aside class="concept-note">
+    <span class="note-label">Concept note · Codec</span>
+    <p>A <strong>codec</strong> is the algorithm used to compress raw video into fewer bytes for transmission and decode those bytes back into video on the viewer's device. H.264, HEVC, and AV1 are different codecs.</p>
+    <p>Newer codecs such as HEVC and AV1 can deliver similar visual quality at roughly 30 to 50 percent lower bitrate, but they require more processing power and are not supported by every device.</p>
+  </aside>
+  <p>Now we have a version for almost every viewer. But we have created a new problem. Suppose a viewer starts in 1080p. Thirty seconds later, their WiFi becomes slow. How do we move them to 480p without restarting the video?</p>
+  <p>We cannot treat the stream as one enormous, continuous file. We need to break it apart.</p>
 </section>
 
 <!-- 03 -->
 <section class="chapter reveal" id="c3">
-  <span class="chapter-num">03 — Segments</span>
+  <span class="chapter-num">03 · Segments</span>
   <h2>Stop thinking of video as one long file.</h2>
   <h3>Cut the stream into small, interchangeable pieces.</h3>
   <p>Instead of producing one continuous video file, the system divides each rendition into a sequence of small media segments. Each column below represents the same moment on the timeline, encoded at different qualities.</p>
@@ -585,10 +614,12 @@ footer .q{
     <div class="viz-caption">Aligned segments across renditions. Segment 103 at any quality contains the same slice of time.</div>
   </div>
 
-  <p>That alignment is not accidental. Video is compressed by describing most frames as differences from earlier frames. To switch qualities cleanly, the player has to begin decoding a rendition at a frame that stands on its own — an <strong>IDR keyframe</strong>. So every encoder in the ladder is instructed to place a keyframe at exactly the same points on the timeline, and segments are cut on those keyframes.</p>
+  <p>That alignment is not accidental. Video is compressed by describing most frames as differences from earlier frames.</p>
+  <p><strong>In simple terms:</strong> the stream is not cut at random points. Each segment begins with a complete, independently decodable keyframe. This ensures that when the next segment starts, or the player switches to another quality, it does not depend on frames from the previous segment.</p>
+  <p>To switch qualities cleanly, the player has to begin decoding a rendition at a frame that stands on its own: an <strong>IDR keyframe</strong>. So every encoder in the ladder is instructed to place a keyframe at exactly the same points on the timeline, and segments are cut on those keyframes.</p>
 
   <h4>Now watch what happens when the network changes</h4>
-  <p>The alignment lets the player finish one segment and request the next segment at a different quality — with no restart.</p>
+  <p>The alignment lets the player finish one segment and request the next segment at a different quality, with no restart.</p>
 
   <div class="viz">
     <svg viewBox="0 0 700 240" id="abrSwitch" role="img" aria-label="Adaptive bitrate switching demo">
@@ -599,19 +630,19 @@ footer .q{
       <rect id="netBar" x="90" y="188" width="200" height="14" rx="7" fill="#c53030"/>
       <text id="netLabel" x="300" y="200" fill="#1a1a1a" font-family="Inter" font-size="12" font-weight="600">Fast</text>
     </svg>
-    <div class="viz-caption">Adaptive bitrate in action — the player picks a quality per segment based on network health.</div>
+    <div class="viz-caption">Adaptive bitrate in action: the player picks a quality per segment based on network health.</div>
   </div>
 
-  <p>The viewer may notice that the picture became softer, but playback continues. This is the foundation of <strong>adaptive bitrate streaming</strong>. The stream is no longer one endless file — it is a timeline made from many small, interchangeable pieces.</p>
+  <p>The viewer may notice that the picture became softer, but playback continues. This is the foundation of <strong>adaptive bitrate streaming</strong>. The stream is no longer one endless file. It is a timeline made from many small, interchangeable pieces.</p>
 
   <h4>Why not make the pieces extremely small?</h4>
-  <p>Smaller segments allow the player to react more quickly. If each segment lasts six seconds, the player may need to wait longer before changing quality. Two-second segments adapt sooner. But smaller segments also create more requests, more metadata, and reduce compression efficiency, because keyframes are expensive and shorter segments mean more of them.</p>
-  <p>Segment size is a trade-off. Large segments are efficient but less responsive. Small segments react faster but increase overhead.</p>
+  <p>Smaller segments allow the player to react more quickly. If each segment lasts six seconds, the player may need to wait longer before changing quality. Two second segments adapt sooner. But smaller segments also create more requests, more metadata, and reduce compression efficiency, because keyframes are expensive and shorter segments mean more of them.</p>
+  <p>Segment size is a tradeoff. Large segments are efficient but less responsive. Small segments react faster but increase overhead.</p>
 </section>
 
 <!-- 04 -->
 <section class="chapter reveal" id="c4">
-  <span class="chapter-num">04 — The manifest</span>
+  <span class="chapter-num">04 · The manifest</span>
   <h2>A small file that describes the stream.</h2>
   <h3>Before any video moves, the player asks for a map.</h3>
   <p>When you press <strong>Watch Live</strong>, the application does not immediately download video. It first requests a small text document called a <strong>manifest</strong> or <strong>playlist</strong>. Conceptually, it might say:</p>
@@ -632,8 +663,13 @@ footer .q{
       </div>
     </div>
   </div>
-  <p>HLS commonly uses playlists with the <code class="inline">.m3u8</code> extension. MPEG-DASH commonly uses a manifest with the <code class="inline">.mpd</code> extension. Increasingly both are backed by the same underlying media format — <strong>CMAF</strong> — so a single set of segments on the origin can be described by either playlist type. That means one packaging pipeline can serve Apple devices (which historically required HLS) and everything else without duplicating the media.</p>
-  <p>The player reads this map and begins requesting segments. Because this is a live event, new segments keep appearing. The playlist advances as the encoder produces more video. Older segments may eventually disappear from the live window.</p>
+  <aside class="concept-note">
+    <span class="note-label">Concept note · HLS, DASH and CMAF</span>
+    <p><strong>HLS</strong>, or <strong>HTTP Live Streaming</strong>, is Apple’s streaming protocol. It uses a playlist to tell the player which video qualities and segments are available.</p>
+    <p><strong>MPEG DASH</strong>, or <strong>Dynamic Adaptive Streaming over HTTP</strong>, does the same job using a different manifest format. HLS usually uses <code class="inline">.m3u8</code>, while DASH uses <code class="inline">.mpd</code>.</p>
+    <p>The actual video segments can use <strong>CMAF</strong>, or <strong>Common Media Application Format</strong>, allowing both HLS and DASH to point to the same video files.</p>
+    <p>The player reads the manifest, chooses a quality, and downloads the matching segments. As the event continues, new segments enter the live playlist and older ones move out of its current window.</p>
+  </aside>
   <p>At this point our architecture looks like this:</p>
   <div class="flow">
     <svg viewBox="0 0 700 480">
@@ -695,18 +731,18 @@ footer .q{
       <rect x="270" y="452" width="160" height="24" rx="12" fill="#c53030"/>
       <text x="350" y="469" text-anchor="middle" fill="#fff" font-family="Inter" font-size="12" font-weight="600">VIEWER</text>
     </svg>
-    <div class="flow-title">The full delivery pipeline — source to screen.</div>
+    <div class="flow-title">The full delivery pipeline, from source to screen.</div>
   </div>
   <p>This works for one viewer. Perhaps even a few thousand viewers. Then the event becomes popular. Five million people request the same new segment within a few seconds. And our origin server melts.</p>
 </section>
 
 <!-- 05 -->
 <section class="chapter reveal" id="c5">
-  <span class="chapter-num">05 — The scale problem</span>
+  <span class="chapter-num">05 · The scale problem</span>
   <h2>Millions of viewers want the same bytes.</h2>
   <h3>Put copies close to the people who want them.</h3>
   <p>Imagine that segment 8,421 contains the winning goal. Every viewer watching near the live edge needs that segment. Without another layer, every request travels back to the origin. Its network capacity becomes the bottleneck.</p>
-  <p>The problem is unusual because the system is doing enormous work while serving highly repetitive data. Millions of people are not requesting millions of different videos — they are requesting the same few newly created segments. That repetition gives us the solution.</p>
+  <p>The problem is unusual because the system is doing enormous work while serving highly repetitive data. Millions of people are not requesting millions of different videos. They are requesting the same few newly created segments. That repetition gives us the solution.</p>
 
   <h4>The fix: a Content Delivery Network</h4>
   <p>A CDN operates servers in many geographic locations, called edge locations or points of presence. When a viewer requests a segment, the request goes to a nearby CDN edge rather than directly to the origin.</p>
@@ -748,7 +784,7 @@ footer .q{
     <div class="viz-caption">One origin, many edges, millions of viewers. Most bytes are served from the nearest edge cache.</div>
   </div>
 
-  <p>Suppose the first viewer near Mumbai requests segment 8,421. The edge may not have it yet — a <strong>cache miss</strong>. The edge retrieves the segment from the origin and stores a temporary copy. The next thousands of nearby viewers request the same segment. Now the edge already has it. Those are <strong>cache hits</strong>.</p>
+  <p>Suppose the first viewer near Mumbai requests segment 8,421. The edge may not have it yet, which creates a <strong>cache miss</strong>. The edge retrieves the segment from the origin and stores a temporary copy. The next thousands of nearby viewers request the same segment. Now the edge already has it. Those are <strong>cache hits</strong>.</p>
   <p>The CDN absorbs most of the video traffic. The origin remains the source of truth for newly produced segments, but it no longer needs to deliver every byte directly to every viewer.</p>
   <p>Live streaming has a particularly useful form of locality: most viewers are watching approximately the same moment. When a new segment appears, many people request it within a short time window. That makes newly produced segments extremely valuable to cache.</p>
   <p>The system now scales. But there is still a difficult question. Who decides whether the next segment should be 1080p, 720p, or 480p? Not the encoder. Not the CDN. The decision is made on the viewer's device.</p>
@@ -756,7 +792,7 @@ footer .q{
 
 <!-- 06 -->
 <section class="chapter reveal" id="c6">
-  <span class="chapter-num">06 — The player</span>
+  <span class="chapter-num">06 · The player</span>
   <h2>The player is the control system.</h2>
   <h3>It is doing much more than displaying video.</h3>
   <p>A modern video player is not a passive screen. It continuously observes playback and makes decisions. It watches:</p>
@@ -769,7 +805,7 @@ footer .q{
   <p>Before requesting the next segment, the player asks:</p>
   <blockquote>Which quality gives me the best picture without risking a stall?</blockquote>
   <p>Suppose the viewer's network currently supports about 8 Mbps. The player may choose 1080p. Then the viewer enters an elevator. Available bandwidth drops. The latest segment takes longer to download. The buffer begins shrinking.</p>
-  <p>The player does not wait for the video to freeze. It requests a smaller version of the next segment. The picture becomes blurry — but the video keeps moving. A few seconds of lower quality is better than a frozen screen. When the connection improves and the buffer becomes healthy, the player climbs back to a higher quality.</p>
+  <p>The player does not wait for the video to freeze. It requests a smaller version of the next segment. The picture becomes blurry, but the video keeps moving. A few seconds of lower quality is better than a frozen screen. When the connection improves and the buffer becomes healthy, the player climbs back to a higher quality.</p>
   <p>This process is called <strong>Adaptive Bitrate</strong>, or <strong>ABR</strong>, selection.</p>
 
   <h4>Why does the player keep a buffer?</h4>
@@ -796,12 +832,12 @@ footer .q{
     <div class="viz-caption">If the network stalls for a second, the buffer keeps playback smooth. It is a safety reserve.</div>
   </div>
 
-  <p>Without a buffer, every small network delay would immediately freeze the stream. But buffering creates a trade-off: a larger buffer improves stability, a smaller buffer keeps the viewer closer to the actual event.</p>
+  <p>Without a buffer, every small network delay would immediately freeze the stream. But buffering creates a tradeoff: a larger buffer improves stability, a smaller buffer keeps the viewer closer to the actual event.</p>
 </section>
 
 <!-- 07 -->
 <section class="chapter reveal" id="c7">
-  <span class="chapter-num">07 — Failure</span>
+  <span class="chapter-num">07 · Failure</span>
   <h2>Live events do not have a retry button.</h2>
   <h3>Reliability has to begin at the source.</h3>
   <p>A movie can be processed again tomorrow. A live final cannot. If the only network connection from the stadium fails during the winning moment, no downstream CDN can recreate the missing video.</p>
@@ -845,56 +881,75 @@ footer .q{
       <rect x="240" y="266" width="220" height="42" rx="10" fill="#c53030"/>
       <text x="350" y="292" text-anchor="middle" fill="#fff" font-family="Inter" font-size="13" font-weight="600">Ingest layer</text>
     </svg>
-    <div class="flow-title">Two independent contribution paths converge at ingest — if one fails, the other carries the feed.</div>
+    <div class="flow-title">Two independent contribution paths converge at ingest. If one fails, the other carries the feed.</div>
   </div>
-  <p>But running two pipelines is not enough. Their outputs must remain compatible. If Region A creates one timeline and Region B creates differently timed segments, switching between them could create jumps, missing frames, or playback errors.</p>
-  <p>The redundant pipelines therefore need aligned timing and compatible segment boundaries — the same keyframe discipline that makes ABR switching work also makes cross-region failover work.</p>
-  <p>The goal is not merely:</p>
-  <blockquote>Keep another server running.</blockquote>
-  <p>It is:</p>
-  <blockquote><strong>Make the backup output usable as a seamless replacement.</strong></blockquote>
-  <p>The viewer sees one Play button. The platform sees many independent failure domains — multiple origins, multiple CDN providers, real-time traffic steering, health monitoring from client devices, automatic failover between regions.</p>
+  <p>Large platforms may process the same live feed through two independent pipelines, often in separate regions. One pipeline serves the stream while the other remains ready to take over.</p>
+  <p>However, the backup pipeline must produce the same timeline as the primary one. Both pipelines use the same source timestamps, keyframe positions, segment duration, and encoding settings, so they cut the stream at exactly the same moments.</p>
+  <p>For example, if Region A fails after segment 102, the system can serve segment 103 from Region B. Because both pipelines created that segment for the same point in time, playback can continue without repeating or skipping part of the event.</p>
+  <p>The goal is not simply to keep another encoder running. The backup output must be a compatible continuation of the primary stream.</p>
 </section>
 
 <!-- 08 -->
 <section class="chapter reveal" id="c8">
-  <span class="chapter-num">08 — Latency</span>
+  <span class="chapter-num">08 · Latency</span>
   <h2>Where the delay comes from.</h2>
-  <h3>A fighter lands a punch. Your friend in the stadium reacts. You see it several seconds later.</h3>
+  <h3>A fighter lands a punch. The crowd inside the arena erupts instantly. I see the same moment several seconds later.</h3>
   <p>That delay did not come from one slow server. It accumulated across the entire pipeline.</p>
 
   <div class="viz">
     <svg viewBox="0 0 700 320" role="img" aria-label="Latency accumulation">
       <g id="latStages"></g>
     </svg>
-    <div class="viz-caption">Each stage adds a little time. Typical HLS/DASH end-to-end delay: 10–45 seconds.</div>
+    <div class="viz-caption">Each stage adds a little time. Typical HLS or DASH end to end delay: 10 to 45 seconds.</div>
   </div>
 
-  <p>Together, those delays become the difference between what is happening and what the viewer sees. One major source is waiting for a segment to finish: if segments are six seconds long, the system must collect and encode enough video to complete the segment before the player can download it. Then the player may keep several more seconds buffered for safety.</p>
+  <p>Together, these delays create the gap between what is happening inside the arena and what the viewer sees.</p>
+  <p>One major source is segment creation. Suppose the packager creates six second segments. In normal streaming, it may wait until all six seconds have been encoded before publishing the segment. Only then can the player request it from the CDN. The player may also keep several more seconds buffered for safety.</p>
 
-  <h4>The low-latency idea</h4>
-  <p>Modern low-latency streaming stops treating a segment as an all-or-nothing object. Instead of waiting for an entire six-second segment:</p>
+  <h4>The low latency idea</h4>
+
+  <aside class="concept-note">
+    <span class="note-label">Where this happens</span>
+    <p><strong>Encoder → Packager → Origin → CDN → Player.</strong> The encoder produces compressed video frames. The packager groups those frames into segments and smaller parts. The origin stores or exposes them, the CDN delivers them, and the player makes the HTTP requests.</p>
+  </aside>
+
+  <p>Low latency streaming does not remove the six second segment. Instead, it exposes smaller pieces while that segment is still being created.</p>
+
   <div class="flow" style="padding:24px 32px">
     <svg viewBox="0 0 700 70">
       <rect x="20" y="15" width="660" height="40" rx="8" fill="#c53030"/>
-      <text x="350" y="40" text-anchor="middle" fill="#fff" font-family="Inter" font-size="14" font-weight="600" letter-spacing=".08em">FULL SEGMENT — 6 seconds</text>
+      <text x="350" y="40" text-anchor="middle" fill="#fff" font-family="Inter" font-size="14" font-weight="600" letter-spacing=".08em">FULL SEGMENT · 6 seconds</text>
     </svg>
-    <div class="flow-title">One monolithic segment. The player must wait for the whole thing.</div>
+    <div class="flow-title">Normal streaming may wait until the complete six second segment is ready.</div>
   </div>
-  <p>the encoder produces it in smaller pieces (called <strong>parts</strong> in Low-Latency HLS, or <strong>chunks</strong> in CMAF) and publishes them the moment each is ready:</p>
+
+  <p>The packager divides that same segment into smaller pieces called <strong>parts</strong> in Low Latency HLS or <strong>chunks</strong> in CMAF. If a six second segment contains four equal pieces, each piece represents 1.5 seconds of video.</p>
+
   <div class="flow" style="padding:24px 32px">
     <svg viewBox="0 0 700 70" id="partsBar">
       <g id="parts"></g>
     </svg>
-    <div class="flow-title">Broken into four parts — each one ships to the player the moment it's ready.</div>
+    <div class="flow-title">The same segment exposed as four 1.5 second pieces, each published as soon as it is ready.</div>
   </div>
-  <p>Two techniques deliver these pieces to the player before the full segment exists.</p>
-  <p>The first is <strong>HTTP chunked transfer encoding</strong>. The origin begins responding to a segment request as soon as the first chunk is encoded, and continues writing chunks into the same open HTTP response as they arrive from the encoder. The player starts decoding immediately, while the tail of the segment is still being produced upstream.</p>
-  <p>The second is a smarter way of discovering new pieces. Instead of the player repeatedly polling — <em>Is the next part ready? Is it ready now? What about now?</em> — the player can request a future playlist update and allow the server or CDN to hold that HTTP request until new media becomes available. LL-HLS calls this a blocking playlist reload.</p>
-  <p>Together, these can bring end-to-end delay down to around 2–5 seconds while still using ordinary CDNs and HTTP caching.</p>
+
+  <p>As soon as Part 1 is ready, the player can download and begin decoding it. It does not have to wait for Parts 2, 3, and 4 or for the full six second segment to finish.</p>
+
+  <aside class="concept-note">
+    <span class="note-label">How the player discovers a new part</span>
+    <p>The player reads the live playlist to learn which parts are available. Repeatedly downloading the playlist would create wasteful polling.</p>
+    <p>With a <strong>blocking playlist reload</strong>, the player requests a future playlist update from the CDN. The CDN or origin keeps that HTTP request open until the next part becomes available, then returns the updated playlist immediately. The player can then request the newly listed part.</p>
+  </aside>
+
+  <aside class="concept-note">
+    <span class="note-label">Related technique · Progressive chunked delivery</span>
+    <p>Another approach lets the player request a segment before the complete file exists. The server starts the HTTP response with the bytes already available and continues sending more bytes through the same open response as they are produced.</p>
+    <p>The player can begin decoding the first bytes while the end of the segment is still being created. The key idea is the same: do not wait for the complete segment before delivery begins.</p>
+  </aside>
+
+  <p><strong>Normal streaming waits for the complete segment. Low latency streaming begins delivering smaller pieces as soon as they are ready.</strong> This reduces delay while preserving HTTP delivery and CDN caching.</p>
 
   <h4>When even that is too slow</h4>
-  <p>Some products — live auctions, interactive game shows, sports betting, remote-camera control — cannot tolerate even a few seconds of delay. For these, platforms reach for <strong>WebRTC</strong>, which can deliver sub-second latency by giving up on segmented HTTP delivery entirely and using a persistent peer connection instead. The trade-off is real: WebRTC does not cache the way HTTP does, so scaling it to millions of viewers requires specialized fan-out infrastructure that most CDNs do not natively provide.</p>
+  <p>Some products, including live auctions, interactive game shows, sports betting, and remote camera control, cannot tolerate even a few seconds of delay. For these, platforms reach for <strong>WebRTC</strong>, which can deliver latency below one second by giving up on segmented HTTP delivery entirely and using a persistent peer connection instead. The tradeoff is real: WebRTC does not cache the way HTTP does, so scaling it to millions of viewers requires specialized fanout infrastructure that most CDNs do not natively provide.</p>
 
   <h4>Why not reduce latency to almost zero for everyone?</h4>
   <p>Because lower latency removes safety margin. A player with very little buffered video has less protection from network variation. Live streaming balances two competing goals:</p>
@@ -904,64 +959,53 @@ footer .q{
       <ul>
         <li>More stable playback</li>
         <li>Survives network hiccups</li>
-        <li>Higher end-to-end delay</li>
+        <li>Higher end to end delay</li>
       </ul>
     </div>
     <div class="right">
       <h5>Less buffering</h5>
       <ul>
         <li>Lower delay, closer to live</li>
-        <li>Feels real-time</li>
+        <li>Feels real time</li>
         <li>Greater risk of stalls</li>
       </ul>
     </div>
   </div>
-  <p>A sports broadcast may tolerate five seconds of delay to remain stable for millions of viewers. A live auction may accept a smaller audience in exchange for near-real-time interaction. The correct architecture depends on the product.</p>
+  <p>A sports broadcast may tolerate five seconds of delay to remain stable for millions of viewers. A live auction may accept a smaller audience in exchange for interaction that is nearly real time. The correct architecture depends on the product.</p>
 </section>
 
 <!-- 09 -->
 <section class="chapter reveal" id="c9">
-  <span class="chapter-num">09 — The rest of the payload</span>
-  <h2>What the pipeline still has to carry.</h2>
-  <h3>A real commercial live event carries more than pixels.</h3>
+  <span class="chapter-num">09 · The rest of the payload</span>
+  <h2>A live stream carries more than video.</h2>
 
-  <h4>Content protection</h4>
-  <p>Almost every paid live event — sports, concerts, pay-per-view — is encrypted. The video segments on the CDN are useless without a decryption key, and the key is only handed out to players that prove they are running an approved <strong>DRM</strong> system: Widevine on most Android and Chrome, FairPlay on Apple devices, PlayReady on Windows and many smart TVs.</p>
-  <p>The player performs a license exchange with a DRM server before the first segment can be decoded, and the license may be time-limited so a leaked key stops working quickly. Thanks to CMAF's Common Encryption, the same encrypted segments on the origin can serve all three DRM systems — only the license negotiation differs.</p>
+  <p><strong>Content protection.</strong> Paid streams encrypt their media segments. Before playback begins, the player requests a license from a DRM system such as Widevine, FairPlay, or PlayReady. CMAF Common Encryption allows the same encrypted segments to work across these systems while only the license exchange changes.</p>
 
-  <h4>Ads</h4>
-  <p>For ad-supported streams, ads must be stitched into the live timeline. The common approach is <strong>server-side ad insertion (SSAI)</strong>: a service rewrites each viewer's manifest so that ad segments appear alongside program segments as one continuous playlist. The player has no idea it just watched an ad — which means ads cannot be blocked at the network layer and the ABR logic continues to work across the boundary. The cost is that every viewer effectively gets a personalized manifest, which changes how aggressively the manifest itself can be cached.</p>
+  <p><strong>Ads.</strong> With server side ad insertion, the platform places ad segments directly into each viewer’s manifest. To the player, the advertisement appears as part of the same continuous stream, so playback and adaptive quality switching continue normally.</p>
 
-  <h4>Timed metadata</h4>
-  <p>Scoreboards, betting odds, chapter markers, subtitle cues, and interactive overlays all need to fire at exactly the right frame. They ride alongside the video as <strong>timed metadata</strong> — ID3 tags in HLS, <code class="inline">emsg</code> boxes in CMAF — attached to specific points on the media timeline. The player extracts them during playback and hands them to the application layer, which is why the score you see on screen stays synchronized with the goal even if your stream is running eight seconds behind reality.</p>
+  <p><strong>Timed metadata.</strong> Scores, subtitles, betting odds, and interactive overlays are attached to specific points on the video timeline. The player reads this metadata during playback, keeping every onscreen update synchronized with the correct moment.</p>
 </section>
 
 <!-- 10 -->
 <section class="chapter reveal" id="c10">
-  <span class="chapter-num">10 — Hyperscale</span>
-  <h2>The simple boxes become systems of their own.</h2>
-  <h3>Zooming in, every stage in the pipeline is itself a distributed system.</h3>
+  <span class="chapter-num">10 · Hyperscale</span>
+  <h2>Every simple box becomes a distributed system.</h2>
 
-  <h4>The origin becomes media-aware</h4>
-  <p>Millions of viewers often ask for the newest segment at nearly the same time. Some players may even request a segment slightly before the encoder has finished publishing it. A basic server may return repeated <code class="inline">404 Not Found</code> responses. The players retry. The retries create even more traffic.</p>
-  <p>A media-aware origin can recognize that the requested segment belongs to the live timeline and is expected soon. Instead of immediately returning an error, it can briefly hold the request and respond when the segment becomes available. Large platforms may also place distributed caches in front of durable storage so extreme read traffic does not interfere with the continuous write path from the encoder.</p>
+  <p><strong>The origin understands live media.</strong> Viewers may request a new segment just before it is ready. Instead of returning repeated <code class="inline">404</code> errors and causing retries, an origin that understands media can briefly hold the request and respond as soon as the segment is published.</p>
 
-  <h4>One CDN may not be enough</h4>
-  <p>A platform serving viewers across many countries may use multiple CDN providers. One CDN may perform well for one internet provider but poorly for another. A regional outage or congestion event may affect only part of the audience. The platform can observe playback failures, buffering, and network latency from real client devices and shift future viewers toward a healthier CDN.</p>
+  <p><strong>One CDN may not be enough.</strong> Large platforms use multiple CDN providers because performance can differ by country, network, or internet provider. Playback data from real devices helps route viewers toward the healthiest CDN.</p>
 
-  <h4>Not every second of video costs the same</h4>
-  <p>A static interview scene is easier to compress than confetti falling across an entire stadium. Modern encoders vary bitrate according to visual complexity. This saves bandwidth while preserving quality — but it creates a subtle capacity problem. During a simple scene, a delivery server may appear underutilized, and a naive traffic router sends more viewers to it. Then the scene suddenly becomes complex, the bitrate rises for every viewer at once, and the server becomes overloaded.</p>
-  <p>So large delivery systems reserve capacity using the expected or nominal bitrate rather than trusting only the traffic visible at that exact moment. Even a bandwidth optimization changes how the rest of the system must scale.</p>
+  <p><strong>Video traffic is not constant.</strong> A quiet interview requires less bitrate than a stadium scene with rapid movement. Because traffic can rise suddenly as visual complexity changes, delivery systems reserve capacity using expected bitrate rather than relying only on current usage.</p>
 </section>
 
 <!-- 11 -->
 <section class="chapter reveal" id="c11">
-  <span class="chapter-num">11 — Replay</span>
+  <span class="chapter-num">11 · Replay</span>
   <h2>Replaying the entire journey.</h2>
   <h3>You open the application and tap Watch Live. What actually happens?</h3>
-  <p>The event is captured at the venue. A high-quality production feed travels through redundant contribution paths into the streaming platform. The encoder continuously creates several renditions, all keyframe-aligned. The packager wraps them into CMAF segments, encrypts them under Common Encryption, and publishes manifests describing what is available. The latest segments arrive at the live origin.</p>
+  <p>The event is captured at the venue. A high quality production feed travels through redundant contribution paths into the streaming platform. The encoder continuously creates several renditions, all aligned at keyframes. The packager wraps them into CMAF segments, encrypts them under Common Encryption, and publishes manifests describing what is available. The latest segments arrive at the live origin.</p>
   <p>CDN edge servers pull those segments on demand and serve cached copies to nearby viewers. Your player downloads the manifest, exchanges a DRM license, selects an initial quality, buffers a few seconds of video, and begins playback.</p>
-  <p>For every new segment, the player measures how the session is behaving. If the network is fast and the buffer is healthy, it may request a higher-quality rendition. If the network slows and the buffer begins shrinking, it requests a smaller segment. Timed metadata rides along, keeping on-screen scores and overlays in sync with the video frame they belong to.</p>
+  <p>For every new segment, the player measures how the session is behaving. If the network is fast and the buffer is healthy, it may request a higher quality rendition. If the network slows and the buffer begins shrinking, it requests a smaller segment. Timed metadata rides along, keeping onscreen scores and overlays in sync with the video frame they belong to.</p>
   <p>Meanwhile, the system continues producing new video. The manifest moves forward. The CDN spreads new segments around the world. The player stays close to the live edge while keeping enough buffered video to survive small network disruptions.</p>
   <p>And if a contribution link, encoder, region, origin, or CDN begins failing, redundant systems attempt to take over before the viewer notices.</p>
   <p>All of that happens while you watch the same screen.</p>
@@ -981,7 +1025,7 @@ footer .q{
       <rect x="230" y="10" width="240" height="46" rx="6" fill="#c53030"/><text x="350" y="38" text-anchor="middle" fill="#fff">LIVE EVENT</text>
       <line x1="350" y1="56" x2="350" y2="80" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
 
-      <rect x="200" y="80" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="108" text-anchor="middle" fill="#f4ede0">High-quality production feed</text>
+      <rect x="200" y="80" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="108" text-anchor="middle" fill="#f4ede0">High quality production feed</text>
       <line x1="350" y1="126" x2="350" y2="150" stroke="#e07a3f" stroke-width="2" marker-end="url(#ar2)"/>
 
       <rect x="200" y="150" width="300" height="46" rx="6" fill="#2a2523" stroke="#e07a3f"/><text x="350" y="178" text-anchor="middle" fill="#f4ede0">Redundant contribution / ingest</text>
@@ -1022,7 +1066,7 @@ footer .q{
   </svg>
 
   <p style="font-family:'Fraunces',serif;font-style:italic;font-size:20px;line-height:1.6;color:#f4ede0;margin-top:20px">Live streaming is not one giant video travelling from a camera to millions of screens. It is a continuously moving pipeline.</p>
-  <p>The encoder creates choices. Keyframe-aligned segments make those choices switchable. The manifest describes them. Encryption protects them. The CDN distributes them. The player decides which one is safe to request. The buffer hides network instability. Low-latency techniques reduce the distance from reality. Timed metadata keeps the rest of the experience in sync. And redundancy keeps the event alive when parts of the system fail.</p>
+  <p>The encoder creates choices. Segments aligned at keyframes make those choices switchable. The manifest describes them. Encryption protects them. The CDN distributes them. The player decides which one is safe to request. The buffer hides network instability. Low latency techniques reduce the distance from reality. Timed metadata keeps the rest of the experience in sync. And redundancy keeps the event alive when parts of the system fail.</p>
 </div>
 
 </article>
@@ -1030,7 +1074,7 @@ footer .q{
 <footer>
   <div class="q">"How do we deliver the best possible version of a moment that did not exist a few seconds ago?"</div>
   <div>You press one button. Behind it, a system is continuously answering.</div>
-  <div style="margin-top:24px;opacity:.6">— FIN —</div>
+  <div style="margin-top:24px;opacity:.6">FIN</div>
 </footer>
 
 <script>
