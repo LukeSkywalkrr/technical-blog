@@ -393,6 +393,20 @@ footer .q{
   font-size:22px;color:var(--ink);
   margin-bottom:20px;line-height:1.5;
 }
+.author-credit{
+  width:fit-content;margin:36px auto 0;padding:18px 28px;
+  display:flex;flex-direction:column;gap:3px;
+  border-top:1px solid var(--accent);
+}
+.author-credit span{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--accent);
+}
+.author-credit strong{
+  font-family:'Fraunces',serif;font-size:22px;font-weight:500;
+  letter-spacing:0;color:var(--ink);
+}
 
 /* SVG animation helpers */
 @keyframes flow{
@@ -1074,6 +1088,10 @@ footer .q{
 <footer>
   <div class="q">"How do we deliver the best possible version of a moment that did not exist a few seconds ago?"</div>
   <div>You press one button. Behind it, a system is continuously answering.</div>
+  <div class="author-credit">
+    <span>Written by</span>
+    <strong>Pratyush Kumar Tiwari</strong>
+  </div>
   <div style="margin-top:24px;opacity:.6">FIN</div>
 </footer>
 
