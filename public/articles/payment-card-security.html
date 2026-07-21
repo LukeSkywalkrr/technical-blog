@@ -10,544 +10,355 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* THE VAULT — dark editorial: obsidian, gold foil, ivory type */
-  --void:#0b0a08;
-  --surface:#121110;
-  --surface-2:#1a1815;
-  --surface-3:#22201c;
-  --plate:#f3ecdb;          /* light "plate" inset for diagrams */
-  --plate-2:#e8dfc9;
+  /* Private-bank ledger meets platinum card foil */
+  --paper:#f2ede1;
+  --paper-2:#eae3d2;
+  --ink:#1c1a15;
+  --ink-soft:#3a352c;
+  --muted:#6d6559;
+  --line:#d4cbb8;
+  --line-strong:#b8ad96;
 
-  --ivory:#ede4d0;
-  --ivory-dim:#c9c0aa;
-  --ivory-soft:#9b9280;
-  --muted:#6a6252;
-  --muted-deep:#4a4438;
+  --sapphire:#1e3a5f;     /* deep bank blue */
+  --sapphire-soft:rgba(30,58,95,.08);
+  --gold:#b08a3e;         /* antique card-foil gold */
+  --gold-soft:rgba(176,138,62,.12);
+  --bordeaux:#8b1a1a;     /* warning / sensitive */
+  --bordeaux-soft:rgba(139,26,26,.08);
+  --moss:#4a5d3a;         /* safe / approved */
+  --moss-soft:rgba(74,93,58,.09);
 
-  --line:rgba(237,228,208,.09);
-  --line-strong:rgba(237,228,208,.18);
-  --line-gold:rgba(201,169,97,.28);
+  --obsidian:#141210;
+  --obsidian-2:#1c1913;
+  --card-ink:#e8dfc9;
+  --card-muted:#9b9384;
 
-  --gold:#c9a961;            /* foil */
-  --gold-bright:#d9bd77;
-  --gold-deep:#8a6d2f;
-  --gold-soft:rgba(201,169,97,.14);
-
-  --sapphire:#7a9dc6;         /* readable on dark */
-  --sapphire-deep:#3a5a82;
-  --sapphire-soft:rgba(122,157,198,.12);
-
-  --bordeaux:#d15a5a;
-  --bordeaux-soft:rgba(209,90,90,.10);
-  --moss:#98b47a;
-  --moss-soft:rgba(152,180,122,.10);
-
-  --shadow-inset: inset 0 1px 0 rgba(237,228,208,.04), inset 0 -1px 0 rgba(0,0,0,.4);
-  --shadow-plate: 0 2px 0 rgba(0,0,0,.5), 0 30px 60px -20px rgba(0,0,0,.55), 0 60px 120px -40px rgba(0,0,0,.45);
-  --shadow-card: 0 1px 0 rgba(237,228,208,.03) inset, 0 20px 60px -20px rgba(0,0,0,.6), 0 40px 100px -30px rgba(201,169,97,.06);
+  --shadow-soft: 0 1px 2px rgba(28,26,21,.04), 0 10px 40px -14px rgba(28,26,21,.10);
+  --shadow-card: 0 2px 4px rgba(28,26,21,.05), 0 24px 60px -20px rgba(28,26,21,.18);
 }
 
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth;background:var(--void)}
+html{scroll-behavior:smooth}
 body{
-  background:var(--void);
-  color:var(--ivory);
+  background:var(--paper);
+  color:var(--ink);
   font-family:'Newsreader','Iowan Old Style','Georgia',serif;
   font-size:20px;
-  line-height:1.7;
+  line-height:1.65;
   font-weight:400;
-  letter-spacing:-.002em;
+  letter-spacing:-.003em;
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
   font-variation-settings:"opsz" 24;
-  position:relative;
 }
-/* subtle grain over the whole page — the "paper" of the dark edition */
-body::before{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
-  background-image:
-    radial-gradient(circle at 20% 10%, rgba(201,169,97,.05), transparent 55%),
-    radial-gradient(circle at 85% 90%, rgba(58,90,130,.06), transparent 60%);
-  mix-blend-mode:screen;
-}
-body::after{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.35;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.87  0 0 0 0 0.75  0 0 0 0.06 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
-}
-body > *{position:relative;z-index:2}
+::selection{background:var(--gold-soft);color:var(--ink)}
 
-::selection{background:var(--gold-soft);color:var(--ivory)}
-
-p{
-  font-family:'Newsreader',serif;
-  font-variation-settings:"opsz" 22;
-  color:var(--ivory-dim);
-  margin-bottom:1.15em;
-  hyphens:auto;
-}
+p{font-family:'Newsreader',serif;font-variation-settings:"opsz" 20;color:var(--ink-soft);margin-bottom:1.1em}
 p:last-child{margin-bottom:0}
-p em, li em{font-style:italic;font-variation-settings:"opsz" 22;color:var(--ivory)}
-p strong, li strong{font-weight:600;color:var(--ivory)}
-a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--line-gold);transition:color .2s, border-color .2s}
-a:hover{color:var(--gold-bright);border-bottom-color:var(--gold-bright)}
-
-/* PULL QUOTE — hangs a large ornamental mark */
+p em, li em{font-style:italic;font-variation-settings:"opsz" 20}
+p strong, li strong{font-weight:600;color:var(--ink)}
 blockquote{
   font-family:'Fraunces',serif;
-  font-style:italic;font-weight:300;
-  font-size:clamp(24px,3vw,32px);
-  line-height:1.32;
-  color:var(--ivory);
-  padding:44px 8px 44px 68px;
-  margin:56px -8px;
-  position:relative;
-  font-variation-settings:"opsz" 96,"SOFT" 60;
-  letter-spacing:-.015em;
+  font-style:italic;font-weight:400;
+  font-size:clamp(21px,2.4vw,26px);
+  line-height:1.35;
+  color:var(--ink);
+  border-left:2px solid var(--gold);
+  padding:8px 0 8px 26px;
+  margin:36px 0;
+  font-variation-settings:"opsz" 72,"SOFT" 40;
 }
-blockquote::before{
-  content:'"';
-  position:absolute;left:0;top:8px;
-  font-family:'Fraunces',serif;
-  font-size:140px;line-height:1;
-  color:var(--gold);
-  font-variation-settings:"opsz" 144,"SOFT" 100,"WONK" 1;
-  opacity:.65;
-  font-style:normal;
-}
-blockquote::after{
-  content:'';position:absolute;left:68px;right:8px;bottom:20px;height:1px;
-  background:linear-gradient(90deg, var(--gold-soft), transparent 60%);
-}
-blockquote strong{font-weight:500;font-style:normal;color:var(--gold-bright)}
-blockquote em{color:var(--sapphire)}
-
-ul,ol{padding-left:26px;margin:1.1em 0 1.4em;color:var(--ivory-dim)}
-ul li,ol li{font-family:'Newsreader',serif;font-variation-settings:"opsz" 22;margin-bottom:10px;padding-left:6px}
+blockquote strong{font-weight:600;font-style:normal;color:var(--sapphire)}
+ul,ol{padding-left:22px;margin:1em 0 1.2em;color:var(--ink-soft)}
+ul li,ol li{font-family:'Newsreader',serif;font-variation-settings:"opsz" 20;margin-bottom:8px}
 ul li::marker{color:var(--gold)}
-ol li::marker{color:var(--gold);font-weight:600;font-family:'JetBrains Mono',monospace;font-size:.85em}
-
+ol li::marker{color:var(--sapphire);font-weight:600}
 code.inline{
   font-family:'JetBrains Mono',monospace;
-  font-size:.8em;
-  background:var(--surface-2);
-  color:var(--gold-bright);
-  padding:2px 8px;border-radius:3px;
+  font-size:.82em;
+  background:var(--sapphire-soft);
+  color:var(--sapphire);
+  padding:2px 7px;border-radius:4px;
   font-weight:500;
-  border:1px solid var(--line-gold);
-  letter-spacing:-.01em;
 }
 
-/* PROGRESS RIBBON — thin gold hairline */
+/* Progress ribbon */
 #progress{
-  position:fixed;top:0;left:0;height:1.5px;width:0%;
-  background:linear-gradient(90deg,var(--gold-deep),var(--gold-bright),var(--gold));
+  position:fixed;top:0;left:0;height:2px;width:0%;
+  background:linear-gradient(90deg,var(--gold),var(--sapphire));
   z-index:1000;transition:width .05s linear;
-  box-shadow:0 0 12px rgba(201,169,97,.5);
 }
 
-/* SIDE TOC RAIL */
+/* Side TOC — always-visible chapter list on the left */
 .toc-rail{
-  position:fixed;left:32px;top:50%;transform:translateY(-50%);
-  z-index:50;display:none;flex-direction:column;gap:4px;
-  width:160px;max-height:80vh;overflow-y:auto;
-  padding:8px 0 8px 0;
+  position:fixed;left:28px;top:50%;transform:translateY(-50%);
+  z-index:50;display:none;flex-direction:column;gap:6px;
+  width:150px;max-height:80vh;overflow-y:auto;
+  padding:4px 0;
   scrollbar-width:none;
 }
 .toc-rail::-webkit-scrollbar{display:none}
-@media(min-width:1280px){.toc-rail{display:flex}}
-.toc-rail::before{
-  content:'INDEX';display:block;
-  font-family:'JetBrains Mono',monospace;
-  font-size:9px;letter-spacing:.32em;
-  color:var(--gold);
-  padding:0 0 12px 12px;
-  border-bottom:1px solid var(--line-gold);
-  margin-bottom:8px;
-}
+@media(min-width:1240px){.toc-rail{display:flex}}
 .toc-rail a{
   text-decoration:none;
   font-family:'JetBrains Mono',monospace;
-  font-size:9.5px;
-  letter-spacing:.08em;
-  color:var(--ivory-soft);
-  padding:5px 0 5px 12px;
+  font-size:10px;
+  letter-spacing:.04em;
+  color:var(--muted);
+  padding:3px 0 3px 11px;
   border-left:1px solid var(--line);
-  border-bottom:0;
   line-height:1.35;
   text-transform:uppercase;
-  transition:color .25s, border-color .25s, padding-left .25s;
+  transition:color .2s, border-color .2s;
   display:block;
 }
-.toc-rail a:hover{color:var(--ivory);border-left-color:var(--gold-deep)}
+.toc-rail a:hover{color:var(--ink);border-left-color:var(--gold)}
 .toc-rail a.active{
-  color:var(--gold-bright);
-  border-left-color:var(--gold);
+  color:var(--sapphire);
+  border-left-color:var(--sapphire);
   border-left-width:2px;
-  padding-left:11px;
+  padding-left:10px;
   font-weight:600;
-  letter-spacing:.1em;
 }
 
-/* SIGNATURE PILL */
+/* Signature pill */
 .pay-pill{
-  display:inline-flex;align-items:center;gap:10px;
-  padding:7px 16px 7px 13px;border-radius:999px;
-  background:linear-gradient(180deg, var(--surface-2), var(--surface));
-  color:var(--gold);
+  display:inline-flex;align-items:center;gap:9px;
+  padding:6px 14px 6px 12px;border-radius:999px;
+  background:var(--obsidian);color:var(--gold);
   font-family:'JetBrains Mono',monospace;
-  font-size:10.5px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;
-  border:1px solid var(--line-gold);
-  box-shadow:var(--shadow-inset), 0 4px 14px -4px rgba(0,0,0,.6);
+  font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;
+  border:1px solid var(--gold);
 }
 .pay-pill::before{
-  content:'';width:6px;height:6px;border-radius:50%;
-  background:var(--gold);animation:pulse-gold 2.2s ease-in-out infinite;
-  box-shadow:0 0 8px var(--gold);
+  content:'';width:7px;height:7px;border-radius:50%;
+  background:var(--gold);animation:pulse-gold 2s ease-in-out infinite;
 }
 @keyframes pulse-gold{
-  0%,100%{opacity:1;box-shadow:0 0 0 0 var(--gold-soft), 0 0 8px var(--gold)}
-  50%{opacity:.5;box-shadow:0 0 0 8px transparent, 0 0 4px var(--gold-deep)}
+  0%,100%{opacity:1;box-shadow:0 0 0 0 var(--gold-soft)}
+  50%{opacity:.55;box-shadow:0 0 0 6px transparent}
 }
 
 /* HERO */
 .hero{
   min-height:100vh;
   display:flex;flex-direction:column;justify-content:center;
-  padding:96px 40px 100px;
+  padding:70px 40px 80px;
   max-width:1180px;margin:0 auto;
   position:relative;
 }
-.hero::before{
-  content:'';position:absolute;left:40px;right:40px;top:80px;height:1px;
-  background:linear-gradient(90deg, transparent, var(--line-gold) 20%, var(--line-gold) 80%, transparent);
-}
 .hero .kicker{
-  color:var(--ivory-soft);
+  color:var(--muted);
   font-family:'JetBrains Mono',monospace;
-  font-size:10.5px;letter-spacing:.34em;text-transform:uppercase;
-  margin:28px 0 0;
-  display:inline-flex;align-items:center;gap:14px;
-}
-.hero .kicker::before{
-  content:'';width:32px;height:1px;background:var(--gold);
+  font-size:11px;letter-spacing:.28em;text-transform:uppercase;
+  margin:24px 0 0;
 }
 .hero h1{
   font-family:'Fraunces',serif;
-  font-weight:300;
-  font-size:clamp(46px,8.2vw,112px);
-  line-height:.98;
-  letter-spacing:-.032em;
-  margin:32px 0 40px;
-  max-width:1040px;
-  font-variation-settings:"opsz" 144,"SOFT" 20;
-  color:var(--ivory);
-  text-wrap:balance;
+  font-weight:400;
+  font-size:clamp(42px,7.2vw,96px);
+  line-height:1.0;
+  letter-spacing:-.025em;
+  margin:26px 0 34px;
+  max-width:960px;
+  font-variation-settings:"opsz" 144,"SOFT" 30;
+  color:var(--ink);
 }
 .hero h1 em{
   font-style:italic;
-  color:var(--gold-bright);
+  color:var(--sapphire);
   font-variation-settings:"opsz" 144,"SOFT" 100,"WONK" 1;
-  font-weight:300;
 }
 .hero .lede{
   font-family:'Fraunces',serif;
   font-style:italic;font-weight:300;
-  font-size:clamp(20px,2.2vw,27px);
+  font-size:clamp(19px,2.1vw,25px);
   line-height:1.5;
-  color:var(--ivory-dim);
-  max-width:740px;
-  margin-bottom:64px;
+  color:var(--ink-soft);
+  max-width:720px;
+  margin-bottom:52px;
   font-variation-settings:"opsz" 60,"SOFT" 80;
-  letter-spacing:-.01em;
 }
 .hero .meta{
-  display:flex;gap:52px;flex-wrap:wrap;
-  padding-top:32px;
-  border-top:1px solid var(--line-strong);
-  font-family:'Newsreader',serif;
-  font-size:15px;color:var(--ivory-dim);
-  max-width:840px;
-  position:relative;
-}
-.hero .meta::before{
-  content:'';position:absolute;left:0;top:-1px;width:60px;height:1px;background:var(--gold);
+  display:flex;gap:44px;flex-wrap:wrap;
+  padding-top:28px;border-top:1px solid var(--line);
+  font-family:'Inter',sans-serif;
+  font-size:13px;color:var(--muted);
+  max-width:720px;
 }
 .hero .meta strong{
-  color:var(--ivory-soft);font-weight:500;display:block;
+  color:var(--ink);font-weight:500;display:block;
   font-family:'JetBrains Mono',monospace;
-  font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
-  margin-bottom:8px;
+  font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  margin-bottom:6px;
 }
 
-/* HERO CARD — the tokenizing platinum card */
+/* Hero signature — the tokenizing card */
 .hero-card{
-  position:relative;margin-top:16px;max-width:540px;
-  background:
-    radial-gradient(circle at 90% 12%, rgba(201,169,97,.22), transparent 42%),
-    radial-gradient(circle at 8% 95%, rgba(58,90,130,.35), transparent 55%),
-    linear-gradient(135deg, #1c1912 0%, #0f0d0a 55%, #2a2416 100%);
-  border-radius:18px;padding:32px 34px 28px;
-  box-shadow:
-    0 1px 0 rgba(201,169,97,.18) inset,
-    0 -1px 0 rgba(0,0,0,.6) inset,
-    0 30px 80px -20px rgba(0,0,0,.7),
-    0 50px 120px -40px rgba(201,169,97,.08);
-  color:var(--ivory);
+  position:relative;margin-top:8px;max-width:520px;
+  background:linear-gradient(135deg,var(--obsidian) 0%, var(--obsidian-2) 60%, #2a2418 100%);
+  border-radius:16px;padding:28px 30px 26px;
+  box-shadow:var(--shadow-card);
+  color:var(--card-ink);
   overflow:hidden;
-  border:1px solid rgba(201,169,97,.25);
 }
 .hero-card::before{
   content:'';position:absolute;inset:0;
   background:
-    radial-gradient(circle at 90% 15%, rgba(217,189,119,.15), transparent 40%),
-    linear-gradient(115deg, transparent 40%, rgba(237,228,208,.06) 50%, transparent 60%);
+    radial-gradient(circle at 90% 15%, rgba(176,138,62,.18), transparent 45%),
+    radial-gradient(circle at 5% 100%, rgba(30,58,95,.35), transparent 55%);
   pointer-events:none;
 }
 .hero-card::after{
   content:'';position:absolute;inset:0;
   background-image:
-    linear-gradient(rgba(237,228,208,.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(237,228,208,.022) 1px, transparent 1px);
-  background-size:24px 24px;
+    linear-gradient(rgba(232,223,201,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,223,201,.025) 1px, transparent 1px);
+  background-size:22px 22px;
   pointer-events:none;
-  mask-image:radial-gradient(ellipse at center, black 30%, transparent 90%);
 }
 .hero-card > *{position:relative;z-index:1}
 .hc-top{
   display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:40px;
+  margin-bottom:34px;
 }
 .hc-chip{
-  width:44px;height:32px;border-radius:6px;
-  background:linear-gradient(135deg,#e5c778, #a4842f 60%, #6b4f1c 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255,235,180,.5),
-    inset 0 -1px 2px rgba(0,0,0,.5),
-    0 1px 2px rgba(0,0,0,.3);
+  width:38px;height:28px;border-radius:5px;
+  background:linear-gradient(135deg,var(--gold), #7a5e28 70%);
+  box-shadow:inset 0 -1px 2px rgba(0,0,0,.4);
   position:relative;
 }
 .hc-chip::after{
-  content:'';position:absolute;inset:5px 6px;
-  border:.5px solid rgba(20,18,16,.4);border-radius:2px;
+  content:'';position:absolute;inset:4px 5px;
+  border:.5px solid rgba(20,18,16,.35);border-radius:2px;
   background-image:
-    linear-gradient(0deg, transparent 45%, rgba(20,18,16,.32) 45%, rgba(20,18,16,.32) 55%, transparent 55%),
-    linear-gradient(90deg, transparent 45%, rgba(20,18,16,.32) 45%, rgba(20,18,16,.32) 55%, transparent 55%);
+    linear-gradient(0deg, transparent 45%, rgba(20,18,16,.3) 45%, rgba(20,18,16,.3) 55%, transparent 55%),
+    linear-gradient(90deg, transparent 45%, rgba(20,18,16,.3) 45%, rgba(20,18,16,.3) 55%, transparent 55%);
 }
 .hc-label{
-  font-family:'Fraunces',serif;font-size:15px;
-  letter-spacing:.02em;color:var(--gold-bright);
-  font-style:italic;font-variation-settings:"opsz" 40,"SOFT" 80;
-  font-weight:400;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  letter-spacing:.24em;color:var(--gold);text-transform:uppercase;
 }
 .hc-num{
   font-family:'JetBrains Mono',monospace;
-  font-size:clamp(20px,2.7vw,25px);
-  letter-spacing:.14em;
-  color:var(--ivory);
-  margin-bottom:22px;
+  font-size:clamp(19px,2.6vw,24px);
+  letter-spacing:.1em;
+  color:var(--card-ink);
+  margin-bottom:18px;
   min-height:1.4em;
-  font-weight:500;
-  text-shadow:0 1px 0 rgba(0,0,0,.4);
 }
 .hc-num .grp{transition:opacity .5s ease, color .5s ease}
-.hc-num .grp.dim{color:var(--ivory-soft)}
+.hc-num .grp.dim{color:var(--card-muted)}
 .hc-num.tokenized{
-  color:var(--gold-bright);
-  font-size:clamp(17px,2.3vw,22px);
-  letter-spacing:.08em;
+  color:var(--gold);
+  font-size:clamp(17px,2.3vw,21px);
 }
 .hc-bottom{
   display:flex;justify-content:space-between;align-items:flex-end;
-  font-family:'JetBrains Mono',monospace;font-size:10px;
-  color:var(--ivory-soft);letter-spacing:.18em;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--card-muted);letter-spacing:.1em;
 }
-.hc-bottom .name{color:var(--ivory);font-size:13px;letter-spacing:.06em;margin-top:2px;font-weight:500}
+.hc-bottom .name{color:var(--card-ink);font-size:12px}
 .hc-caption{
-  margin-top:20px;
+  margin-top:16px;
   font-family:'JetBrains Mono',monospace;
-  font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
-  color:var(--ivory-soft);
-  display:flex;align-items:center;gap:12px;
+  font-size:11px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--muted);
+  display:flex;align-items:center;gap:10px;
 }
-.hc-caption span:first-child{
-  color:var(--gold);
-  padding:3px 10px;border:1px solid var(--line-gold);border-radius:3px;
-  background:var(--surface);
-}
+.hc-caption span:first-child{color:var(--sapphire)}
 
-/* ARTICLE BODY */
+/* Article body */
 article{
-  max-width:740px;margin:0 auto;padding:20px 24px 120px;
-  position:relative;
+  max-width:720px;margin:0 auto;padding:0 24px 120px;
 }
-
-/* CHAPTER SECTIONS */
 section.chapter{
-  padding:96px 0 88px;
+  padding:88px 0;
+  border-top:1px solid var(--line);
   position:relative;
 }
-/* Ornamental separator between chapters */
-section.chapter + section.chapter::before{
-  content:'§';
-  position:absolute;
-  left:50%;top:0;
-  transform:translate(-50%, -50%);
-  font-family:'Fraunces',serif;
-  font-size:22px;
-  color:var(--gold);
-  background:var(--void);
-  padding:0 20px;
-  font-variation-settings:"opsz" 40,"SOFT" 100,"WONK" 1;
-  font-style:italic;
-  font-weight:300;
-}
-section.chapter + section.chapter{
-  border-top:1px solid var(--line-gold);
-}
-section.chapter:first-of-type{padding-top:48px}
+section.chapter:first-of-type{border-top:none;padding-top:40px}
 
 .chapter-num{
   font-family:'JetBrains Mono',monospace;
-  font-size:10.5px;color:var(--gold);
-  letter-spacing:.28em;margin-bottom:20px;
-  display:inline-flex;align-items:center;gap:12px;
-  text-transform:uppercase;font-weight:600;
+  font-size:11px;color:var(--sapphire);
+  letter-spacing:.22em;margin-bottom:14px;
+  display:inline-flex;align-items:center;gap:10px;
+  text-transform:uppercase;
 }
 .chapter-num::before{
-  content:'';width:28px;height:1px;background:var(--gold);
+  content:'';width:24px;height:1px;background:var(--gold);
 }
-
 h2{
   font-family:'Fraunces',serif;
-  font-weight:300;
-  font-size:clamp(34px,4.8vw,54px);
-  line-height:1.06;letter-spacing:-.026em;
-  margin-bottom:18px;
-  color:var(--ivory);
-  font-variation-settings:"opsz" 96,"SOFT" 20;
-  text-wrap:balance;
+  font-weight:400;
+  font-size:clamp(30px,4.2vw,46px);
+  line-height:1.12;letter-spacing:-.018em;
+  margin-bottom:14px;
+  color:var(--ink);
+  font-variation-settings:"opsz" 96,"SOFT" 25;
 }
 h3.subtitle{
   font-family:'Fraunces',serif;
-  font-style:italic;font-weight:300;
-  font-size:clamp(20px,2.4vw,27px);
-  color:var(--ivory-soft);
-  margin-bottom:44px;
+  font-style:italic;font-weight:400;
+  font-size:clamp(19px,2.3vw,25px);
+  color:var(--muted);
+  margin-bottom:40px;
   font-variation-settings:"opsz" 40,"SOFT" 100;
   line-height:1.35;
-  letter-spacing:-.012em;
-  text-wrap:balance;
 }
-h3.subtitle em{color:var(--gold-bright);font-style:italic}
 h4{
   font-family:'Fraunces',serif;
   font-weight:500;
-  font-size:24px;
-  margin:52px 0 16px;
-  letter-spacing:-.012em;
-  color:var(--ivory);
+  font-size:22px;
+  margin:44px 0 14px;
+  letter-spacing:-.01em;
+  color:var(--ink);
   font-variation-settings:"opsz" 40,"SOFT" 30;
 }
 
-/* DROP CAP — prologue and chapter 1 first paragraph */
-#prologue > p:first-of-type::first-letter,
-#c1 > p:first-of-type::first-letter{
-  font-family:'Fraunces',serif;
-  font-weight:400;
-  font-style:italic;
-  font-size:5.6em;
-  line-height:.85;
-  float:left;
-  padding:6px 14px 0 0;
-  color:var(--gold-bright);
-  font-variation-settings:"opsz" 144,"SOFT" 100,"WONK" 1;
-  letter-spacing:-.04em;
-}
-
-/* CONCEPT NOTE — floats to margin on wide viewports (marginalia) */
+/* Concept note aside */
 aside.concept-note{
-  background:linear-gradient(180deg, var(--surface-2), var(--surface));
-  border:1px solid var(--line-strong);
-  border-left:2px solid var(--gold);
+  background:var(--paper-2);
+  border:1px solid var(--line);
+  border-left:3px solid var(--gold);
   border-radius:2px;
-  padding:24px 26px 22px;
-  margin:36px 0;
+  padding:22px 26px 20px;
+  margin:32px 0;
   position:relative;
-  box-shadow:0 20px 40px -20px rgba(0,0,0,.5);
-}
-aside.concept-note::before{
-  content:'';position:absolute;left:-2px;top:-1px;width:2px;height:20px;background:var(--gold-bright);
 }
 aside.concept-note .note-label{
   display:block;
   font-family:'JetBrains Mono',monospace;
-  font-size:10px;letter-spacing:.24em;text-transform:uppercase;
-  color:var(--gold);margin-bottom:14px;font-weight:600;
+  font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:12px;font-weight:600;
 }
 aside.concept-note p{
-  font-size:16.5px;margin-bottom:.9em;
-  color:var(--ivory-dim);
+  font-size:17px;margin-bottom:.8em;
 }
 aside.concept-note p:last-child{margin-bottom:0}
 
-/* Marginalia float on wide viewports */
-@media(min-width:1420px){
-  aside.concept-note{
-    float:right;
-    width:280px;
-    margin:16px -320px 24px 32px;
-    font-size:14px;
-    padding:20px 22px;
-  }
-  aside.concept-note p{font-size:14.5px;line-height:1.6}
-  aside.concept-note::after{
-    content:'MARGINALIA';
-    position:absolute;top:-9px;right:14px;background:var(--void);
-    padding:0 8px;
-    font-family:'JetBrains Mono',monospace;
-    font-size:8.5px;letter-spacing:.28em;color:var(--gold-deep);
-  }
-}
-
-/* CALLOUTS */
+/* Callouts */
 .callout{
-  padding:22px 26px;margin:32px 0;border-radius:2px;
-  border-left:2px solid var(--sapphire);
-  background:linear-gradient(180deg, var(--sapphire-soft), transparent);
-  font-family:'Newsreader',serif;font-size:18px;line-height:1.6;
-  color:var(--ivory-dim);
-  font-variation-settings:"opsz" 22;
-  position:relative;
+  padding:20px 24px;margin:28px 0;border-radius:2px;
+  border-left:3px solid var(--sapphire);
+  background:var(--sapphire-soft);
+  font-family:'Newsreader',serif;font-size:18px;line-height:1.55;
+  color:var(--ink);
+  font-variation-settings:"opsz" 20;
 }
-.callout::before{
-  content:'⟶';
-  position:absolute;left:-12px;top:20px;
-  background:var(--void);color:var(--sapphire);
-  padding:0 3px;font-size:14px;
-}
-.callout.warn{
-  border-left-color:var(--bordeaux);
-  background:linear-gradient(180deg, var(--bordeaux-soft), transparent);
-}
-.callout.warn::before{content:'!';color:var(--bordeaux);font-weight:700}
+.callout.warn{border-left-color:var(--bordeaux);background:var(--bordeaux-soft)}
 .callout.warn strong{color:var(--bordeaux)}
-.callout.good{
-  border-left-color:var(--moss);
-  background:linear-gradient(180deg, var(--moss-soft), transparent);
-}
-.callout.good::before{content:'✓';color:var(--moss)}
+.callout.good{border-left-color:var(--moss);background:var(--moss-soft)}
 .callout.good strong{color:var(--moss)}
 .callout strong{color:var(--sapphire);font-weight:600}
-.callout em{color:var(--ivory);font-style:italic}
-.callout a{color:inherit;border-bottom-color:currentColor;opacity:.9}
 
-/* DARK DIAGRAMS (viz) — inset plate on the dark page */
+/* Diagrams */
 .viz{
-  margin:44px -32px;
-  background:linear-gradient(180deg, var(--surface-2), var(--surface));
-  border:1px solid var(--line-strong);
-  border-radius:6px;
-  padding:32px 28px 24px;
+  margin:40px -20px;
+  background:var(--obsidian);
+  border-radius:8px;
+  padding:28px 24px 22px;
   overflow:hidden;
   position:relative;
   box-shadow:var(--shadow-card);
@@ -555,255 +366,163 @@ aside.concept-note p:last-child{margin-bottom:0}
 .viz::before{
   content:'';position:absolute;inset:0;
   background-image:
-    linear-gradient(rgba(237,228,208,.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(237,228,208,.02) 1px, transparent 1px);
-  background-size:36px 36px;pointer-events:none;
-  mask-image:radial-gradient(ellipse at center, black 40%, transparent 100%);
-}
-.viz::after{
-  content:'FIG.';
-  position:absolute;top:14px;right:18px;
-  font-family:'JetBrains Mono',monospace;
-  font-size:9px;letter-spacing:.28em;
-  color:var(--gold-deep);
+    linear-gradient(rgba(232,223,201,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,223,201,.025) 1px, transparent 1px);
+  background-size:32px 32px;pointer-events:none;
 }
 .viz > *{position:relative}
 .viz svg{width:100%;height:auto;display:block}
 .viz .caption{
-  margin-top:18px;padding-top:16px;
-  border-top:1px solid var(--line-gold);
-  font-family:'Fraunces',serif;
-  font-style:italic;font-weight:300;
-  font-size:14px;letter-spacing:0;
-  color:var(--ivory-soft);
+  margin-top:14px;padding-top:14px;
+  border-top:1px solid rgba(232,223,201,.12);
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;letter-spacing:.08em;
+  color:var(--card-muted);
   text-align:center;
-  font-variation-settings:"opsz" 24,"SOFT" 100;
 }
 
-/* PAPER DIAGRAM PLATE — an intentional light "reference plate" set into dark */
+/* Paper diagrams (light bg for tables etc.) */
 .paper-viz{
-  margin:40px -16px;
-  background:linear-gradient(180deg, var(--plate), var(--plate-2));
-  border:1px solid var(--gold-deep);
+  margin:32px 0;
+  background:#fbf7ec;
+  border:1px solid var(--line);
   border-radius:4px;
-  padding:32px 28px 24px;
-  position:relative;
-  box-shadow:
-    0 1px 0 rgba(237,228,208,.08) inset,
-    var(--shadow-plate);
+  padding:24px;
 }
-.paper-viz::before{
-  content:'';position:absolute;inset:6px;border:1px solid rgba(138,109,47,.25);border-radius:2px;pointer-events:none;
-}
-.paper-viz::after{
-  content:'PLATE';
-  position:absolute;top:16px;right:20px;
-  font-family:'JetBrains Mono',monospace;
-  font-size:9px;letter-spacing:.28em;
-  color:var(--gold-deep);
-}
-.paper-viz svg{position:relative;width:100%;height:auto;display:block}
 .paper-viz .caption{
-  margin-top:16px;padding-top:14px;
-  border-top:1px solid rgba(138,109,47,.25);
-  font-family:'Fraunces',serif;
-  font-style:italic;font-weight:400;
-  font-size:14px;
-  color:var(--muted-deep);text-align:center;
-  font-variation-settings:"opsz" 24,"SOFT" 100;
-  position:relative;
+  margin-top:14px;padding-top:14px;
+  border-top:1px solid var(--line);
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;letter-spacing:.08em;
+  color:var(--muted);text-align:center;
 }
 
-/* CODE BLOCKS */
+/* Code blocks */
 pre.code{
-  background:linear-gradient(180deg, #100e0c, #0a0908);
-  color:var(--ivory-dim);
+  background:var(--obsidian);
+  color:var(--card-ink);
   font-family:'JetBrains Mono',monospace;
-  font-size:13.5px;line-height:1.75;
-  padding:26px 28px 24px;
-  border-radius:4px;
-  margin:32px -32px;
+  font-size:13.5px;line-height:1.7;
+  padding:22px 24px;
+  border-radius:6px;
+  margin:28px -20px;
   overflow-x:auto;
-  border:1px solid var(--line-strong);
-  border-left:2px solid var(--gold-deep);
   box-shadow:var(--shadow-card);
   position:relative;
 }
-pre.code::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg, transparent, var(--gold-soft), transparent);
-}
-pre.code .k{color:var(--gold-bright)}
-pre.code .c{color:var(--muted);font-style:italic}
-pre.code .s{color:var(--sapphire)}
-pre.code .n{color:var(--ivory)}
-pre.code .d{color:var(--bordeaux)}
-pre.code .g{color:var(--moss)}
+pre.code .k{color:#c9a961}    /* keyword/highlight */
+pre.code .c{color:#7a7060;font-style:italic}  /* comment */
+pre.code .s{color:#9dc0e0}    /* string */
+pre.code .n{color:#e8dfc9}    /* normal */
+pre.code .d{color:#8b1a1a}    /* dangerous */
+pre.code .g{color:#7a9a5a}    /* good */
 pre.code .label{
-  position:absolute;top:14px;right:18px;
-  font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
-  color:var(--gold-deep);font-weight:600;
+  position:absolute;top:12px;right:16px;
+  font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--card-muted);
 }
 
-/* COMPARISON TABLE — treated as elevated plate */
+/* Comparison table */
 .compare{
-  margin:36px -16px;
-  border:1px solid var(--gold-deep);
+  margin:32px 0;
+  border:1px solid var(--line);
   border-radius:4px;overflow:hidden;
-  background:linear-gradient(180deg, var(--plate), var(--plate-2));
-  box-shadow:var(--shadow-plate);
-  position:relative;
-}
-.compare::before{
-  content:'TABLE';
-  position:absolute;top:14px;right:16px;z-index:2;
-  font-family:'JetBrains Mono',monospace;
-  font-size:9px;letter-spacing:.28em;
-  color:var(--ivory-soft);
+  background:#fbf7ec;
 }
 .compare table{width:100%;border-collapse:collapse;font-family:'Newsreader',serif;font-size:16px}
 .compare th{
-  background:linear-gradient(180deg, #1c1913, #141210);
-  color:var(--gold-bright);
+  background:var(--obsidian);color:var(--card-ink);
   font-family:'JetBrains Mono',monospace;
-  font-size:10px;letter-spacing:.2em;text-transform:uppercase;
-  padding:16px 18px;text-align:left;font-weight:600;
-  border-bottom:1px solid var(--gold-deep);
+  font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  padding:14px 16px;text-align:left;font-weight:600;
 }
 .compare td{
-  padding:16px 18px;border-bottom:1px solid rgba(138,109,47,.2);
-  vertical-align:top;color:#3a352c;
-  font-variation-settings:"opsz" 18;
+  padding:14px 16px;border-bottom:1px solid var(--line);
+  vertical-align:top;color:var(--ink-soft);
 }
 .compare tr:last-child td{border-bottom:none}
-.compare tr:hover td{background:rgba(138,109,47,.06)}
-.compare td strong{color:#1c1a15;font-weight:600}
-.compare td.yes{color:#4a5d3a;font-weight:500}
-.compare td.no{color:#8b1a1a;font-weight:500}
-.compare td.maybe{color:#8a6d2f;font-weight:500}
+.compare td strong{color:var(--ink)}
+.compare td.yes{color:var(--moss);font-weight:500}
+.compare td.no{color:var(--bordeaux);font-weight:500}
+.compare td.maybe{color:var(--gold);font-weight:500}
 
-/* TRUTHS LIST — end-of-piece ledger of principles */
+/* Truth list */
 .truths{
   counter-reset:tr;
-  margin:44px 0 32px;
-  padding:32px 32px 20px;
-  list-style:none;
-  border:1px solid var(--line-strong);
-  border-top:1px solid var(--gold);
-  background:linear-gradient(180deg, var(--surface-2), transparent);
-  position:relative;
-}
-.truths::before{
-  content:'THE LEDGER';
-  position:absolute;top:-9px;left:24px;background:var(--void);
-  padding:0 12px;
-  font-family:'JetBrains Mono',monospace;
-  font-size:10px;letter-spacing:.32em;color:var(--gold);font-weight:600;
+  margin:36px 0;
+  padding:0;list-style:none;
 }
 .truths li{
   counter-increment:tr;
-  padding:18px 0 18px 60px;
+  padding:16px 0 16px 52px;
   border-bottom:1px solid var(--line);
   position:relative;
-  font-family:'Newsreader',serif;font-size:18px;line-height:1.6;
-  color:var(--ivory-dim);
-  font-variation-settings:"opsz" 22;
+  font-family:'Newsreader',serif;font-size:18px;line-height:1.55;
+  color:var(--ink);
+  font-variation-settings:"opsz" 20;
 }
 .truths li::before{
   content:counter(tr,decimal-leading-zero);
-  position:absolute;left:0;top:20px;
+  position:absolute;left:0;top:18px;
   font-family:'JetBrains Mono',monospace;
   font-size:11px;letter-spacing:.1em;
   color:var(--gold);font-weight:600;
 }
-.truths li:last-child{border-bottom:none;padding-bottom:8px}
-.truths li strong{color:var(--ivory)}
-.truths li code.inline{font-size:.78em}
+.truths li:last-child{border-bottom:none}
 
-/* FOOTER */
+/* Footer */
 footer{
-  max-width:740px;margin:0 auto;padding:80px 24px 120px;
-  border-top:1px solid var(--line-gold);
-  position:relative;
+  max-width:720px;margin:0 auto;padding:60px 24px 100px;
+  border-top:1px solid var(--line);
 }
-footer::before{
-  content:'✦';
-  position:absolute;left:50%;top:0;transform:translate(-50%,-50%);
-  background:var(--void);padding:0 20px;
-  color:var(--gold);font-size:14px;font-family:'Fraunces',serif;
-}
-footer h4{
-  font-size:22px;margin-bottom:24px;
-  font-family:'Fraunces',serif;font-weight:400;color:var(--ivory);
-  font-variation-settings:"opsz" 40,"SOFT" 30;
-}
+footer h4{font-size:20px;margin-bottom:20px}
 footer .refs{
-  display:grid;gap:0;
-  font-family:'Newsreader',serif;font-size:15px;
-  margin-bottom:40px;
+  display:grid;gap:2px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  margin-bottom:32px;
 }
 footer .refs a{
-  color:var(--ivory-dim);text-decoration:none;
-  padding:14px 0;
-  border:0;
+  color:var(--sapphire);text-decoration:none;
+  padding:10px 0;
   border-bottom:1px solid var(--line);
-  display:flex;justify-content:space-between;gap:16px;align-items:baseline;
-  transition:color .15s, padding-left .2s;
+  display:flex;justify-content:space-between;gap:14px;
+  transition:color .15s;
 }
-footer .refs a:hover{color:var(--gold-bright);padding-left:8px}
-footer .refs a > span:first-child{font-variation-settings:"opsz" 20;font-style:italic;font-family:'Fraunces',serif;font-weight:400}
-footer .refs a .src{
-  color:var(--gold-deep);text-transform:uppercase;letter-spacing:.22em;
-  font-size:9.5px;font-family:'JetBrains Mono',monospace;font-weight:600;
-  flex-shrink:0;align-self:center;font-style:normal;
-}
+footer .refs a:hover{color:var(--gold)}
+footer .refs a .src{color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-size:10px;flex-shrink:0;align-self:center}
 footer .colophon{
-  font-family:'Fraunces',serif;font-size:14.5px;
-  color:var(--ivory-soft);line-height:1.7;
-  padding-top:28px;border-top:1px solid var(--line);
-  font-style:italic;font-weight:300;
-  font-variation-settings:"opsz" 24,"SOFT" 100;
-  text-align:center;
-  max-width:600px;margin:0 auto;
+  font-family:'Newsreader',serif;font-size:15px;
+  color:var(--muted);line-height:1.6;
+  padding-top:24px;border-top:1px solid var(--line);
+  font-style:italic;
 }
 
-/* REVEAL ON SCROLL */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .9s ease, transform .9s ease}
+/* Reveal on scroll */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .8s ease, transform .8s ease}
 .reveal.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){
   .reveal{opacity:1;transform:none;transition:none}
   .pay-pill::before{animation:none}
 }
 
-/* RESPONSIVE */
-@media(min-width:1280px){
+/* Responsive */
+@media(min-width:1240px){
   .hero{
-    margin-left:max(220px, calc((100vw - 1180px) / 2));
+    margin-left:max(200px, calc((100vw - 1180px) / 2));
     margin-right:auto;
   }
 }
-@media(max-width:900px){
-  .hero{padding:80px 28px 80px}
-  aside.concept-note{float:none;width:auto;margin:32px 0}
-}
 @media(max-width:720px){
   body{font-size:18px}
-  .hero{padding:64px 22px 60px;min-height:auto}
-  .hero .meta{gap:28px}
-  .viz, pre.code{margin-left:-14px;margin-right:-14px;border-radius:3px;padding:22px 18px}
-  .paper-viz, .compare, .truths{margin-left:-8px;margin-right:-8px}
-  .truths{padding:24px 20px 12px}
-  .truths li{padding-left:44px;font-size:16.5px}
+  .hero{padding:60px 24px 60px;min-height:auto}
+  .hero .meta{gap:24px}
+  .viz, pre.code{margin-left:-12px;margin-right:-12px;border-radius:4px}
   article{padding:0 20px 80px}
-  section.chapter{padding:72px 0}
-  h2{font-size:32px}
-  h3.subtitle{font-size:19px;margin-bottom:32px}
-  blockquote{font-size:22px;padding:32px 4px 32px 52px;margin:36px -4px}
-  blockquote::before{font-size:100px}
-  aside.concept-note{padding:20px 22px}
-  #prologue > p:first-of-type::first-letter,
-  #c1 > p:first-of-type::first-letter{font-size:4.6em;padding:4px 10px 0 0}
-  .toc-rail{display:none !important}
+  section.chapter{padding:64px 0}
+  h2{font-size:30px}
+  h3.subtitle{font-size:19px;margin-bottom:28px}
+  blockquote{font-size:20px}
+  aside.concept-note{padding:18px 20px}
 }
 
 .home-link{
@@ -813,20 +532,18 @@ footer .colophon{
   bottom:18px;
   display:inline-flex;
   align-items:center;
-  gap:8px;
   padding:10px 14px;
   border:1px solid var(--line-strong);
   border-radius:999px;
-  background:rgba(18,17,16,.94);
-  box-shadow:0 10px 30px rgba(0,0,0,.3);
-  color:var(--ivory);
+  background:rgba(242,237,225,.94);
+  box-shadow:0 10px 30px rgba(28,26,21,.12);
+  color:var(--ink);
   font:600 13px/1 Inter,sans-serif;
   text-decoration:none;
   backdrop-filter:blur(12px);
 }
-.home-link:hover{border-color:var(--line-gold);color:var(--gold-bright)}
+.home-link:hover{border-color:var(--gold);color:var(--sapphire)}
 @media(max-width:720px){.home-link{position:static;margin:14px 0 0 14px}}
-
 </style>
 </head>
 <body>
@@ -840,15 +557,15 @@ footer .colophon{
 
 <!-- HERO -->
 <header class="hero">
-  <div class="pay-pill">Secure · PCI</div>
+  <div class="pay-pill">Shopify · Stripe · Visa · HDFC</div>
   <div class="kicker">Systems · Payments</div>
-  <h1>How your card number<br/>reaches a <em>bank</em><br/>without touching the shop.</h1>
-  <p class="lede">You type sixteen digits into a checkout box. A moment later a bank has approved the payment. The shop selling you headphones never actually held your card. Between those two facts is a small, carefully engineered slice of the internet. Let us walk through it.</p>
+  <h1>How your Visa reaches<br/>your <em>bank</em> without<br/>touching Shopify.</h1>
+  <p class="lede">Jane types a Visa card number into a Shopify checkout. Stripe processes the payment. HDFC Bank approves it. But the Shopify store selling her the headphones never actually held her card. Between "type" and "approved" is a small, carefully engineered slice of the internet. Let us walk through it, with the real companies named.</p>
 
   <div class="hero-card" aria-hidden="true">
     <div class="hc-top">
       <div class="hc-chip"></div>
-      <div class="hc-label">Bank of Example</div>
+      <div class="hc-label">HDFC Bank · Visa</div>
     </div>
     <div class="hc-num" id="cardNum">
       <span class="grp" data-i="0">4532</span>&nbsp;<span class="grp" data-i="1">1094</span>&nbsp;<span class="grp" data-i="2">7823</span>&nbsp;<span class="grp" data-i="3">9012</span>
@@ -873,7 +590,7 @@ footer .colophon{
   <div class="meta" style="margin-top:56px">
     <div><strong>Read time</strong>24 minutes</div>
     <div><strong>Chapters</strong>Fourteen</div>
-    <div><strong>Topic</strong>Payment systems, browser isolation, key management</div>
+    <div><strong>Cast</strong>Shopify, Stripe, Visa, HDFC Bank</div>
   </div>
 </header>
 
@@ -881,37 +598,37 @@ footer .colophon{
 
 <!-- PROLOGUE -->
 <section class="chapter reveal" id="prologue">
-  <span class="chapter-num">00 — Prologue</span>
+  <span class="chapter-num">00: Prologue</span>
   <h2>The button that hides a vault.</h2>
-  <h3 class="subtitle">You tap <em>Pay ₹4,999</em>. A moment later, <em>Payment successful</em>.</h3>
+  <h3 class="subtitle">Jane taps <em>Pay ₹4,999</em>. A moment later, <em>Payment successful</em>.</h3>
 
-  <p>Between those two events, several things you did not ask for happened. The shop <em>appeared</em> to receive your card. It did not. The card number <em>appeared</em> to be sent to your bank. It was — but not directly. And nowhere in the shop's own databases is your card actually stored.</p>
+  <p>Between those two events, several things she did not ask for happened. Shopify <em>appeared</em> to receive her card. It did not. The card number <em>appeared</em> to be sent to HDFC Bank. It was, but not directly. And nowhere in Shopify's databases is Jane's card actually stored.</p>
 
   <p>Behind that small <strong>Pay</strong> button is a system solving a stubborn design problem:</p>
 
   <ul>
-    <li>The shop needs a payment, but the shop should not hold the card.</li>
-    <li>The bank needs the card, but the bank is not on the shop's website.</li>
-    <li>The customer expects a single form and a single button, all inside the shop's page.</li>
+    <li>Shopify needs a payment, but Shopify should not hold Jane's card.</li>
+    <li>HDFC needs the card to charge it, but HDFC is not on Shopify's website.</li>
+    <li>Jane expects a single form and a single button, all inside the store's page.</li>
   </ul>
 
-  <p>Three parties. One page. One moment. Only one of them is allowed to see the sixteen digits.</p>
+  <p>Three companies. One page. One moment. Only one of them is allowed to see the sixteen digits, and it is neither Shopify nor HDFC.</p>
 
-  <p>Let us build the system one problem at a time.</p>
+  <p>It is <strong>Stripe</strong>, the payment provider sitting invisibly between them. Let us build the system one problem at a time.</p>
 
   <aside class="concept-note">
     <span class="note-label">Honesty note</span>
-    <p>Payment providers do not publish every internal detail of their production systems. What follows is an industry architecture model assembled from public integration behavior, PCI guidance, browser security rules, tokenization standards, and common high-assurance system design — not a claim about any single provider's private implementation.</p>
+    <p>Stripe, like all payment providers, does not publish every internal detail of its production vault, HSM configuration, or key management. What follows is an industry architecture model assembled from Stripe's public documentation, PCI DSS guidance, browser security rules, EMVCo tokenization standards, and common high assurance system design, not a claim about Stripe's private implementation. Where the article says "Stripe does X," it means X is publicly documented or observable in the integration. Where it says "the vault does Y," it means Y is the standard pattern in this space.</p>
   </aside>
 </section>
 
 <!-- 01 THE ILLUSION -->
 <section class="chapter reveal" id="c1">
-  <span class="chapter-num">01 — The illusion</span>
-  <h2>It feels like you gave the shop your card.</h2>
-  <h3 class="subtitle">You typed the digits into the shop's page. The shop got them. Simple, and wrong.</h3>
+  <span class="chapter-num">01: The illusion</span>
+  <h2>It feels like Jane gave Shopify her card.</h2>
+  <h3 class="subtitle">She typed the digits on Shopify's checkout page. Shopify got them. Simple, and wrong.</h3>
 
-  <p>When you check out at <code class="inline">shop.example.com</code>, the natural mental model is a straight line: your browser sends the card to the shop, the shop asks the bank, the bank replies. Something like this:</p>
+  <p>When Jane checks out at <code class="inline">headphonesshop.myshopify.com</code>, the natural mental model is a straight line: her browser sends the card to Shopify, Shopify asks HDFC, HDFC replies. Something like this:</p>
 
   <div class="viz">
     <svg viewBox="0 0 700 150" role="img" aria-label="Naive payment flow">
@@ -922,7 +639,7 @@ footer .colophon{
       </defs>
       <g>
         <rect x="30" y="40" width="150" height="70" rx="8" fill="#1c1913" stroke="#b08a3e" stroke-width="1"/>
-        <text x="105" y="72" text-anchor="middle" fill="#e8dfc9" font-family="Inter" font-size="13" font-weight="600">You</text>
+        <text x="105" y="72" text-anchor="middle" fill="#e8dfc9" font-family="Inter" font-size="13" font-weight="600">Jane</text>
         <text x="105" y="90" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="10">BROWSER</text>
       </g>
       <line x1="185" y1="75" x2="270" y2="75" stroke="#b08a3e" stroke-width="1.5" marker-end="url(#arrGold)"/>
@@ -930,7 +647,7 @@ footer .colophon{
 
       <g>
         <rect x="275" y="40" width="150" height="70" rx="8" fill="#1c1913" stroke="#b08a3e" stroke-width="1"/>
-        <text x="350" y="72" text-anchor="middle" fill="#e8dfc9" font-family="Inter" font-size="13" font-weight="600">Shop</text>
+        <text x="350" y="72" text-anchor="middle" fill="#e8dfc9" font-family="Inter" font-size="13" font-weight="600">Shopify</text>
         <text x="350" y="90" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="10">MERCHANT</text>
       </g>
       <line x1="430" y1="75" x2="515" y2="75" stroke="#b08a3e" stroke-width="1.5" marker-end="url(#arrGold)"/>
@@ -938,68 +655,68 @@ footer .colophon{
 
       <g>
         <rect x="520" y="40" width="150" height="70" rx="8" fill="#1c1913" stroke="#b08a3e" stroke-width="1"/>
-        <text x="595" y="72" text-anchor="middle" fill="#e8dfc9" font-family="Inter" font-size="13" font-weight="600">Bank</text>
+        <text x="595" y="72" text-anchor="middle" fill="#e8dfc9" font-family="Inter" font-size="13" font-weight="600">HDFC</text>
         <text x="595" y="90" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="10">ISSUER</text>
       </g>
     </svg>
-    <div class="caption">The naive design — the shop sits in the middle.</div>
+    <div class="caption">The naive design, Shopify sits in the middle.</div>
   </div>
 
   <p>Clean. Except this design breaks a promise we did not know we were making.</p>
 
-  <p>The shop is not one server. It is a running application, with a frontend, a backend, request logs, error trackers, analytics, backups, a queue for slow work, a team of engineers who can search production data, and dozens of third-party dependencies loaded into the page by the browser. Anywhere the card touches, the card <em>can</em> leak.</p>
+  <p>Shopify is not one server. It is a running application with a frontend, a backend, request logs, error trackers, analytics, backups, a queue for slow work, thousands of merchants with dashboards that can search production data, and dozens of third party apps that merchants install and that load code into their storefront. Anywhere the card touches, the card <em>can</em> leak.</p>
 
-  <p>Even the shop's honest employees are a problem. They should not be one careless log line away from a database of live card numbers.</p>
+  <p>Even Shopify's honest engineers are a problem. Nobody at Shopify should be one careless log line away from a database of live card numbers belonging to millions of shoppers.</p>
 
-  <p>So the real question is not <em>how do we send the card safely</em>. It is:</p>
+  <p>So the real question is not <em>how do we send Jane's card safely</em>. It is:</p>
 
-  <blockquote>How do we let a customer enter a card <strong>on the shop's page</strong> without the shop ever holding it?</blockquote>
+  <blockquote>How do we let Jane enter a card <strong>on Shopify's page</strong> without Shopify ever holding it?</blockquote>
 
-  <p>That question is the whole article.</p>
+  <p>That question is what Stripe answers, and it is what the rest of this article is about.</p>
 </section>
 
 <!-- 02 HTTPS IS NOT ENOUGH -->
 <section class="chapter reveal" id="c2">
-  <span class="chapter-num">02 — The first misconception</span>
+  <span class="chapter-num">02: The first misconception</span>
   <h2>HTTPS looks like enough. It isn't.</h2>
   <h3 class="subtitle">HTTPS protects the wire. It stops at the front door.</h3>
 
-  <p>The instinct of most engineers is to say: <em>fine, send the card over HTTPS.</em> That defeats someone sniffing coffee-shop Wi-Fi, and the URL bar shows the reassuring lock icon. Problem solved.</p>
+  <p>The instinct of most engineers is to say: <em>fine, Shopify collects the card and sends it to HDFC over HTTPS.</em> That defeats someone sniffing coffee shop Wi Fi, and the URL bar shows the reassuring lock icon. Problem solved.</p>
 
-  <p>HTTPS does solve exactly what it advertises: the network path between the browser and the intended server is confidential, authenticated, and tamper-evident.</p>
+  <p>HTTPS does solve exactly what it advertises: the network path between Jane's browser and Shopify's server is confidential, authenticated, and tamper evident.</p>
 
-  <p>But the moment the shop's backend decrypts the request, HTTPS is done. What remains is a payload sitting in application memory that any of the following can see or accidentally record:</p>
+  <p>But the moment Shopify's Ruby backend decrypts the request, HTTPS is done. What remains is a payload sitting in application memory that any of the following can see or accidentally record:</p>
 
   <ul>
-    <li>The web framework's request logger.</li>
-    <li>Whatever middleware runs before the payment handler — auth, rate limits, telemetry, feature flags.</li>
-    <li>The distributed tracer, which stringifies request bodies for debugging.</li>
-    <li>The error tracker, which uploads the failing request to a third-party service.</li>
-    <li>The message queue that a downstream worker reads from.</li>
-    <li>The database backup that copies rows to cold storage overnight.</li>
-    <li>The support tool that lets a human "replay" a customer's failed order.</li>
+    <li>Rails' request logger, which writes every request to a log file.</li>
+    <li>Whatever middleware runs before the payment handler, auth, rate limits, telemetry, feature flags.</li>
+    <li>Datadog or a similar tracer, which stringifies request bodies for debugging.</li>
+    <li>The error tracker, which uploads the failing request to Sentry or Bugsnag.</li>
+    <li>The Kafka topic that a downstream fulfillment worker reads from.</li>
+    <li>The nightly database backup that copies rows to S3.</li>
+    <li>The admin tool that lets a Shopify support engineer replay a customer's failed order.</li>
   </ul>
 
-  <p>None of these are careless — they exist for good reasons. But every one of them is now a place where a card number can live longer than it should.</p>
+  <p>None of these are careless, they exist for good reasons. But every one of them is now a place where a card number can live longer than it should.</p>
 
   <div class="callout warn">
-    <strong>The stronger statement:</strong> if raw card data reaches the shop's server, every system that can receive, process, persist, debug, replay, back up, or observe that request has become part of the card-security problem.
+    <strong>The stronger statement:</strong> if raw card data reaches Shopify's servers, every system inside Shopify that can receive, process, persist, debug, replay, back up, or observe that request has become part of the card security problem.
   </div>
 
-  <p>The realization is that we are asking the wrong question. Better encryption between the browser and the shop does not help, because the shop was never supposed to see the card in the first place.</p>
+  <p>The realization is that we are asking the wrong question. Better encryption between Jane and Shopify does not help, because Shopify was never supposed to see the card in the first place.</p>
 
-  <blockquote>The goal is not <em>protect the card inside the shop</em>. The goal is <strong>keep the card out of the shop entirely</strong>.</blockquote>
+  <blockquote>The goal is not <em>protect the card inside Shopify</em>. The goal is <strong>keep the card out of Shopify entirely</strong>, and hand it to Stripe instead.</blockquote>
 
-  <p>Which is a strange goal, because the customer is typing the card on the shop's page. So who is receiving it, and how did they get in?</p>
+  <p>Which is a strange goal, because Jane is typing the card on Shopify's page. So who is receiving it, and how did they get in?</p>
 </section>
 
 <!-- 03 THE CAST -->
 <section class="chapter reveal" id="c3">
-  <span class="chapter-num">03 — The cast</span>
-  <h2>Six parties, one payment.</h2>
-  <h3 class="subtitle">Before the architecture makes sense, the vocabulary has to.</h3>
+  <span class="chapter-num">03: The cast</span>
+  <h2>Six companies, one payment.</h2>
+  <h3 class="subtitle">Before the architecture makes sense, the vocabulary has to. This time, with names.</h3>
 
-  <p>Almost every confusing conversation about payments turns out to be a vocabulary problem in disguise. So, briefly, the players:</p>
+  <p>Almost every confusing conversation about payments turns out to be a vocabulary problem in disguise. So, briefly, the players in Jane's ₹4,999 headphone purchase:</p>
 
   <div class="paper-viz">
     <svg viewBox="0 0 700 340" role="img" aria-label="Six parties in a card payment" style="width:100%;height:auto;display:block">
@@ -1011,49 +728,49 @@ footer .colophon{
         </style>
       </defs>
 
-      <!-- Row 1: You, Shop, PSP -->
+      <!-- Row 1: Jane, Shopify, Stripe -->
       <g>
         <rect x="20" y="30" width="200" height="90" rx="4" fill="#f2ede1" stroke="#d4cbb8"/>
-        <text x="34" y="52" class="role-num">01</text>
-        <text x="34" y="76" class="role-name">Cardholder</text>
-        <text x="34" y="95" class="role-desc">YOU. TYPES THE CARD.</text>
+        <text x="34" y="52" class="role-num">01 · CARDHOLDER</text>
+        <text x="34" y="76" class="role-name">Jane Doe</text>
+        <text x="34" y="95" class="role-desc">TYPES THE VISA CARD.</text>
         <text x="34" y="109" class="role-desc">AUTHORIZES THE PURCHASE.</text>
       </g>
       <g>
         <rect x="250" y="30" width="200" height="90" rx="4" fill="#f2ede1" stroke="#d4cbb8"/>
-        <text x="264" y="52" class="role-num">02</text>
-        <text x="264" y="76" class="role-name">Merchant</text>
-        <text x="264" y="95" class="role-desc">THE SHOP. OWNS THE PAGE,</text>
-        <text x="264" y="109" class="role-desc">ORDERS, CATALOG, TOTALS.</text>
+        <text x="264" y="52" class="role-num">02 · MERCHANT</text>
+        <text x="264" y="76" class="role-name">Shopify</text>
+        <text x="264" y="95" class="role-desc">HOSTS THE STORE, THE PAGE,</text>
+        <text x="264" y="109" class="role-desc">THE ORDER, THE CATALOG.</text>
       </g>
       <g>
         <rect x="480" y="30" width="200" height="90" rx="4" fill="#1e3a5f" stroke="#1e3a5f"/>
-        <text x="494" y="52" class="role-num" fill="#b08a3e">03</text>
-        <text x="494" y="76" class="role-name" fill="#e8dfc9">Payment provider</text>
-        <text x="494" y="95" class="role-desc" fill="#9b9384">PSP OR GATEWAY.</text>
-        <text x="494" y="109" class="role-desc" fill="#9b9384">TAKES THE CARD, HIDES IT.</text>
+        <text x="494" y="52" class="role-num" fill="#b08a3e">03 · PAYMENT PROVIDER</text>
+        <text x="494" y="76" class="role-name" fill="#e8dfc9">Stripe</text>
+        <text x="494" y="95" class="role-desc" fill="#9b9384">TAKES THE CARD FROM JANE,</text>
+        <text x="494" y="109" class="role-desc" fill="#9b9384">HIDES IT FROM SHOPIFY.</text>
       </g>
 
-      <!-- Row 2: Acquirer, Network, Issuer -->
+      <!-- Row 2: Acquirer, Visa, HDFC -->
       <g>
         <rect x="20" y="220" width="200" height="90" rx="4" fill="#f2ede1" stroke="#d4cbb8"/>
-        <text x="34" y="242" class="role-num">04</text>
-        <text x="34" y="266" class="role-name">Acquirer</text>
-        <text x="34" y="285" class="role-desc">SHOP-SIDE BANK OR</text>
-        <text x="34" y="299" class="role-desc">PROCESSOR. THE ENTRY RAMP.</text>
+        <text x="34" y="242" class="role-num">04 · ACQUIRER</text>
+        <text x="34" y="266" class="role-name">Stripe's bank</text>
+        <text x="34" y="285" class="role-desc">RAMP ONTO THE CARD RAILS.</text>
+        <text x="34" y="299" class="role-desc">STRIPE OWNS THIS RELATIONSHIP.</text>
       </g>
       <g>
         <rect x="250" y="220" width="200" height="90" rx="4" fill="#f2ede1" stroke="#d4cbb8"/>
-        <text x="264" y="242" class="role-num">05</text>
-        <text x="264" y="266" class="role-name">Card network</text>
-        <text x="264" y="285" class="role-desc">VISA, MASTERCARD, ETC.</text>
-        <text x="264" y="299" class="role-desc">ROUTES. APPLIES RULES.</text>
+        <text x="264" y="242" class="role-num">05 · CARD NETWORK</text>
+        <text x="264" y="266" class="role-name">Visa</text>
+        <text x="264" y="285" class="role-desc">ROUTES MESSAGES TO HDFC.</text>
+        <text x="264" y="299" class="role-desc">APPLIES NETWORK RULES.</text>
       </g>
       <g>
         <rect x="480" y="220" width="200" height="90" rx="4" fill="#f2ede1" stroke="#d4cbb8"/>
-        <text x="494" y="242" class="role-num">06</text>
-        <text x="494" y="266" class="role-name">Issuer</text>
-        <text x="494" y="285" class="role-desc">CUSTOMER'S BANK.</text>
+        <text x="494" y="242" class="role-num">06 · ISSUER</text>
+        <text x="494" y="266" class="role-name">HDFC Bank</text>
+        <text x="494" y="285" class="role-desc">JANE'S BANK. HOLDS THE MONEY.</text>
         <text x="494" y="299" class="role-desc">APPROVES OR DECLINES.</text>
       </g>
 
@@ -1061,27 +778,27 @@ footer .colophon{
       <path d="M 580 120 Q 700 170 580 220" fill="none" stroke="#b08a3e" stroke-width="1" stroke-dasharray="3 3"/>
       <path d="M 120 120 Q -20 170 120 220" fill="none" stroke="#b08a3e" stroke-width="1" stroke-dasharray="3 3"/>
     </svg>
-    <div class="caption">The six parties. The provider is highlighted because it does the work this article is about.</div>
+    <div class="caption">The six companies in Jane's payment. Stripe is highlighted because it does the work the rest of this article is about.</div>
   </div>
 
-  <p>A single company frequently plays several of these roles at once. Stripe, for instance, is your PSP, but it also connects to acquiring banks and card networks on your behalf. The conceptual roles stay useful even when one API hides them all.</p>
+  <p>Notice that Stripe collapses several of these roles behind one API. Shopify does not call Visa directly and does not maintain its own relationship with an acquiring bank. It calls Stripe, and Stripe handles everything from the card form on the checkout page down to the ISO 8583 message that eventually reaches HDFC. The conceptual roles above stay useful even though Shopify only ever sees one API.</p>
 
-  <p>And two of these six parties share your browser tab: the merchant, whose page you are on, and the payment provider, whose card form is sitting inside it. Somehow both of them are in the same window, and only one of them is allowed to see the digits.</p>
+  <p>Two of these six companies share Jane's browser tab: Shopify, whose page she is on, and Stripe, whose card form is sitting inside it. Somehow both of them are in the same window, and only Stripe is allowed to see her card digits.</p>
 
   <p>That is the trick worth understanding first.</p>
 </section>
 
 <!-- 04 THE WALL -->
 <section class="chapter reveal" id="c4">
-  <span class="chapter-num">04 — A wall you cannot see</span>
+  <span class="chapter-num">04: A wall you cannot see</span>
   <h2>The card field looks embedded. It belongs to somebody else.</h2>
   <h3 class="subtitle">The browser draws an invisible line through the checkout page.</h3>
 
-  <p>Load a modern checkout and you will see a form: card number, expiry, CVC. Type into the card field and it feels like any other input on the shop's page. Border, cursor, placeholder text — all styled by the shop.</p>
+  <p>Load Jane's Shopify checkout page and she sees a form: card number, expiry, CVC. Type into the card field and it feels like any other input on the store's page. Border, cursor, placeholder text, all styled to match Shopify's theme.</p>
 
-  <p>Peek at the DOM in your browser's dev tools and something odd shows up. The input is not really an input. It is an <code class="inline">&lt;iframe&gt;</code>, and the document inside that iframe is served from a completely different domain — something like <code class="inline">https://js.stripe.com/</code>, not <code class="inline">https://shop.example.com/</code>.</p>
+  <p>Now peek at the DOM in Chrome's dev tools and something odd shows up. The card input is not really an input. It is an <code class="inline">&lt;iframe&gt;</code>, and the document inside that iframe is served from a completely different domain: <code class="inline">https://js.stripe.com/</code>, not <code class="inline">https://headphonesshop.myshopify.com/</code>.</p>
 
-  <p>The shop styled the outer container. The payment provider rendered the actual field.</p>
+  <p>Shopify styled the outer container. Stripe rendered the actual field.</p>
 
   <div class="viz">
     <svg viewBox="0 0 700 340" role="img" aria-label="Cross-origin iframe boundary">
@@ -1094,15 +811,15 @@ footer .colophon{
 
       <!-- Merchant origin -->
       <rect x="30" y="30" width="290" height="280" rx="6" fill="#2a2418" stroke="#b08a3e" stroke-width="1"/>
-      <text x="50" y="58" fill="#b08a3e" font-family="JetBrains Mono" font-size="10" letter-spacing="1.5">SHOP.EXAMPLE.COM</text>
-      <text x="50" y="76" fill="#9b9384" font-family="JetBrains Mono" font-size="9">merchant origin</text>
+      <text x="50" y="58" fill="#b08a3e" font-family="JetBrains Mono" font-size="10" letter-spacing="1.5">MYSHOPIFY.COM</text>
+      <text x="50" y="76" fill="#9b9384" font-family="JetBrains Mono" font-size="9">Shopify's origin</text>
 
       <!-- fake fields on merchant page -->
       <rect x="50" y="100" width="250" height="34" rx="3" fill="#141210" stroke="#3a3428"/>
-      <text x="62" y="121" fill="#9b9384" font-family="Inter" font-size="11">Email — jane@example.com</text>
+      <text x="62" y="121" fill="#9b9384" font-family="Inter" font-size="11">Email, jane@example.com</text>
 
       <rect x="50" y="146" width="250" height="34" rx="3" fill="#141210" stroke="#3a3428"/>
-      <text x="62" y="167" fill="#9b9384" font-family="Inter" font-size="11">Total — ₹ 4,999</text>
+      <text x="62" y="167" fill="#9b9384" font-family="Inter" font-size="11">Total, ₹ 4,999</text>
 
       <!-- container div (empty, waiting for iframe) -->
       <rect x="50" y="192" width="250" height="60" rx="3" fill="none" stroke="#b08a3e" stroke-width="1" stroke-dasharray="3 3"/>
@@ -1111,7 +828,7 @@ footer .colophon{
       <text x="62" y="244" fill="#9b9384" font-family="JetBrains Mono" font-size="9">but does not own what fills it</text>
 
       <!-- Boundary label -->
-      <text x="350" y="80" text-anchor="middle" fill="#b08a3e" font-family="JetBrains Mono" font-size="9" letter-spacing="2">SAME-ORIGIN</text>
+      <text x="350" y="80" text-anchor="middle" fill="#b08a3e" font-family="JetBrains Mono" font-size="9" letter-spacing="2">SAME ORIGIN</text>
       <text x="350" y="95" text-anchor="middle" fill="#b08a3e" font-family="JetBrains Mono" font-size="9" letter-spacing="2">POLICY</text>
       <line x1="350" y1="110" x2="350" y2="290" stroke="#b08a3e" stroke-width="1" stroke-dasharray="4 4"/>
       <text x="350" y="308" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="8">enforced by the browser</text>
@@ -1119,7 +836,7 @@ footer .colophon{
       <!-- PSP origin -->
       <rect x="380" y="30" width="290" height="280" rx="6" fill="url(#pspGrad)" stroke="#b08a3e" stroke-width="1"/>
       <text x="400" y="58" fill="#b08a3e" font-family="JetBrains Mono" font-size="10" letter-spacing="1.5">JS.STRIPE.COM</text>
-      <text x="400" y="76" fill="#9b9384" font-family="JetBrains Mono" font-size="9">provider origin — inside the iframe</text>
+      <text x="400" y="76" fill="#9b9384" font-family="JetBrains Mono" font-size="9">Stripe's origin, inside the iframe</text>
 
       <!-- PSP fields (sensitive) -->
       <rect x="400" y="100" width="250" height="34" rx="3" fill="#0a1826" stroke="#b08a3e" stroke-width="1"/>
@@ -1132,142 +849,145 @@ footer .colophon{
       <text x="542" y="167" fill="#e8dfc9" font-family="JetBrains Mono" font-size="11">•••</text>
 
       <text x="400" y="212" fill="#b08a3e" font-family="JetBrains Mono" font-size="9">sends the card straight to</text>
-      <text x="400" y="226" fill="#b08a3e" font-family="JetBrains Mono" font-size="9">the provider — never to the</text>
-      <text x="400" y="240" fill="#b08a3e" font-family="JetBrains Mono" font-size="9">shop's own backend.</text>
+      <text x="400" y="226" fill="#b08a3e" font-family="JetBrains Mono" font-size="9">Stripe, never to Shopify's</text>
+      <text x="400" y="240" fill="#b08a3e" font-family="JetBrains Mono" font-size="9">own backend.</text>
     </svg>
     <div class="caption">Two documents. One browser tab. The wall is invisible but strictly enforced.</div>
   </div>
 
-  <p>The wall is called the <strong>Same-Origin Policy</strong>. The rule is short: a script running on one origin cannot read the DOM of a document served from a different origin. "Origin" here means the exact combination of scheme, host, and port. <code class="inline">shop.example.com</code> and <code class="inline">js.stripe.com</code> are different origins. The wall is between them.</p>
+  <p>The wall is called the <strong>Same Origin Policy</strong>. The rule is short: a script running on one origin cannot read the DOM of a document served from a different origin. "Origin" here means the exact combination of scheme, host, and port. <code class="inline">headphonesshop.myshopify.com</code> and <code class="inline">js.stripe.com</code> are different origins. The wall is between them.</p>
 
-  <p>So even though the shop's JavaScript is running on the same page as the card field, it cannot read the value of that input. It cannot copy the DOM. It cannot attach a listener to the field's <code class="inline">keydown</code> events. Every one of those operations is refused by the browser itself, not by a polite request.</p>
+  <p>So even though Shopify's JavaScript is running on the same page as Stripe's card field, Shopify cannot read the value of that input. It cannot copy the DOM. It cannot attach a listener to the field's <code class="inline">keydown</code> events. Every one of those operations is refused by Chrome itself, not by a polite request to Stripe.</p>
 
   <aside class="concept-note">
     <span class="note-label">Concept · Hosted fields</span>
-    <p>The pattern of embedding a provider-owned form inside a merchant page via a cross-origin iframe has an industry name: <strong>hosted fields</strong>. Stripe Elements, Braintree Hosted Fields, and Adyen Web Components are all implementations of the same idea.</p>
-    <p>The merchant loads the provider's small SDK, calls something like <code class="inline">elements.create('card')</code>, and points it at an empty <code class="inline">&lt;div&gt;</code> on the page. The SDK inserts an iframe into that div. Everything sensitive lives inside the iframe.</p>
+    <p>The pattern of embedding a provider owned form inside a merchant page via a cross origin iframe has an industry name: <strong>hosted fields</strong>. Stripe calls this product <strong>Stripe Elements</strong>. Braintree Hosted Fields and Adyen Web Components are the same idea from other providers.</p>
+    <p>Shopify loads Stripe's small SDK (a script from <code class="inline">js.stripe.com</code>), calls <code class="inline">elements.create('card')</code>, and points it at an empty <code class="inline">&lt;div&gt;</code> in the Shopify checkout theme. Stripe's SDK inserts an iframe into that div. Everything sensitive lives inside the iframe.</p>
   </aside>
 
   <div class="callout warn">
-    An iframe is a containment boundary, not a magic shield. A malicious script running on the shop's page cannot <em>read</em> the iframe's inputs, but it can hide the iframe, cover it with a fake overlay, or redirect the entire checkout. We will return to this in <a href="#c11" style="color:inherit;font-weight:600">chapter 11</a>.
+    An iframe is a containment boundary, not a magic shield. A malicious script running on Shopify's page cannot <em>read</em> Stripe's iframe inputs, but it can hide the iframe, cover it with a fake overlay, or redirect the entire checkout. We will return to this in <a href="#c11" style="color:inherit;font-weight:600">chapter 11</a>.
   </div>
 
-  <p>The wall settles one question and creates another. The shop cannot read the card. Good. But the shop still needs to know whether the field is even filled in, so the <em>Pay</em> button can enable. How does the shop learn that much without learning too much?</p>
+  <p>The wall settles one question and creates another. Shopify cannot read the card. Good. But Shopify still needs to know whether the field is even filled in, so its <em>Pay</em> button can enable. How does Shopify learn that much without learning too much?</p>
 </section>
 
 
 <!-- 05 POSTMESSAGE -->
 <section class="chapter reveal" id="c5">
-  <span class="chapter-num">05 — Talking through the wall</span>
+  <span class="chapter-num">05: Talking through the wall</span>
   <h2>The iframe sends postcards, not the card.</h2>
   <h3 class="subtitle">Enough information to run a checkout. Nothing more.</h3>
 
-  <p>The browser gives cross-origin windows a narrow way to talk: <code class="inline">window.postMessage()</code>. It is a message-passing API, not a shared-memory API. One window can send a message; the other window can listen for it and choose what to do.</p>
+  <p>The browser gives cross origin windows a narrow way to talk: <code class="inline">window.postMessage()</code>. It is a message passing API, not a shared memory API. Stripe's iframe can send a message out; Shopify's page can listen for it and choose what to do.</p>
 
-  <p>Hosted fields use postMessage to tell the shop only the things the shop needs to know:</p>
+  <p>Stripe uses postMessage to tell Shopify only the things Shopify needs to know:</p>
 
   <ul>
-    <li><em>The card field is complete.</em> — so the Pay button can enable.</li>
-    <li><em>It's a Visa.</em> — so the shop can show the correct brand logo.</li>
-    <li><em>The expiry is invalid.</em> — so the shop can show an inline error.</li>
+    <li><em>The card field is complete.</em>, so the Pay button can enable.</li>
+    <li><em>It's a Visa.</em>, so Shopify can show the Visa brand logo.</li>
+    <li><em>The expiry is invalid.</em>, so Shopify can show an inline error.</li>
   </ul>
 
-  <p>None of these are the card number. None of them are the CVC. They are metadata about a value the shop is not allowed to see.</p>
+  <p>None of these are the card number. None of them are the CVC. They are metadata about a value Shopify is not allowed to see.</p>
 
-  <pre class="code"><span class="label">Merchant page — parent window</span>
-<span class="c">// Listen for messages from the payment provider iframe.</span>
+  <pre class="code"><span class="label">Shopify's checkout page, parent window</span>
+<span class="c">// Listen for messages from the Stripe iframe.</span>
 window.addEventListener(<span class="s">'message'</span>, (event) => {
 
   <span class="c">// Rule 1: check the sender's origin, exactly.</span>
   <span class="k">if</span> (event.origin !== <span class="s">'https://js.stripe.com'</span>) <span class="k">return</span>;
 
   <span class="c">// Rule 2: validate the shape of what you received.</span>
-  <span class="k">const</span> msg = validatePaymentFieldMessage(event.data);
+  <span class="k">const</span> msg = validateStripeMessage(event.data);
   <span class="k">if</span> (!msg) <span class="k">return</span>;
 
   <span class="c">// Rule 3: act on only the fields you expect.</span>
   payButton.disabled = !msg.complete;
-  brandLogo.src = brandFor(msg.brand);
+  brandLogo.src = brandFor(msg.brand);  <span class="c">// "visa"</span>
 });
 
 <span class="c">// Never: event.origin.endsWith('stripe.com')</span>
-<span class="c">//        — evil-stripe.com passes that check.</span></pre>
+<span class="c">// The malicious evilstripe.com origin passes that check.</span></pre>
 
-  <p>The three rules — exact origin, validated shape, expected fields — are the difference between a safe listener and a hole. The failure mode is easy to picture: an attacker embeds their own iframe from <code class="inline">evil-stripe.com</code>, sends a message that looks legitimate, and the shop's page happily believes them.</p>
+  <p>The three rules, exact origin, validated shape, expected fields, are the difference between a safe listener and a hole. The failure mode is easy to picture: an attacker embeds an iframe from <code class="inline">jsstripe.com</code> or <code class="inline">stripe.evil.com</code>, sends a message that looks legitimate, and Shopify's page happily believes them.</p>
 
-  <p>So the shop now knows the customer has typed something Visa-shaped and complete. The <em>Pay</em> button lights up. The customer clicks it. And at that moment, the iframe does the one thing the shop cannot do: it takes the card, and sends it directly to the payment provider over TLS. The shop's servers are not on that path at all.</p>
+  <p>So Shopify now knows Jane has typed something Visa shaped and complete. The <em>Pay</em> button lights up. Jane clicks it. And at that moment, Stripe's iframe does the one thing Shopify cannot do: it takes the Visa card, and sends it directly to Stripe's servers over TLS. Shopify's servers are not on that path at all.</p>
 
-  <blockquote>Same-origin policy decides <em>who</em> receives the card. TLS protects the <em>path</em> to that receiver. Both are required.</blockquote>
+  <blockquote>Same origin policy decides <em>who</em> receives Jane's card. TLS protects the <em>path</em> from her browser to Stripe. Both are required.</blockquote>
 
-  <p>Seconds later, the iframe sends the shop one more message. This one is the point of everything so far.</p>
+  <p>Seconds later, Stripe's iframe sends Shopify one more message. This one is the point of everything so far.</p>
 </section>
 
 <!-- 06 THE RECEIPT -->
 <section class="chapter reveal" id="c6">
-  <span class="chapter-num">06 — The receipt</span>
+  <span class="chapter-num">06: The receipt</span>
   <h2>What comes back is a claim ticket for something you never touched.</h2>
   <h3 class="subtitle">Tokenization, and the smallest object the merchant needs.</h3>
 
-  <p>The card is now inside the payment provider. In exchange, the provider hands the merchant an opaque identifier — a <strong>token</strong>, sometimes called a payment method ID. It looks like this:</p>
+  <p>The Visa card is now inside Stripe. In exchange, Stripe hands Shopify an opaque identifier, a <strong>PaymentMethod ID</strong>, in Stripe's naming. It looks like this:</p>
 
-  <pre class="code"><span class="label">What the provider returns to the browser</span>{
-  <span class="k">"payment_method_id"</span>: <span class="s">"pm_7Hk9x2Ktm3aVzQ4pL"</span>,
+  <pre class="code"><span class="label">What Stripe returns to Shopify's browser</span>{
+  <span class="k">"id"</span>: <span class="s">"pm_1PxK9x2eZvKYlo2C5tHm3aVz"</span>,
+  <span class="k">"object"</span>: <span class="s">"payment_method"</span>,
+  <span class="k">"type"</span>: <span class="s">"card"</span>,
   <span class="k">"card"</span>: {
     <span class="k">"brand"</span>:     <span class="s">"visa"</span>,
     <span class="k">"last4"</span>:     <span class="s">"9012"</span>,
     <span class="k">"exp_month"</span>: <span class="n">12</span>,
-    <span class="k">"exp_year"</span>:  <span class="n">2030</span>
+    <span class="k">"exp_year"</span>:  <span class="n">2030</span>,
+    <span class="k">"country"</span>:   <span class="s">"IN"</span>
   }
 }
 
 <span class="c">// The full PAN is not here.</span>
 <span class="c">// The CVC is not here, and is not stored.</span></pre>
 
-  <p>The merchant page receives this JSON, hands it to the merchant's own backend along with the order details, and the whole thing gets treated like a coat-check ticket. The shop never had the coat; it only has the number on the little paper stub. Handing the stub to the provider says <em>charge whatever this represents</em>.</p>
+  <p>Shopify's checkout page receives this JSON, hands the PaymentMethod ID to Shopify's backend along with the order details, and the whole thing gets treated like a coat check ticket. Shopify never had the coat; it only has the number on the paper stub. Handing that stub back to Stripe means <em>charge whatever this represents</em>.</p>
 
-  <pre class="code"><span class="label">Merchant frontend → merchant backend</span><span class="k">POST</span> /api/orders/checkout
+  <pre class="code"><span class="label">Shopify's frontend → Shopify's backend</span><span class="k">POST</span> /checkout/complete
 {
-  <span class="k">"order_id"</span>:         <span class="s">"ord_1042"</span>,
+  <span class="k">"order_id"</span>:         <span class="s">"ord_2024_10428"</span>,
   <span class="k">"amount"</span>:           <span class="n">499900</span>,
   <span class="k">"currency"</span>:         <span class="s">"INR"</span>,
-  <span class="k">"payment_method_id"</span>: <span class="s">"pm_7Hk9x2Ktm3aVzQ4pL"</span>
+  <span class="k">"payment_method"</span>:   <span class="s">"pm_1PxK9x2eZvKYlo2C5tHm3aVz"</span>
 }</pre>
 
-  <p>Notice what is not in that payload. No PAN. No CVC. No expiry beyond what the merchant needs to display. From this point on, every merchant system — the order service, the fulfillment queue, the finance database, the analytics warehouse, the support console, the nightly backup — can traffic in tokens and never once see a card number.</p>
+  <p>Notice what is not in that payload. No PAN. No CVC. No expiry beyond what Shopify needs to display. From this point on, every Shopify system, the order service, the fulfillment queue, the finance database, the analytics warehouse, the support console the merchant uses to look up "why did this order fail," the nightly backup to S3: can traffic in tokens and never once see Jane's card number.</p>
 
   <p>The token has three properties that make it work:</p>
 
   <ol>
-    <li><strong>It is opaque.</strong> Nothing about <code class="inline">pm_7Hk9x2Ktm3aVzQ4pL</code> reveals the card behind it. You cannot decode it.</li>
-    <li><strong>It is scoped.</strong> The token is only usable inside the account that created it, from the API credentials that own it. Steal the token, and without the account's server-side secret key, you have a piece of string.</li>
-    <li><strong>It is revocable.</strong> The provider can invalidate a token at any time without changing the underlying card.</li>
+    <li><strong>It is opaque.</strong> Nothing about <code class="inline">pm_1PxK9x2eZv...</code> reveals the Visa card behind it. You cannot decode it. Only Stripe can.</li>
+    <li><strong>It is scoped.</strong> The token is only usable inside the Stripe account that created it, from the secret API key that owns it. Steal the token from Shopify's database, and without Shopify's Stripe secret key (which lives on Shopify's backend, not in the browser), the token is a piece of string.</li>
+    <li><strong>It is revocable.</strong> Stripe can invalidate a token at any time without Jane needing to reissue her Visa card.</li>
   </ol>
 
   <div class="callout good">
-    <strong>The shift in what the merchant stores:</strong> instead of a secret (the card), the merchant stores a pointer (the token). The provider decides what the pointer resolves to, who is allowed to resolve it, and for what.
+    <strong>The shift in what Shopify stores:</strong> instead of a secret (the card), Shopify stores a pointer (the Stripe PaymentMethod ID). Stripe decides what the pointer resolves to, who is allowed to resolve it, and for what.
   </div>
 
-  <p>So the shop is safe. The token is useless without the shop's server-side credential, and the card itself never left the provider. The natural next question is: fine, the provider has the card now. Where does the provider actually keep it, and who at the provider gets to see it?</p>
+  <p>So Shopify is safe. The token is useless without Shopify's server side Stripe key, and Jane's card itself never left Stripe. The natural next question is: fine, Stripe has the card now. Where does Stripe actually keep it, and who at Stripe gets to see it?</p>
 </section>
 
 <!-- 07 THE VAULT -->
 <section class="chapter reveal" id="c7">
-  <span class="chapter-num">07 — Inside the vault</span>
+  <span class="chapter-num">07: Inside the vault</span>
   <h2>Even inside the provider, the card is kept in the smallest possible room.</h2>
   <h3 class="subtitle">Not every service at the payment company is allowed to see a card number.</h3>
 
-  <p>Imagine designing the provider's own architecture. The card has arrived. You need to store it somewhere so future charges on this payment method can succeed. The naive answer is: put it in a database, encrypt the column, done.</p>
+  <p>Imagine designing Stripe's own architecture. Jane's Visa has arrived. You need to store it somewhere so future charges on this PaymentMethod can succeed. The naive answer is: put it in a Postgres table, encrypt the column, done.</p>
 
-  <p>The mature answer is stranger, and much more careful. It has three ideas stacked on top of each other.</p>
+  <p>The mature answer is stranger, and much more careful. Stripe does not publish the exact topology of its vault, but its public engineering posts, PCI attestations, and industry norms all point to the same three ideas stacked on top of each other.</p>
 
-  <h4>Idea 1 — Separate the record from the key.</h4>
+  <h4>Idea 1: Separate the record from the key.</h4>
   <p>The encrypted card record sits in one system. The key that decrypts it sits in another. Stealing the database gets you ciphertext. Stealing the key management system gets you keys with nothing to decrypt. You need both, and they are protected by different controls.</p>
 
-  <h4>Idea 2 — Wrap keys with keys.</h4>
-  <p>The card is not encrypted directly with a master key. It is encrypted with a per-record or per-tenant <strong>data encryption key (DEK)</strong>. That DEK is itself encrypted — "wrapped" — under a longer-lived <strong>key encryption key (KEK)</strong>. The KEK never leaves a hardened boundary. Rotating a DEK is a small operation. Rotating a KEK is a rare, well-audited one. This layered structure is called <strong>envelope encryption</strong>.</p>
+  <h4>Idea 2: Wrap keys with keys.</h4>
+  <p>The card is not encrypted directly with a master key. It is encrypted with a per record or per tenant <strong>data encryption key (DEK)</strong>. That DEK is itself encrypted, "wrapped", under a longer lived <strong>key encryption key (KEK)</strong>. The KEK never leaves a hardened boundary. Rotating a DEK is a small operation. Rotating a KEK is a rare, well audited one. This layered structure is called <strong>envelope encryption</strong>.</p>
 
-  <h4>Idea 3 — Put the root key inside hardware that will not release it.</h4>
-  <p>The KEK lives inside a <strong>Hardware Security Module (HSM)</strong> — a cryptographic appliance designed so that keys can be used inside it but not extracted. You can ask the HSM to unwrap a DEK for you; you cannot ask it to hand over the KEK itself. FIPS 140-3 is the widely used standard that describes what "hardened" means here.</p>
+  <h4>Idea 3: Put the root key inside hardware that will not release it.</h4>
+  <p>The KEK lives inside a <strong>Hardware Security Module (HSM)</strong>, a cryptographic appliance designed so that keys can be used inside it but not extracted. You can ask the HSM to unwrap a DEK for you; you cannot ask it to hand over the KEK itself. FIPS 140 3 is the widely used standard that describes what "hardened" means here.</p>
 
   <div class="viz">
     <svg viewBox="0 0 700 340" role="img" aria-label="Envelope encryption layers">
@@ -1297,39 +1017,39 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
       <rect x="60" y="230" width="580" height="80" rx="6" fill="#1e3a5f" stroke="#b08a3e" stroke-width="2"/>
       <text x="80" y="255" fill="#b08a3e" font-family="JetBrains Mono" font-size="10" letter-spacing="1.5">LAYER 3 · HSM</text>
       <text x="80" y="282" fill="#e8dfc9" font-family="Fraunces" font-size="16" font-weight="500">KEK (never leaves the boundary)</text>
-      <text x="80" y="300" fill="#9b9384" font-family="JetBrains Mono" font-size="10">FIPS 140-3 validated · tamper-responsive · role-controlled</text>
+      <text x="80" y="300" fill="#9b9384" font-family="JetBrains Mono" font-size="10">FIPS 140 3 validated · tamper responsive · role controlled</text>
     </svg>
     <div class="caption">Envelope encryption. Each layer protects the one above it.</div>
   </div>
 
-  <p>Reading the card back is a small ceremony. A tightly restricted service asks the HSM to unwrap the DEK; the DEK is used to decrypt the PAN record; the plaintext PAN is used to build the outbound authorization message; and then everything is discarded. No other service — not analytics, not the support tool, not the fraud engine, not the general billing pipeline — is on that path at all. Network segmentation, workload identity, and explicit authorization all say <em>no</em> to anyone else who asks.</p>
+  <p>Reading Jane's Visa back is a small ceremony. A tightly restricted service inside Stripe asks the HSM to unwrap the DEK; the DEK is used to decrypt the PAN record; the plaintext PAN is used to build the outbound authorization message to Visa; and then everything is discarded. No other service at Stripe, not the fraud engine, not the merchant dashboard, not analytics, not the billing pipeline, not the support tool that Shopify's account manager might use, is on that path at all. Network segmentation, workload identity, and explicit authorization all say <em>no</em> to anyone else who asks.</p>
 
   <aside class="concept-note">
     <span class="note-label">Concept · HSM</span>
-    <p>A <strong>Hardware Security Module</strong> is a purpose-built cryptographic appliance. It performs signing, decryption, and key wrapping inside a sealed enclosure, enforces role-based authentication for those operations, and responds to physical tampering by destroying its keys.</p>
+    <p>A <strong>Hardware Security Module</strong> is a purpose built cryptographic appliance. It performs signing, decryption, and key wrapping inside a sealed enclosure, enforces role based authentication for those operations, and responds to physical tampering by destroying its keys.</p>
     <p>An HSM is not a substitute for good architecture. It is a strong last resort for the specific goal of making key extraction extremely difficult even when the surrounding software fails.</p>
   </aside>
 
-  <p>There is one piece of card data even this vault refuses to keep. Not because it cannot — because the rules forbid it. And this is where payment security is at its strictest.</p>
+  <p>There is one piece of card data even this vault refuses to keep. Not because it cannot, because the rules forbid it. And this is where payment security is at its strictest.</p>
 </section>
 
 <!-- 08 CVC -->
 <section class="chapter reveal" id="c8">
-  <span class="chapter-num">08 — The rule that never bends</span>
+  <span class="chapter-num">08: The rule that never bends</span>
   <h2>The CVC is used once, and then it is gone.</h2>
   <h3 class="subtitle">Some data cannot be stored, no matter how well you would store it.</h3>
 
-  <p>The three digits on the back of the card — the <strong>CVC</strong>, or CVV, or CID, depending on the network — exist to prove that whoever is trying to charge the card has physical access to it. That guarantee is worth exactly nothing if the CVC is written down after the first use.</p>
+  <p>The three digits on the back of the card, the <strong>CVC</strong>, or CVV, or CID, depending on the network, exist to prove that whoever is trying to charge the card has physical access to it. That guarantee is worth exactly nothing if the CVC is written down after the first use.</p>
 
   <p>So the rule is short and absolute: <strong>the CVC must not be retained after the transaction is authorized</strong>. Not encrypted. Not tokenized. Not "held briefly in Redis just in case the customer wants to retry." The moment the bank replies to the authorization request, the CVC is discarded. This rule is PCI DSS at its most inflexible.</p>
 
   <div class="callout warn">
-    "Encrypt the CVC" is not a valid compromise. The point is not to protect the CVC from a database breach. The point is that a stored CVC allows silent replay of a full <em>card-present</em>-style credential without the cardholder present. Its value comes precisely from not existing anywhere between transactions.
+    "Encrypt the CVC" is not a valid compromise. The point is not to protect the CVC from a database breach. The point is that a stored CVC allows silent replay of a full <em>card present</em> style credential without the cardholder present. Its value comes precisely from not existing anywhere between transactions.
   </div>
 
-  <p>This creates an obvious question: if the CVC is thrown away, how do saved cards work? How does a subscription service charge you next month without asking you to re-enter the CVC?</p>
+  <p>This creates an obvious question: if the CVC is thrown away, how do saved cards work? How does a subscription service charge you next month without asking you to re enter the CVC?</p>
 
-  <p>The answer is that saved cards work with weaker guarantees. A future charge on a saved card uses the stored PAN (or a network token, which we will meet in the next chapter), the stored expiry, and the merchant's demonstration that this is a legitimate recurring or merchant-initiated transaction. It cannot present a fresh CVC because there isn't one. The card networks accommodate this with special transaction indicators — <em>this is a recurring charge, not a fresh purchase</em> — and the issuer takes that into account when deciding whether to approve.</p>
+  <p>The answer is that saved cards work with weaker guarantees. A future charge on a saved card uses the stored PAN (or a network token, which we will meet in the next chapter), the stored expiry, and the merchant's demonstration that this is a legitimate recurring or merchant initiated transaction. It cannot present a fresh CVC because there isn't one. The card networks accommodate this with special transaction indicators, <em>this is a recurring charge, not a fresh purchase</em>, and the issuer takes that into account when deciding whether to approve.</p>
 
   <p>The PAN, meanwhile, may live longer. Inside the vault, protected by the layers we just built. Ready to be resolved when the next charge comes in.</p>
 
@@ -1339,11 +1059,11 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
 
 <!-- 09 TWO TOKENS -->
 <section class="chapter reveal" id="c9">
-  <span class="chapter-num">09 — Two kinds of tokens</span>
+  <span class="chapter-num">09: Two kinds of tokens</span>
   <h2>The word "token" hides two very different things.</h2>
   <h3 class="subtitle">A gateway's private reference is not a card network's substitute credential.</h3>
 
-  <p>Everything so far has used one word — token — for one thing: the opaque identifier the merchant gets back from the payment provider. That is a <strong>PSP token</strong>, or gateway token. It is a private handle inside a single company's systems.</p>
+  <p>Everything so far has used one word, token, for one thing: the opaque identifier the merchant gets back from the payment provider. That is a <strong>PSP token</strong>, or gateway token. It is a private handle inside a single company's systems.</p>
 
   <p>There is a second animal with the same name, issued by the card networks themselves. It is called a <strong>network token</strong>, and it is defined by an EMVCo standard called EMV Payment Tokenisation. Visa, Mastercard, and Amex all operate their own token services under it.</p>
 
@@ -1372,8 +1092,8 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
         </tr>
         <tr>
           <td><strong>Transaction proof</strong></td>
-          <td>Provider's server-side API credentials</td>
-          <td>A per-transaction <strong>cryptogram</strong> generated with the token</td>
+          <td>Provider's server side API credentials</td>
+          <td>A per transaction <strong>cryptogram</strong> generated with the token</td>
         </tr>
         <tr>
           <td><strong>If it leaks</strong></td>
@@ -1383,30 +1103,30 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
         <tr>
           <td><strong>Lifecycle</strong></td>
           <td>Provider updates when card is reissued (if the network supports it)</td>
-          <td>Network keeps the token stable when the card is reissued — the number under it changes, the token does not</td>
+          <td>Network keeps the token stable when the card is reissued, the number under it changes, the token does not</td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <p>Network tokens have a property that PSP tokens do not: the token itself is bound to a <em>domain of use</em>. A token issued for card-on-file at a specific merchant will be rejected if it shows up somewhere else. A token bound to a specific device will not work from a different device. And each transaction needs a fresh cryptogram, which prevents replay.</p>
+  <p>Network tokens have a property that PSP tokens do not: the token itself is bound to a <em>domain of use</em>. A token issued for card on file at a specific merchant will be rejected if it shows up somewhere else. A token bound to a specific device will not work from a different device. And each transaction needs a fresh cryptogram, which prevents replay.</p>
 
   <div class="callout">
-    A stolen PSP token gets you nothing without the provider's server-side credential. A stolen network token gets you nothing without its bound domain and a valid cryptogram. Both are strong. They just draw the boundary in different places.
+    A stolen PSP token gets you nothing without the provider's server side credential. A stolen network token gets you nothing without its bound domain and a valid cryptogram. Both are strong. They just draw the boundary in different places.
   </div>
 
-  <p>So the token that leaves the vault, on its way to the bank, may not be a card number at all. It may be a card-network-issued substitute with a cryptographic proof attached. But either way, the message now has to travel out of the payment provider, across the financial rails, and into the bank that issued the card. Which is a longer journey than most people realize.</p>
+  <p>So the token that leaves the vault, on its way to the bank, may not be a card number at all. It may be a card network issued substitute with a cryptographic proof attached. But either way, the message now has to travel out of the payment provider, across the financial rails, and into the bank that issued the card. Which is a longer journey than most people realize.</p>
 </section>
 
 <!-- 10 PATH TO THE BANK -->
 <section class="chapter reveal" id="c10">
-  <span class="chapter-num">10 — The long path to the bank</span>
+  <span class="chapter-num">10: The long path to the bank</span>
   <h2>The message leaves the provider and enters an older world.</h2>
   <h3 class="subtitle">Modern JSON goes in. A 1980s message format comes out. It works.</h3>
 
-  <p>The merchant's backend has called the payment provider with a modern REST request: <em>charge this token for this amount</em>. Inside the provider, the token has been resolved into either a PAN or a network token with a cryptogram, wrapped for outbound transmission, and handed to the connector that speaks to acquiring banks.</p>
+  <p>Shopify's backend has called Stripe with a modern REST request: <code class="inline">POST /v1/payment_intents/{id}/confirm</code>, with the PaymentMethod ID Jane's browser gave it. Inside Stripe, the PaymentMethod is resolved into either Jane's actual Visa PAN or a Visa issued network token with a cryptogram, wrapped for outbound transmission, and handed to Stripe's connector that speaks to its acquiring bank.</p>
 
-  <p>From here the message is no longer JSON. It is <strong>ISO 8583</strong>, or a network-specific dialect derived from it — a binary message format designed decades ago for card networks, still used by most of them. It contains a message type, a bitmap indicating which fields are present, and the fields themselves: account credential, amount, currency, merchant category, terminal type, response code, and dozens more.</p>
+  <p>From here the message is no longer JSON. It is <strong>ISO 8583</strong>, or a Visa specific dialect derived from it (VisaNet uses BASE II format based on ISO 8583 principles), a binary message format designed decades ago for card networks, still used by most of them. It contains a message type, a bitmap indicating which fields are present, and the fields themselves: account credential, amount, currency, merchant category, terminal type, response code, and dozens more.</p>
 
   <div class="viz">
     <svg viewBox="0 0 700 380" role="img" aria-label="Payment authorization path">
@@ -1419,35 +1139,35 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
       <!-- boxes down -->
       <g>
         <rect x="240" y="20" width="220" height="42" rx="4" fill="#2a2418" stroke="#b08a3e"/>
-        <text x="350" y="40" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Merchant backend</text>
-        <text x="350" y="55" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="9">POST /charges  { token, amount }</text>
+        <text x="350" y="40" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Shopify backend</text>
+        <text x="350" y="55" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="9">POST /v1/payment_intents/confirm</text>
       </g>
       <line x1="350" y1="62" x2="350" y2="80" stroke="#b08a3e" stroke-width="1.5" marker-end="url(#arrPath)"/>
 
       <g>
         <rect x="240" y="82" width="220" height="42" rx="4" fill="#1e3a5f" stroke="#b08a3e" stroke-width="1.5"/>
-        <text x="350" y="102" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Payment provider</text>
+        <text x="350" y="102" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Stripe</text>
         <text x="350" y="117" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="9">resolve token · risk · route</text>
       </g>
       <line x1="350" y1="124" x2="350" y2="142" stroke="#b08a3e" stroke-width="1.5" marker-end="url(#arrPath)"/>
 
       <g>
         <rect x="240" y="144" width="220" height="42" rx="4" fill="#2a2418" stroke="#b08a3e"/>
-        <text x="350" y="164" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Acquirer</text>
+        <text x="350" y="164" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Stripe's acquirer</text>
         <text x="350" y="179" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="9">ISO 8583 · 0100 authorization request</text>
       </g>
       <line x1="350" y1="186" x2="350" y2="204" stroke="#b08a3e" stroke-width="1.5" marker-end="url(#arrPath)"/>
 
       <g>
         <rect x="240" y="206" width="220" height="42" rx="4" fill="#2a2418" stroke="#b08a3e"/>
-        <text x="350" y="226" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Card network</text>
-        <text x="350" y="241" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="9">route by BIN · apply scheme rules</text>
+        <text x="350" y="226" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Visa (VisaNet)</text>
+        <text x="350" y="241" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="9">route by BIN → HDFC</text>
       </g>
       <line x1="350" y1="248" x2="350" y2="266" stroke="#b08a3e" stroke-width="1.5" marker-end="url(#arrPath)"/>
 
       <g>
         <rect x="240" y="268" width="220" height="42" rx="4" fill="#1e3a5f" stroke="#b08a3e" stroke-width="1.5"/>
-        <text x="350" y="288" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">Issuer</text>
+        <text x="350" y="288" text-anchor="middle" fill="#e8dfc9" font-family="Fraunces" font-size="14" font-weight="500">HDFC Bank</text>
         <text x="350" y="303" text-anchor="middle" fill="#9b9384" font-family="JetBrains Mono" font-size="9">funds · risk · authenticate · decide</text>
       </g>
 
@@ -1467,42 +1187,42 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
     <div class="caption">Down the chain of authorization. Back up the chain, a single approved/declined bit.</div>
   </div>
 
-  <p>The issuer — the bank that gave you the card — is the only party allowed to decide whether the charge succeeds. It looks at whatever combination of these it can:</p>
+  <p>HDFC, the bank that gave Jane the Visa, is the only party allowed to decide whether the charge succeeds. It looks at whatever combination of these it can:</p>
 
   <ul>
-    <li><em>Is the account active?</em> Not blocked, not expired, not reported stolen.</li>
-    <li><em>Are the funds or credit available?</em></li>
-    <li><em>Does the transaction look normal?</em> Right country, right merchant category, right velocity.</li>
-    <li><em>Was the cardholder authenticated?</em> Did a 3-D Secure challenge succeed?</li>
+    <li><em>Is Jane's account active?</em> Not blocked, not expired, not reported stolen.</li>
+    <li><em>Are the funds or credit available?</em> Does she have ₹4,999 to spare?</li>
+    <li><em>Does the transaction look normal?</em> Right country, right merchant category (Stripe → e commerce), right velocity.</li>
+    <li><em>Was Jane authenticated?</em> Did the 3 D Secure OTP HDFC sent to her phone succeed?</li>
   </ul>
 
-  <p>The answer is a single response code that flows back up the same chain: acquirer → provider → merchant → your screen. <em>Approved.</em> Or <em>declined, insufficient funds.</em> Or <em>declined, requires authentication.</em></p>
+  <p>The answer is a single response code that flows back up the same chain: HDFC → Visa → Stripe's acquirer → Stripe → Shopify → Jane's screen. <em>Approved.</em> Or <em>declined, insufficient funds.</em> Or <em>declined, requires authentication.</em></p>
 
   <aside class="concept-note">
-    <span class="note-label">Concept · 3-D Secure</span>
-    <p><strong>3-D Secure</strong> (EMV 3DS) is an authentication protocol layered on top of card payments, primarily for card-not-present transactions. When a payment looks risky, the issuer can require the cardholder to authenticate — a bank-app tap, a biometric prompt, an OTP.</p>
-    <p>3DS is not tokenization and is not encryption. It is a way for the issuer to say <em>prove it's really you</em> without asking the merchant to handle a password. When it succeeds, a piece of evidence rides along with the authorization message, and the liability for fraud shifts to the issuer.</p>
+    <span class="note-label">Concept · 3 D Secure</span>
+    <p><strong>3 D Secure</strong> (EMV 3DS) is an authentication protocol layered on top of card payments, primarily for card not present transactions. When a payment looks risky, HDFC can require Jane to authenticate, a HDFC app tap, a biometric prompt, or the classic OTP over SMS. In India, RBI mandates 3DS for most online card payments, which is why Jane always sees an OTP screen.</p>
+    <p>3DS is not tokenization and is not encryption. It is a way for HDFC to say <em>prove it's really Jane</em> without asking Shopify or Stripe to handle her banking password. When 3DS succeeds, a piece of evidence rides along with the authorization message, and the liability for fraud shifts from Shopify to HDFC.</p>
   </aside>
 
-  <p>And that, in the merchant's world, is the end of the payment story. A row in the orders table flips from <code class="inline">pending</code> to <code class="inline">paid</code>. The customer sees a confirmation page. The shop dispatches the headphones.</p>
+  <p>And that, in Shopify's world, is the end of the payment story. A row in the orders table flips from <code class="inline">pending</code> to <code class="inline">paid</code>. Jane sees a confirmation page. Shopify emails the merchant. The merchant dispatches the headphones.</p>
 
-  <p>Except we are not done. We have protected the vault. We have protected the wire. We have protected the message. There are three more places where a real payment system can still fail — and each of them has ended in a headline before.</p>
+  <p>Except we are not done. We have protected the vault at Stripe. We have protected the wire between Jane, Shopify, Stripe, Visa, and HDFC. We have protected the message. There are three more places where a real payment system can still fail, and each of them has ended in a headline before.</p>
 </section>
 
 <!-- 11 THE PAGE -->
 <section class="chapter reveal" id="c11">
-  <span class="chapter-num">11 — The page is still dangerous</span>
+  <span class="chapter-num">11: The page is still dangerous</span>
   <h2>The iframe was not enough. It was never going to be.</h2>
   <h3 class="subtitle">An attacker cannot read the card field. They can replace it.</h3>
 
-  <p>Here is the failure mode. A merchant's checkout page loads eleven third-party scripts: an analytics library, a tag manager, a chat widget, a session replay tool, three A/B testing scripts, and four things nobody remembers adding. One of them — often not the merchant's own JavaScript, but a dependency of a dependency of a dependency — is compromised.</p>
+  <p>Here is the failure mode. A Shopify merchant installs eleven apps from the Shopify App Store: Google Analytics, a tag manager, a Tidio chat widget, a session replay tool, three A/B testing scripts, a reviews plugin, and three abandoned cart tools nobody remembers adding. Each app loads its own JavaScript into the checkout theme. One of them, often not even the app's own code, but a fourth level dependency of an npm package the app maintainer uses, is compromised.</p>
 
-  <p>The compromised script cannot read the iframe. Same-origin policy still holds. But it can do this: draw a pixel-perfect fake card form directly over the real iframe, capture the keystrokes into itself, and quietly send them to an attacker's server. To the customer, everything looks normal. The Pay button even works — the malicious script forwards the card to the real provider after it has copied it.</p>
+  <p>The compromised script cannot read Stripe's iframe. Same origin policy still holds. But it can do this: draw a pixel perfect fake card form directly over Stripe's real iframe, capture Jane's keystrokes into itself, and quietly send them to an attacker's server. To Jane, everything looks normal. The Pay button even works, the malicious script forwards the card to Stripe's real endpoint after copying it, so Shopify's order still completes.</p>
 
-  <p>This is called <strong>e-skimming</strong>, or a Magecart attack after the group that industrialized it. The vault we built is untouched. The wire is untouched. The card just never made it to the vault, because it was intercepted before it left the browser.</p>
+  <p>This is called <strong>e skimming</strong>, or a Magecart attack after the group that industrialized it. Real Shopify stores have been hit by this. Stripe's vault is untouched. The wire is untouched. Jane's card just never made it to Stripe, because it was intercepted before it left her browser.</p>
 
   <div class="callout warn">
-    <strong>The mental correction:</strong> hosted fields reduce the shop's exposure to the card, but they do not remove the shop's responsibility for the checkout page. The page is now the smallest and most valuable attack surface.
+    <strong>The mental correction:</strong> Stripe Elements reduces Shopify's exposure to Jane's card, but it does not remove Shopify's responsibility for the checkout page. The page is now the smallest and most valuable attack surface.
   </div>
 
   <p>PCI DSS v4 responded to this with two requirements aimed squarely at the payment page: <strong>6.4.3</strong> (know which scripts run on the payment page, authorize each one, and confirm their integrity) and <strong>11.6.1</strong> (detect unauthorized changes to headers and script content). Together they push toward a small idea with a large operational tail: <em>you must know, at every moment, exactly what is running on your checkout page.</em></p>
@@ -1524,33 +1244,33 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
 
 <!-- 12 NO TRUST INSIDE -->
 <section class="chapter reveal" id="c12">
-  <span class="chapter-num">12 — No trust inside either</span>
+  <span class="chapter-num">12: No trust inside either</span>
   <h2>The provider's own network is not automatically friendly.</h2>
   <h3 class="subtitle">A perfect vault does not help if the log line beside it is a card number.</h3>
 
-  <p>Inside the payment provider, the vault does one job: hold the card. Everything else — routing, risk scoring, dispute handling, fee calculation, statements, dashboards — is done by dozens of other services. None of them need the card. Almost all of them touch payment data.</p>
+  <p>Inside Stripe, the vault does one job: hold Jane's Visa. Everything else, routing, risk scoring, dispute handling, fee calculation, monthly statements for Shopify, the merchant dashboard, the developer webhooks, the Radar fraud engine, is done by dozens of other services. None of them need her card. Almost all of them touch payment data.</p>
 
-  <p>The rule inside the provider is roughly: <em>no implicit trust and no accidental copies</em>.</p>
+  <p>The rule inside Stripe is roughly: <em>no implicit trust and no accidental copies</em>.</p>
 
-  <p><strong>No implicit trust</strong> means every internal call is authenticated. A service is not trusted because it is on the same VPC. Mutual TLS establishes both sides of every connection; workload identity confirms which specific service is calling; explicit authorization policy decides whether that service is allowed to invoke this specific operation. <em>Can this workload de-tokenize a PAN?</em> is a policy question, not a network question.</p>
+  <p><strong>No implicit trust</strong> means every internal call is authenticated. A service is not trusted because it is on the same VPC. Mutual TLS establishes both sides of every connection; workload identity confirms which specific Stripe service is calling; explicit authorization policy decides whether that service is allowed to invoke this specific operation. <em>Can this workload de tokenize a PAN?</em> is a policy question, not a network question.</p>
 
   <p><strong>No accidental copies</strong> means observability is the leak path. This is subtle and worth showing:</p>
 
-  <pre class="code"><span class="label">Two log lines. One is a disaster.</span><span class="c">// Dangerous — the whole request body ends up in logs.</span>
+  <pre class="code"><span class="label">Two log lines. One is a disaster.</span><span class="c">// Dangerous, the whole request body ends up in logs.</span>
 <span class="d">logger.info(</span><span class="s">"payment request = {}"</span><span class="d">, requestBody);</span>
 
-<span class="c">// Better — only allow-listed fields.</span>
+<span class="c">// Better, only fields on the allow list.</span>
 <span class="g">logger.info(
   </span><span class="s">"payment attempt order={} pm={} amount={} status={}"</span><span class="g">,
   orderId, paymentMethodId, amount, status
 );</span>
 
-<span class="c">// Best — never depend on developers remembering.</span>
-<span class="c">// Use secret-aware types, structural allow-lists,</span>
+<span class="c">// Best, never depend on developers remembering.</span>
+<span class="c">// Use types that recognize secrets, structural allow lists,</span>
 <span class="c">// central redaction, restricted debug access,</span>
-<span class="c">// and data-loss-prevention scanners as defense in depth.</span></pre>
+<span class="c">// and data loss prevention scanners as defense in depth.</span></pre>
 
-  <p>A payment platform that gets this right treats sensitive values the way a well-designed type system treats units. A <code class="inline">Pan</code> type has no default <code class="inline">toString()</code>. A <code class="inline">Cvc</code> type refuses to be serialized. A <code class="inline">Card</code> object cannot enter the general-purpose structured logger. The redaction regex that scans for card-shaped digit sequences in log pipelines exists — but it is the safety net beneath the design, not the design itself.</p>
+  <p>A payment platform that gets this right treats sensitive values the way a well designed type system treats units. A <code class="inline">Pan</code> type has no default <code class="inline">toString()</code>. A <code class="inline">Cvc</code> type refuses to be serialized. A <code class="inline">Card</code> object cannot enter the general purpose structured logger. The redaction regex that scans for card shaped digit sequences in log pipelines exists, but it is the safety net beneath the design, not the design itself.</p>
 
   <p>Which services should ever see a full PAN? Almost none of them.</p>
 
@@ -1560,12 +1280,12 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
         <tr><th>System</th><th>Sees full PAN?</th><th>Normally receives</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Merchant order service</strong></td><td class="no">No</td><td>Order ID, amount, currency, PSP reference, payment state</td></tr>
-        <tr><td><strong>Merchant analytics</strong></td><td class="no">No</td><td>Aggregated outcomes, tokenized IDs, non-sensitive metadata</td></tr>
-        <tr><td><strong>Merchant support console</strong></td><td class="no">No</td><td>Brand, last four, expiry display, status, dispute info</td></tr>
-        <tr><td><strong>PSP fraud engine</strong></td><td class="maybe">Rarely</td><td>Tokenized identity, BIN-derived attributes, device and behavior signals</td></tr>
-        <tr><td><strong>PSP vault + connector</strong></td><td class="yes">Restricted</td><td>Encrypted at rest; brief plaintext or network token only for authorization</td></tr>
-        <tr><td><strong>Logs · traces · queues</strong></td><td class="no">Never</td><td>Allow-listed metadata with secret-aware serialization</td></tr>
+        <tr><td><strong>Shopify's order service</strong></td><td class="no">No</td><td>Order ID, amount, currency, Stripe PaymentMethod ID, payment state</td></tr>
+        <tr><td><strong>Shopify analytics</strong></td><td class="no">No</td><td>Aggregated outcomes, tokenized IDs, non sensitive metadata</td></tr>
+        <tr><td><strong>Shopify merchant admin</strong></td><td class="no">No</td><td>Brand, last four, expiry display, status, dispute info</td></tr>
+        <tr><td><strong>Stripe Radar (fraud)</strong></td><td class="maybe">Rarely</td><td>Tokenized identity, BIN derived attributes, device and behavior signals</td></tr>
+        <tr><td><strong>Stripe vault + connector</strong></td><td class="yes">Restricted</td><td>Encrypted at rest; brief plaintext or Visa network token only for authorization</td></tr>
+        <tr><td><strong>Logs · traces · Kafka</strong></td><td class="no">Never</td><td>Allow listed metadata with secret aware serialization</td></tr>
       </tbody>
     </table>
   </div>
@@ -1576,34 +1296,37 @@ window.addEventListener(<span class="s">'message'</span>, (event) => {
 
 <!-- 13 CORRECTNESS -->
 <section class="chapter reveal" id="c13">
-  <span class="chapter-num">13 — A different kind of failure</span>
+  <span class="chapter-num">13: A different kind of failure</span>
   <h2>A secure double charge is still a broken payment.</h2>
   <h3 class="subtitle">The card was safe. The customer was charged twice. Both statements are true.</h3>
 
-  <p>Consider a specific bad moment. The merchant's backend calls the payment provider. The provider forwards the authorization. The issuer approves. And then, before the response reaches the merchant, a load balancer times out. The merchant sees a network error.</p>
+  <p>Consider a specific bad moment. Shopify's backend calls Stripe's <code class="inline">/v1/payment_intents/{id}/confirm</code> endpoint. Stripe forwards the authorization to Visa. HDFC approves it, and ₹4,999 is placed on hold on Jane's card. And then, before Stripe's response reaches Shopify, a load balancer between them times out. Shopify sees a network error.</p>
 
-  <p>The merchant does not know whether the charge succeeded. Retrying might create a second charge. Not retrying might mean the customer paid and the shop shipped nothing.</p>
+  <p>Shopify does not know whether the charge succeeded. Retrying might charge Jane twice. Not retrying might mean she paid and the merchant shipped nothing.</p>
 
   <p>None of the machinery we have built so far solves this problem. Envelope encryption does not know whether a request completed. TLS does not distinguish a lost response from a failed one. This is a <em>correctness</em> problem, not a <em>security</em> problem, and it needs its own tools.</p>
 
   <blockquote>An idempotency key prevents a duplicate operation. A token prevents PAN exposure. They are unrelated tools for unrelated failures.</blockquote>
 
-  <p>The primary tool is the <strong>idempotency key</strong>: a client-generated unique identifier attached to each write. The rule the provider follows is simple. The first time the provider sees a given key, it performs the operation, records the outcome, and returns the result. The second, third, and hundredth time it sees the same key, it does not perform the operation again — it returns the stored result of the first attempt.</p>
+  <p>The primary tool is Stripe's <strong>Idempotency Key</strong> header: a Shopify generated unique identifier attached to each write to Stripe's API. The rule Stripe follows is simple. The first time Stripe sees a given key, it performs the operation, records the outcome, and returns the result. The second, third, and hundredth time it sees the same key, it does not perform the operation again, it returns the stored result of the first attempt.</p>
 
-  <pre class="code"><span class="label">A safe retry</span><span class="k">POST</span> /v1/payment_intents/pi_xyz/confirm
-Idempotency-Key: <span class="s">"ord_1042-confirm-a4f2"</span>
+  <pre class="code"><span class="label">Shopify → Stripe: a safe retry</span><span class="k">POST</span> /v1/payment_intents/pi_1PxK9x.../confirm
+<span class="k">Authorization:</span> Bearer sk_live_...
+<span class="k">Idempotency-Key:</span> <span class="s">"ord_2024_10428-confirm-a4f2"</span>
 
-<span class="c">// First attempt: charge succeeds, response is lost in transit.</span>
-<span class="c">// Second attempt: same key, provider returns the same result.</span>
-<span class="c">//                 No second charge.</span>
+<span class="c">// First attempt: HDFC approves, Stripe records success,</span>
+<span class="c">//                response is lost between Stripe and Shopify.</span>
 
-<span class="c">// A conflicting reuse (same key, different amount) is refused,</span>
-<span class="c">// not silently accepted.</span></pre>
+<span class="c">// Second attempt: same Idempotency-Key,</span>
+<span class="c">//                 Stripe returns the same result. No second charge.</span>
 
-  <p>Sitting under the idempotency key is a small state machine for the payment intent itself: <em>created → requires_action → processing → succeeded | failed → reconciled</em>. Each terminal state is durable and cannot be moved out of. When the merchant is unsure, it does not guess — it queries the provider or reconciles from the provider's webhook. The state machine is the single source of truth about what happened; the network timeout is just noise.</p>
+<span class="c">// A conflicting reuse (same key, different amount) is refused</span>
+<span class="c">// by Stripe with a 400, not silently accepted.</span></pre>
+
+  <p>Sitting under the idempotency key is Stripe's <strong>PaymentIntent</strong> state machine: <em>requires_payment_method → requires_confirmation → requires_action → processing → succeeded | canceled</em>. Each terminal state is durable and cannot be moved out of. When Shopify is unsure, it does not guess, it queries Stripe with the PaymentIntent ID, or waits for Stripe's <code class="inline">payment_intent.succeeded</code> webhook. Stripe's state machine is the single source of truth about what happened to Jane's payment; the network timeout is just noise.</p>
 
   <div class="callout">
-    Card data security and financial correctness travel together but do not overlap. Hosted fields, tokenization, TLS, vault isolation, and log discipline protect the <em>secret</em>. Idempotency keys, durable state, and reconciliation protect the <em>outcome</em>. A serious payment system needs both, and neither implies the other.
+    Card data security and financial correctness travel together but do not overlap. Stripe Elements, tokenization, TLS, vault isolation, and log discipline protect the <em>secret</em>. Idempotency keys, durable PaymentIntent state, and webhooks protect the <em>outcome</em>. A serious payment system needs both, and neither implies the other.
   </div>
 
   <p>That is every part. Time to assemble them.</p>
@@ -1611,48 +1334,48 @@ Idempotency-Key: <span class="s">"ord_1042-confirm-a4f2"</span>
 
 <!-- 14 THE COMPLETE PICTURE -->
 <section class="chapter reveal" id="c14">
-  <span class="chapter-num">14 — The complete picture</span>
+  <span class="chapter-num">14: The complete picture</span>
   <h2>From keystroke to bank response, in one walk.</h2>
   <h3 class="subtitle">This is the mental model. Everything above is why each piece exists.</h3>
 
-  <p>A customer opens <code class="inline">shop.example.com/checkout</code>. Order total: ₹4,999. The merchant's page loads the payment provider's SDK. The SDK inserts an iframe from <code class="inline">js.stripe.com</code> into a container on the page. Card, expiry, CVC are painted, but they live inside the iframe's document — a different origin from the shop.</p>
+  <p>Jane opens <code class="inline">headphonesshop.myshopify.com/checkout</code>. Order total: ₹4,999. Shopify's page loads Stripe's SDK from <code class="inline">js.stripe.com</code>. The SDK inserts an iframe into a container on the page. Card, expiry, CVC are painted, but they live inside Stripe's iframe document, a different origin from Shopify.</p>
 
-  <p>The customer types the digits. The iframe reports back through <code class="inline">postMessage</code>: <em>Visa, complete, no errors.</em> The Pay button lights up. The customer clicks it.</p>
+  <p>Jane types her Visa: <code class="inline">4532 1094 7823 9012</code>. Stripe's iframe reports back to Shopify through <code class="inline">postMessage</code>: <em>Visa, complete, no errors.</em> The Pay button lights up. Jane clicks it.</p>
 
-  <p>The iframe opens a TLS connection to the provider's tokenization endpoint, sends the card details, and receives back a payment method ID: <code class="inline">pm_7Hk9x2Ktm3aVzQ4pL</code>, along with the brand and last four digits. The shop's servers were nowhere on that path.</p>
+  <p>Stripe's iframe opens a TLS connection to Stripe's tokenization endpoint, sends the card details, and receives back a PaymentMethod ID: <code class="inline">pm_1PxK9x2eZvKYlo2C5tHm3aVz</code>, along with the brand (Visa) and last four (9012). Shopify's servers were nowhere on that path.</p>
 
-  <p>The merchant's frontend hands the payment method ID, the order ID, the amount, and the currency to the merchant's backend. The backend recalculates the amount from the order — because a client-provided total is not a source of truth — and calls the payment provider's API with a server-side secret key and a fresh idempotency key.</p>
+  <p>Shopify's checkout JavaScript hands the PaymentMethod ID, the order ID, the amount, and the currency to Shopify's backend. Shopify's backend recalculates ₹4,999 from the actual cart contents, because a client provided total is not a source of truth, and calls Stripe's API with Shopify's server side secret key and a fresh Idempotency Key.</p>
 
-  <p>Inside the provider, an edge service authenticates the API credential, checks rate limits, and passes the request to the orchestrator. A risk service scores it. If the score demands it, a 3-D Secure challenge is invoked and the customer authenticates with their bank. The vault is asked to resolve the token: it retrieves the encrypted PAN record, asks the HSM to unwrap the DEK, decrypts the PAN into memory just long enough to build the outbound message, and hands it to the acquirer connector.</p>
+  <p>Inside Stripe, an edge service authenticates Shopify's API key, checks rate limits, and passes the request to the payment orchestrator. Stripe Radar scores it for fraud. If the score demands it, or India's RBI rules require it, a 3 D Secure challenge is invoked, Jane sees an OTP screen from HDFC on her phone and enters six digits. Stripe's vault is asked to resolve the PaymentMethod: it retrieves the encrypted PAN record, asks the HSM to unwrap the DEK, decrypts Jane's PAN into memory just long enough to build the outbound authorization message, and hands it to Stripe's acquirer connector.</p>
 
-  <p>The acquirer connector translates the request into ISO 8583 and sends it to an acquiring bank. The acquirer routes to the card network based on the card's BIN. The card network delivers the message to the issuer. The issuer looks at account status, funds, risk signals, and the 3DS evidence, and decides <em>approved</em>. The response climbs back up: issuer → network → acquirer → provider. The provider marks the payment intent <code class="inline">succeeded</code>, sends a webhook to the merchant, and returns the success response.</p>
+  <p>The acquirer connector translates the request into ISO 8583 and sends it to Stripe's acquiring bank. The acquirer routes into VisaNet based on the card's BIN (which starts with 4, so Visa). VisaNet delivers the authorization to HDFC. HDFC looks at Jane's account status, available balance, the 3DS evidence, and its own risk signals, and decides <em>approved</em>. The response climbs back up: HDFC → Visa → Stripe's acquirer → Stripe. Stripe marks the PaymentIntent <code class="inline">succeeded</code>, sends a <code class="inline">payment_intent.succeeded</code> webhook to Shopify, and returns the success response synchronously too.</p>
 
-  <p>The merchant's backend updates the order to <code class="inline">paid</code>. The frontend shows a confirmation page. The customer sees <em>Payment successful</em>.</p>
+  <p>Shopify's backend updates the order from <code class="inline">pending</code> to <code class="inline">paid</code>. Jane's screen shows a confirmation page. Somewhere, a fulfillment worker picks up the order and emails the merchant to ship headphones.</p>
 
   <p>Every one of these steps had a reason. Here are the truths that survive the walk:</p>
 
   <ol class="truths">
     <li>HTTPS protects data on the wire; it does not keep data out of the application that decrypted it.</li>
-    <li>Hosted fields put the sensitive card inputs inside a provider-owned iframe from a different origin.</li>
-    <li>The browser's Same-Origin Policy prevents ordinary merchant scripts from reading that iframe's DOM.</li>
-    <li>Cross-origin communication uses <code class="inline">postMessage</code>, and only carries non-sensitive status.</li>
+    <li>Hosted fields put the sensitive card inputs inside a provider owned iframe from a different origin.</li>
+    <li>The browser's Same Origin Policy prevents ordinary merchant scripts from reading that iframe's DOM.</li>
+    <li>Cross origin communication uses <code class="inline">postMessage</code>, and only carries non sensitive status.</li>
     <li>The card travels from the iframe directly to the provider over TLS, bypassing the merchant backend.</li>
-    <li>The merchant receives a token — a payment method ID — not the PAN.</li>
-    <li>A token is opaque, scoped to the account, and useless without the server-side API credential.</li>
+    <li>The merchant receives a token, a payment method ID, not the PAN.</li>
+    <li>A token is opaque, scoped to the account, and useless without the server side API credential.</li>
     <li>Inside the vault, envelope encryption separates the encrypted record, the data key, and the root key.</li>
     <li>The root key lives inside an HSM, which lets keys be used but not extracted.</li>
-    <li>The CVC is used once and then discarded — it must not be retained after authorization.</li>
+    <li>The CVC is used once and then discarded, it must not be retained after authorization.</li>
     <li>A network token replaces the PAN in the payment message itself, bound to a domain, proven by a cryptogram.</li>
     <li>The authorization message becomes ISO 8583 as it enters the card networks, and the issuer decides.</li>
     <li>The iframe blocks DOM reading but not overlays; the checkout page needs script inventory and integrity monitoring.</li>
-    <li>Inside the provider, mTLS, workload identity, secret-aware types, and central redaction keep secrets out of logs and traces.</li>
+    <li>Inside the provider, mTLS, workload identity, secret aware types, and central redaction keep secrets out of logs and traces.</li>
     <li>Idempotency keys and a durable payment state machine protect the customer from being charged twice by a lost response.</li>
     <li>Every layer minimizes who can see the credential, how long they can see it, and what they can do with it.</li>
   </ol>
 
-  <blockquote>The shop embeds a card field it does not own. The browser sends the card directly to the provider. The provider returns a reference. Every other system uses that reference, and only the smallest, most tightly controlled boundary inside the provider is ever allowed to resolve it.</blockquote>
+  <blockquote>Shopify embeds a card field it does not own. Jane's browser sends the Visa directly to Stripe. Stripe returns a PaymentMethod ID. Every Shopify system uses that ID, and only Stripe's smallest, most tightly controlled boundary is ever allowed to resolve it against Jane's real card, long enough to build one ISO 8583 message for Visa to route to HDFC.</blockquote>
 
-  <p>You still typed your card. The shop still sold you headphones. Between those two events, sixteen digits were seen by exactly the systems that had to see them — and by none of the ones that didn't.</p>
+  <p>Jane still typed her card. Shopify still sold her headphones. HDFC still approved ₹4,999. Between those events, sixteen digits were seen by Stripe, Visa, and HDFC, the three companies that had to see them, and by nobody else.</p>
 
   <p>That was the whole design.</p>
 </section>
@@ -1662,17 +1385,17 @@ Idempotency-Key: <span class="s">"ord_1042-confirm-a4f2"</span>
 <footer>
   <h4>References</h4>
   <div class="refs">
-    <a href="https://docs.stripe.com/payments/elements" target="_blank" rel="noreferrer"><span>Stripe Elements and client-side tokenization</span><span class="src">Stripe</span></a>
+    <a href="https://docs.stripe.com/payments/elements" target="_blank" rel="noreferrer"><span>Stripe Elements and client side tokenization</span><span class="src">Stripe</span></a>
     <a href="https://docs.stripe.com/payments/save-card-without-authentication" target="_blank" rel="noreferrer"><span>Element iframe sends payment information over HTTPS</span><span class="src">Stripe</span></a>
-    <a href="https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy" target="_blank" rel="noreferrer"><span>Same-Origin Policy</span><span class="src">MDN</span></a>
+    <a href="https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy" target="_blank" rel="noreferrer"><span>Same Origin Policy</span><span class="src">MDN</span></a>
     <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage" target="_blank" rel="noreferrer"><span>window.postMessage()</span><span class="src">MDN</span></a>
     <a href="https://www.pcisecuritystandards.org/standards/pci-dss/" target="_blank" rel="noreferrer"><span>PCI Data Security Standard</span><span class="src">PCI SSC</span></a>
-    <a href="https://blog.pcisecuritystandards.org/new-information-supplement-payment-page-security-and-preventing-e-skimming" target="_blank" rel="noreferrer"><span>Payment page security and e-skimming</span><span class="src">PCI SSC</span></a>
+    <a href="https://blog.pcisecuritystandards.org/new-information-supplement-payment-page-security-and-preventing-e-skimming" target="_blank" rel="noreferrer"><span>Payment page security and e skimming</span><span class="src">PCI SSC</span></a>
     <a href="https://www.pcisecuritystandards.org/faqs/1574/" target="_blank" rel="noreferrer"><span>Card verification codes cannot be retained after authorization</span><span class="src">PCI SSC</span></a>
     <a href="https://www.pcisecuritystandards.org/documents/Tokenization_Product_Security_Guidelines.pdf" target="_blank" rel="noreferrer"><span>Tokenization Product Security Guidelines</span><span class="src">PCI SSC</span></a>
     <a href="https://www.emvco.com/emv-technologies/payment-tokenisation/" target="_blank" rel="noreferrer"><span>EMV Payment Tokenisation</span><span class="src">EMVCo</span></a>
-    <a href="https://www.emvco.com/emv-technologies/3-d-secure/" target="_blank" rel="noreferrer"><span>EMV 3-D Secure</span><span class="src">EMVCo</span></a>
-    <a href="https://csrc.nist.gov/pubs/fips/140-3/final" target="_blank" rel="noreferrer"><span>FIPS 140-3, Security Requirements for Cryptographic Modules</span><span class="src">NIST</span></a>
+    <a href="https://www.emvco.com/emv-technologies/3-d-secure/" target="_blank" rel="noreferrer"><span>EMV 3 D Secure</span><span class="src">EMVCo</span></a>
+    <a href="https://csrc.nist.gov/pubs/fips/140-3/final" target="_blank" rel="noreferrer"><span>FIPS 140 3, Security Requirements for Cryptographic Modules</span><span class="src">NIST</span></a>
     <a href="https://docs.stripe.com/api/idempotent_requests" target="_blank" rel="noreferrer"><span>Idempotent requests</span><span class="src">Stripe</span></a>
   </div>
   <p class="colophon">A study guide assembled from public provider documentation, browser platform documentation, PCI SSC guidance, EMVCo standards, and NIST cryptographic module guidance. PCI eligibility and scope depend on the exact integration, channels, systems, and assessor requirements. Hosted fields and tokenization can materially reduce exposure and scope; they do not remove the merchant's responsibility to secure its checkout page and connected environment.</p>
