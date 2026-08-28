@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SyncDrop: System Design and Build Journal — Daedalus Journal</title>
+<meta name="description" content="The high level design, low level design, and build journal for SyncDrop, a private cross device inbox built with AWS serverless services.">
+<meta name="theme-color" content="#141413">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SyncDrop: System Design and Build Journal">
+<meta property="og:description" content="A practical architecture and build journal for a private cross device inbox built with Next.js, Java, Lambda, DynamoDB, S3, and Cognito.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="SyncDrop: System Design and Build Journal">
+<meta name="twitter:description" content="A practical architecture and build journal for a private cross device inbox built with Next.js, Java, Lambda, DynamoDB, S3, and Cognito.">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=DM+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --bg: #FAFAF7;
+    --bg-surface: #F0EFEB;
+    --bg-code: #E8E6E1;
+    --text-primary: #1A1918;
+    --text-secondary: #5C5954;
+    --text-tertiary: #8A857D;
+    --accent: #2D6A4F;
+    --accent-light: #D8F3DC;
+    --accent-muted: #40916C;
+    --border: #D6D3CC;
+    --border-light: #E8E6E1;
+    --tag-bg: #EDF2F4;
+    --tag-text: #2B4C5B;
+    --warn-bg: #FFF3CD;
+    --warn-text: #856404;
+    --warn-border: #FFEAA7;
+    --serif: 'Source Serif 4', 'Georgia', serif;
+    --sans: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', 'Cascadia Code', monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413;
+      --bg-surface: #1E1D1C;
+      --bg-code: #252423;
+      --text-primary: #E8E6E1;
+      --text-secondary: #A8A29E;
+      --text-tertiary: #78716C;
+      --accent: #52B788;
+      --accent-light: #1B3A2A;
+      --accent-muted: #74C69D;
+      --border: #2E2D2B;
+      --border-light: #232221;
+      --tag-bg: #1C2A33;
+      --tag-text: #7EC8E3;
+      --warn-bg: #332B00;
+      --warn-text: #FFD43B;
+      --warn-border: #4D4000;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #141413;
+    --bg-surface: #1E1D1C;
+    --bg-code: #252423;
+    --text-primary: #E8E6E1;
+    --text-secondary: #A8A29E;
+    --text-tertiary: #78716C;
+    --accent: #52B788;
+    --accent-light: #1B3A2A;
+    --accent-muted: #74C69D;
+    --border: #2E2D2B;
+    --border-light: #232221;
+    --tag-bg: #1C2A33;
+    --tag-text: #7EC8E3;
+    --warn-bg: #332B00;
+    --warn-text: #FFD43B;
+    --warn-border: #4D4000;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page-wrap {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 6rem;
+  }
+
+  /* --- NAV --- */
+  .nav {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 3rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+    overflow-x: auto;
+  }
+  .nav button {
+    font-family: var(--sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 0.75rem 1.25rem;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .nav button:hover { color: var(--text-primary); }
+  .nav button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* --- PANELS --- */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* --- HERO --- */
+  .hero {
+    margin-bottom: 3.5rem;
+  }
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin-bottom: 1rem;
+  }
+  .hero p {
+    color: var(--text-secondary);
+    font-size: 1.0625rem;
+    max-width: 600px;
+    line-height: 1.7;
+  }
+
+  /* --- SECTION --- */
+  .section {
+    margin-bottom: 3rem;
+  }
+  .section h2 {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .section h3 {
+    font-family: var(--sans);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+  }
+  .section p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    max-width: 65ch;
+  }
+  .section p strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  /* --- DIAGRAM --- */
+  .diagram-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    overflow-x: auto;
+  }
+  .diagram-box svg {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* --- ARCHITECTURE GRID --- */
+  .arch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .arch-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
+  }
+  .arch-card-icon {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .arch-card h4 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin-bottom: 0.375rem;
+  }
+  .arch-card p {
+    font-size: 0.8125rem;
+    color: var(--text-tertiary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* --- CODE BLOCKS --- */
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--text-primary);
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--bg-code);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  /* --- TAGS --- */
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 0.2em 0.6em;
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    border-radius: 3px;
+    letter-spacing: 0.02em;
+  }
+  .tag + .tag { margin-left: 0.375rem; }
+
+  /* --- TABLE --- */
+  .data-table-wrap {
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    text-align: left;
+    padding: 0.625rem 1rem;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-secondary);
+  }
+  td strong { color: var(--text-primary); font-weight: 600; }
+
+  /* --- CALLOUT --- */
+  .callout {
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn-border);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    font-size: 0.875rem;
+    color: var(--warn-text);
+    line-height: 1.6;
+  }
+  .callout strong { font-weight: 600; }
+
+  .callout-info {
+    background: var(--accent-light);
+    border-left-color: var(--accent);
+    color: var(--accent-muted);
+  }
+
+  /* --- JOURNAL ENTRY --- */
+  .journal-entry {
+    border-left: 2px solid var(--border);
+    padding-left: 1.5rem;
+    margin-bottom: 2.5rem;
+    position: relative;
+  }
+  .journal-entry::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 0.35rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .journal-date {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    letter-spacing: 0.04em;
+    margin-bottom: 0.375rem;
+  }
+  .journal-entry h3 {
+    margin-top: 0;
+    font-size: 1.125rem;
+  }
+  .journal-entry p {
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+  }
+
+  /* --- CONCEPT BOX --- */
+  .concept {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin: 1.25rem 0;
+  }
+  .concept-label {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .concept h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .concept p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+  }
+  .concept p:last-child { margin-bottom: 0; }
+
+  /* --- FOOTER --- */
+  .footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-light);
+    font-size: 0.8125rem;
+    color: var(--text-tertiary);
+  }
+
+  /* --- RESPONSIVE --- */
+  @media (max-width: 600px) {
+    .page-wrap { padding: 2rem 1rem 4rem; }
+    .arch-grid { grid-template-columns: 1fr; }
+    .nav button { padding: 0.625rem 0.875rem; font-size: 0.75rem; }
+  }
+  .skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 10;
+    padding: 0.65rem 0.9rem;
+    border-radius: 4px;
+    background: var(--text-primary);
+    color: var(--bg);
+    font-size: 0.8rem;
+    font-weight: 700;
+    transform: translateY(-180%);
+    transition: transform 0.2s;
+  }
+  .skip-link:focus { transform: translateY(0); }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 1.75rem;
+    color: var(--text-tertiary);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+  .back-link:hover,
+  .back-link:focus-visible { color: var(--accent); }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to content</a>
+
+<div class="page-wrap" id="main-content">
+  <a class="back-link" href="../index.html" aria-label="Back to Daedalus Journal">← Daedalus Journal</a>
+
+  <nav class="nav" role="tablist">
+    <button class="active" onclick="showPanel('hld')" role="tab" aria-selected="true">High-Level Design</button>
+    <button onclick="showPanel('lld')" role="tab" aria-selected="false">Low-Level Design</button>
+    <button onclick="showPanel('journal')" role="tab" aria-selected="false">Build Journal</button>
+  </nav>
+
+  <!-- ===== HLD ===== -->
+  <div id="panel-hld" class="panel active">
+    <div class="hero">
+      <div class="hero-eyebrow">High-Level Design</div>
+      <h1>SyncDrop</h1>
+      <p>A private cross-device inbox. Drop text, links, or files on one device and pick them up on another &mdash; everything signed into the same Google account stays in sync. Items expire after 7 days unless pinned.</p>
+    </div>
+
+    <div class="section">
+      <h2>System Overview</h2>
+      <p>SyncDrop is a serverless application on AWS with a Next.js PWA frontend. There is no server to manage &mdash; Lambda functions respond to API requests, DynamoDB stores the data, and S3 holds uploaded files. Authentication is handled entirely by Cognito with Google as the identity provider.</p>
+
+      <div class="diagram-box">
+        <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg" style="font-family: 'DM Sans', system-ui, sans-serif;">
+          <!-- Browser -->
+          <rect x="20" y="130" width="130" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+          <text x="85" y="158" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Next.js PWA</text>
+          <text x="85" y="178" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.5">Browser / Mobile</text>
+
+          <!-- Arrow 1 -->
+          <line x1="150" y1="165" x2="210" y2="165" stroke="currentColor" stroke-width="1.2" opacity="0.4" marker-end="url(#arrow)"/>
+          <text x="180" y="155" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.4">HTTPS</text>
+
+          <!-- API Gateway -->
+          <rect x="210" y="120" width="120" height="90" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+          <text x="270" y="150" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">API Gateway</text>
+          <text x="270" y="166" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">REST API</text>
+          <text x="270" y="180" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">JWT Authorizer</text>
+          <text x="270" y="198" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.35">10 req/s &middot; 50k/day</text>
+
+          <!-- Arrow 2 -->
+          <line x1="330" y1="165" x2="390" y2="165" stroke="currentColor" stroke-width="1.2" opacity="0.4" marker-end="url(#arrow)"/>
+
+          <!-- Lambda -->
+          <rect x="390" y="125" width="120" height="80" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+          <text x="450" y="155" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">Lambda</text>
+          <text x="450" y="170" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">Java 21 + SnapStart</text>
+          <text x="450" y="186" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">1024 MB &middot; 10s</text>
+
+          <!-- Arrow to DynamoDB -->
+          <line x1="510" y1="145" x2="580" y2="80" stroke="currentColor" stroke-width="1.2" opacity="0.4" marker-end="url(#arrow)"/>
+
+          <!-- DynamoDB -->
+          <rect x="580" y="40" width="120" height="80" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+          <text x="640" y="70" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">DynamoDB</text>
+          <text x="640" y="85" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">Single table</text>
+          <text x="640" y="100" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">1 RCU / 1 WCU</text>
+
+          <!-- Arrow to S3 -->
+          <line x1="510" y1="185" x2="580" y2="250" stroke="currentColor" stroke-width="1.2" opacity="0.4" marker-end="url(#arrow)"/>
+
+          <!-- S3 -->
+          <rect x="580" y="220" width="120" height="80" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+          <text x="640" y="250" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">S3</text>
+          <text x="640" y="265" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">Private bucket</text>
+          <text x="640" y="280" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">Presigned URLs</text>
+
+          <!-- Cognito -->
+          <rect x="210" y="260" width="120" height="60" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+          <text x="270" y="285" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">Cognito</text>
+          <text x="270" y="300" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.5">Google IdP only</text>
+
+          <!-- Arrow Cognito to API GW -->
+          <line x1="270" y1="260" x2="270" y2="210" stroke="currentColor" stroke-width="1.2" opacity="0.4" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+          <text x="290" y="238" font-size="8" fill="currentColor" opacity="0.4">validates JWT</text>
+
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+              <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" opacity="0.5"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Components</h2>
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-card-icon">Frontend</div>
+          <h4>Next.js PWA</h4>
+          <p>App Router, TypeScript, Tailwind. Installable as a PWA. Polls /sync every 5s. IndexedDB cache, optimistic updates.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-card-icon">API Layer</div>
+          <h4>API Gateway (REST)</h4>
+          <p>JWT authorizer validates Cognito tokens on every route. Stage throttle 10 req/s, usage plan quota 50k/day.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-card-icon">Compute</div>
+          <h4>Lambda (Java 21)</h4>
+          <p>Plain handlers, no framework. SnapStart for cold start reduction. Static SDK clients initialized once.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-card-icon">Database</div>
+          <h4>DynamoDB</h4>
+          <p>Single-table design. PK/SK pattern for users, items, todos. TTL auto-expires items. LSI on updatedAt for sync.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-card-icon">Storage</div>
+          <h4>S3</h4>
+          <p>Private bucket for file uploads (max 25 MB). All access via presigned URLs. Block all public access.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-card-icon">Auth</div>
+          <h4>Cognito + Google</h4>
+          <p>Google sign-in only. User identity from JWT sub claim. No email/password flow. Testing mode during development.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Data Flow</h2>
+      <p><strong>Creating a text item:</strong> Browser sends POST /v1/items with the JWT. API Gateway validates the token, forwards to Lambda. Lambda reads the user's sub from the JWT, writes to DynamoDB with a 7-day TTL, returns the created item.</p>
+      <p><strong>File upload (two-phase):</strong> Browser requests a presigned upload URL. Lambda checks quotas, creates a pending item row, returns the presigned POST URL. Browser uploads directly to S3. Browser calls /complete to mark the item visible.</p>
+      <p><strong>Sync:</strong> Each device polls GET /v1/sync?since=&lt;timestamp&gt;. Lambda queries the updatedAt LSI for all records newer than the timestamp, including soft-deleted tombstones so other devices learn about deletions.</p>
+    </div>
+
+    <div class="section">
+      <h2>Cost Ceilings</h2>
+      <p>SyncDrop is a personal tool. Every infrastructure choice includes a hard spending limit so the AWS bill stays under $1/month.</p>
+      <div class="data-table-wrap">
+        <table>
+          <thead><tr><th>Control</th><th>Limit</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Lambda concurrency</strong></td><td>5 reserved</td><td>Caps parallel executions</td></tr>
+            <tr><td><strong>API Gateway rate</strong></td><td>10 req/s, burst 20</td><td>Prevents request floods</td></tr>
+            <tr><td><strong>API Gateway quota</strong></td><td>50,000 req/day</td><td>Daily ceiling via usage plan</td></tr>
+            <tr><td><strong>DynamoDB capacity</strong></td><td>1 RCU / 1 WCU</td><td>Provisioned, not on-demand</td></tr>
+            <tr><td><strong>S3 access</strong></td><td>Block all public</td><td>No accidental public exposure</td></tr>
+            <tr><td><strong>Billing alarm</strong></td><td>$1</td><td>Email alert if charges exceed</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LLD ===== -->
+  <div id="panel-lld" class="panel">
+    <div class="hero">
+      <div class="hero-eyebrow">Low-Level Design</div>
+      <h1>Data Model &amp; API</h1>
+      <p>Single-table DynamoDB design, REST API contract, and the key patterns that make each piece work.</p>
+    </div>
+
+    <div class="section">
+      <h2>DynamoDB Table: <code>syncdrop</code></h2>
+      <p>Every entity &mdash; user profiles, items, and todos &mdash; lives in one table with a composite primary key. The partition key (PK) groups records by user; the sort key (SK) identifies the entity type and provides ordering.</p>
+
+      <h3>Key Patterns</h3>
+      <div class="data-table-wrap">
+        <table>
+          <thead><tr><th>Entity</th><th>PK</th><th>SK</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td><strong>User profile</strong></td><td>USER#&lt;sub&gt;</td><td>PROFILE</td><td>USER#abc123 / PROFILE</td></tr>
+            <tr><td><strong>Item</strong></td><td>USER#&lt;sub&gt;</td><td>ITEM#&lt;ms&gt;#&lt;uuid&gt;</td><td>USER#abc123 / ITEM#1740000000000#e8f...</td></tr>
+            <tr><td><strong>Todo</strong></td><td>USER#&lt;sub&gt;</td><td>TODO#&lt;ms&gt;#&lt;uuid&gt;</td><td>USER#abc123 / TODO#1740000000000#a2b...</td></tr>
+            <tr><td><strong>System stats</strong></td><td>SYSTEM</td><td>STATS</td><td>SYSTEM / STATS</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Why Single Table?</h3>
+      <p>With provisioned capacity at 1 RCU / 1 WCU, every table costs money. A single table means one set of capacity units serves all access patterns. The PK groups everything by user, so a query for "all of user X's items" is a single partition scan &mdash; fast and cheap.</p>
+
+      <div class="concept">
+        <div class="concept-label">Interview Concept</div>
+        <h4>DynamoDB Single-Table Design</h4>
+        <p>Unlike relational databases where you normalize into many tables, DynamoDB encourages denormalization. You model access patterns, not entities. The PK+SK combination lets you store different entity types together and query them efficiently.</p>
+        <p><strong>Key insight:</strong> You pick your keys based on the questions you need to answer, not the shape of the data. "Give me all items for user X, newest first" becomes a simple Query on PK=USER#X with SK begins_with ITEM# in reverse order.</p>
+      </div>
+
+      <h3>TTL: The Easiest Thing to Get Wrong</h3>
+      <p><code>expiresAt</code> is in <strong>epoch seconds</strong>. Every other timestamp is in <strong>epoch milliseconds</strong>. DynamoDB TTL expects seconds &mdash; if you accidentally store milliseconds, items won't expire for thousands of years.</p>
+      <div class="data-table-wrap">
+        <table>
+          <thead><tr><th>Event</th><th>expiresAt Value</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Item created</strong></td><td>now_seconds + 7 days (604,800)</td></tr>
+            <tr><td><strong>Item pinned</strong></td><td>now_seconds + 90 days</td></tr>
+            <tr><td><strong>Item unpinned</strong></td><td>createdAt_seconds + 7 days</td></tr>
+            <tr><td><strong>Todo completed</strong></td><td>doneAt_seconds + 30 days</td></tr>
+            <tr><td><strong>Todo not done</strong></td><td>absent (no TTL)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Local Secondary Index</h3>
+      <p>An LSI on <code>updatedAt</code> powers the sync endpoint. Same partition key (PK), different sort key (updatedAt). This lets the sync query ask: "for user X, give me everything changed since timestamp T" &mdash; a single, efficient range query.</p>
+    </div>
+
+    <div class="section">
+      <h2>API Contract</h2>
+      <p>Base path <code>/v1</code>. Every route requires a Cognito JWT in the <code>Authorization</code> header.</p>
+
+      <h3>Core Rules</h3>
+      <div class="callout-info callout">
+        <strong>User identity comes from the JWT <code>sub</code> claim, never from the request body.</strong> Any code that reads a user ID from the request body is a security bug. The API Gateway validates the JWT before Lambda even runs.
+      </div>
+
+      <h3>Endpoints</h3>
+      <div class="data-table-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Response</th></tr></thead>
+          <tbody>
+            <tr><td><strong>POST</strong></td><td>/v1/items</td><td>Create text or link item</td><td>201 + item</td></tr>
+            <tr><td><strong>GET</strong></td><td>/v1/items</td><td>List items (newest first)</td><td>200 + paginated</td></tr>
+            <tr><td><strong>PATCH</strong></td><td>/v1/items/{id}</td><td>Update note or pinned</td><td>200 + item</td></tr>
+            <tr><td><strong>DELETE</strong></td><td>/v1/items/{id}</td><td>Soft delete</td><td>204</td></tr>
+            <tr><td><strong>POST</strong></td><td>/v1/items/upload-url</td><td>Get presigned upload URL</td><td>201 + URL</td></tr>
+            <tr><td><strong>POST</strong></td><td>/v1/items/{id}/complete</td><td>Mark upload complete</td><td>200</td></tr>
+            <tr><td><strong>GET</strong></td><td>/v1/items/{id}/download-url</td><td>Get presigned download URL</td><td>200 + URL</td></tr>
+            <tr><td><strong>POST</strong></td><td>/v1/todos</td><td>Create todo</td><td>201 + todo</td></tr>
+            <tr><td><strong>GET</strong></td><td>/v1/todos</td><td>List todos</td><td>200 + list</td></tr>
+            <tr><td><strong>PATCH</strong></td><td>/v1/todos/{id}</td><td>Toggle done</td><td>200 + todo</td></tr>
+            <tr><td><strong>DELETE</strong></td><td>/v1/todos/{id}</td><td>Soft delete</td><td>204</td></tr>
+            <tr><td><strong>GET</strong></td><td>/v1/sync?since=</td><td>Poll for changes</td><td>200 + items + todos</td></tr>
+            <tr><td><strong>GET</strong></td><td>/v1/me</td><td>User profile + quota</td><td>200 + profile</td></tr>
+            <tr><td><strong>DELETE</strong></td><td>/v1/me</td><td>Delete account</td><td>204</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Error Shape</h3>
+<pre><code>{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Storage limit of 500 MB reached."
+  }
+}</code></pre>
+      <p>Consistent error codes: <code>UNAUTHENTICATED</code> 401, <code>ACCOUNT_BLOCKED</code> 403, <code>NOT_FOUND</code> 404, <code>VALIDATION_FAILED</code> 400, <code>FILE_TOO_LARGE</code> 413, <code>QUOTA_EXCEEDED</code> 413, <code>PIN_LIMIT_REACHED</code> 409, <code>RATE_LIMITED</code> 429, <code>INTERNAL</code> 500.</p>
+    </div>
+
+    <div class="section">
+      <h2>File Upload Flow (Two-Phase)</h2>
+      <div class="concept">
+        <div class="concept-label">Interview Concept</div>
+        <h4>Presigned URLs</h4>
+        <p>Instead of proxying file uploads through Lambda (which has a 6 MB payload limit and charges per ms), the client uploads directly to S3 using a presigned POST URL. Lambda just generates the signed URL with a content-length-range condition &mdash; the client can't upload more than it declared.</p>
+        <p><strong>Why two-phase?</strong> The item row is created with <code>pending: true</code> when the URL is issued. The client calls <code>/complete</code> after uploading. This prevents the database showing items whose files never arrived. Uncompleted items are swept by TTL.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Soft Delete Pattern</h2>
+      <p>Deleting an item sets <code>deleted: true</code> and updates <code>updatedAt</code>. The row stays in DynamoDB so other devices learn about the deletion via the sync query. TTL eventually removes the tombstone. For files, the S3 object is deleted immediately and <code>bytesUsed</code> is decremented atomically.</p>
+    </div>
+  </div>
+
+  <!-- ===== JOURNAL ===== -->
+  <div id="panel-journal" class="panel">
+    <div class="hero">
+      <div class="hero-eyebrow">Build Journal</div>
+      <h1>Building SyncDrop</h1>
+      <p>A step-by-step record of building a serverless application from scratch, explaining the AWS services, Java tooling, and decisions along the way. Written as interview-prep material.</p>
+    </div>
+
+    <div class="section">
+      <h2>Day 1: Setup &amp; Tooling</h2>
+
+      <div class="journal-entry">
+        <div class="journal-date">2026-08-25 &mdash; Session 1</div>
+        <h3>Repository &amp; Spec</h3>
+        <p>Created a private GitHub repo with three directories: <code>/infra</code> (CDK infrastructure), <code>/backend</code> (Lambda handlers), <code>/web</code> (Next.js frontend). Wrote the complete spec in PROJECT.md.</p>
+        <p>The repo skeleton reflects the separation of concerns: infrastructure is defined in Java CDK, business logic in plain Java handlers, and the frontend is an independent Next.js app.</p>
+      </div>
+
+      <div class="journal-entry">
+        <div class="journal-date">2026-08-27 &mdash; Session 2</div>
+        <h3>AWS Account Security</h3>
+        <p>Enabled MFA on the root AWS account and created an IAM user <code>v6_inline</code> with MFA. Configured the <code>syncdrop-dev</code> CLI profile pointing to <code>ap-south-1</code> (Mumbai).</p>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>IAM Users vs Root Account</h4>
+          <p>The root account has unrestricted access to everything. You lock it with MFA and never use it day-to-day. Instead, you create IAM users with only the permissions they need (principle of least privilege). For this project, the dev user has AdministratorAccess &mdash; fine for a personal project, but in production you'd scope it to specific services.</p>
+        </div>
+      </div>
+
+      <div class="journal-entry">
+        <div class="journal-date">2026-08-28 &mdash; Session 3</div>
+        <h3>Local Tooling &amp; Google OAuth</h3>
+        <p>Installed the complete development toolchain:</p>
+        <div class="data-table-wrap">
+          <table>
+            <thead><tr><th>Tool</th><th>Version</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Java 21</strong></td><td>21.0.5</td><td>The language for Lambda handlers and CDK infrastructure</td></tr>
+              <tr><td><strong>Node.js</strong></td><td>22.14.0</td><td>Runs the Next.js frontend and CDK CLI</td></tr>
+              <tr><td><strong>AWS CLI</strong></td><td>2.36.30</td><td>Command-line interface to all AWS services</td></tr>
+              <tr><td><strong>AWS CDK</strong></td><td>2.1138.0</td><td>Infrastructure as Code &mdash; defines AWS resources in Java</td></tr>
+              <tr><td><strong>Maven</strong></td><td>3.9.9</td><td>Build system for Java &mdash; compiles code and manages dependencies</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>What is AWS CDK?</h4>
+          <p>CDK (Cloud Development Kit) lets you define cloud infrastructure using a real programming language instead of writing JSON/YAML templates. You write Java classes that describe your DynamoDB table, Lambda function, API Gateway, etc. CDK compiles this into a CloudFormation template and deploys it.</p>
+          <p><strong>Why it matters:</strong> Infrastructure as Code means your entire cloud setup is version-controlled, reviewable, and reproducible. You can destroy and recreate your entire stack from a single command. No clicking around the AWS console.</p>
+<pre><code>// This Java code creates a DynamoDB table in AWS
+Table table = Table.Builder.create(this, "SyncDropTable")
+    .tableName("syncdrop")
+    .partitionKey(Attribute.builder()
+        .name("PK").type(AttributeType.STRING).build())
+    .billingMode(BillingMode.PROVISIONED)
+    .readCapacity(1)
+    .writeCapacity(1)
+    .build();</code></pre>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>What is Maven?</h4>
+          <p>Maven is a build tool for Java. It manages dependencies (downloading libraries your code needs), compiles your source code, runs tests, and packages everything into a JAR file. The <code>pom.xml</code> file describes your project and its dependencies.</p>
+          <p><strong>Key command:</strong> <code>mvn package</code> compiles the code and produces a JAR. For Lambda, we use the <code>maven-shade-plugin</code> to create a "fat JAR" &mdash; a single file containing your code and all its dependencies.</p>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>Google OAuth 2.0</h4>
+          <p>OAuth lets users sign in with their existing Google account instead of creating a new username/password. The flow: user clicks "Sign in with Google" &rarr; Google shows a consent screen &rarr; user approves &rarr; Google redirects back with an authorization code &rarr; Cognito exchanges it for tokens.</p>
+          <p><strong>Why Cognito + Google?</strong> Cognito handles the OAuth flow, token management, and JWT generation. We never see the user's Google password. We just get a JWT with a <code>sub</code> claim (a unique user identifier) that we use as the partition key in DynamoDB.</p>
+        </div>
+
+        <p>Created Google Cloud project "SyncDrop" with OAuth 2.0 credentials. In Testing mode, only specified test users can sign in &mdash; prevents strangers from using the app during development.</p>
+      </div>
+
+      <div class="journal-entry">
+        <div class="journal-date">2026-08-28 &mdash; Session 3 (continued)</div>
+        <h3>CDK Bootstrap &amp; Billing Alarm</h3>
+        <p>Ran <code>cdk bootstrap</code> which creates an S3 bucket that CDK uses to stage deployment assets (like Lambda JARs). This is a one-time setup per AWS account per region.</p>
+        <p>Created a $1 billing alarm via CloudWatch that sends an email alert if estimated charges exceed $1. This is the safety net &mdash; every cost ceiling in the infrastructure exists to keep the bill under this threshold.</p>
+
+        <div class="callout">
+          <strong>Gotcha:</strong> AWS CLI silent install (msiexec /quiet) fails with exit code 1603 on Windows &mdash; needs admin elevation. Download the MSI and run the GUI installer instead.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Day 2: Slice 1 &mdash; CDK Skeleton</h2>
+
+      <div class="journal-entry">
+        <div class="journal-date">2026-08-28 &mdash; Session 4</div>
+        <h3>The First Deploy</h3>
+        <p>Built the CDK stack with all the AWS resources. The goal: <code>cdk deploy</code> succeeds and the API returns 401 (because there's no auth yet).</p>
+
+        <h3>Where the code lives</h3>
+        <div class="data-table-wrap">
+          <table>
+            <thead><tr><th>File</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><strong>infra/src/.../InfraApp.java</strong></td><td>CDK entry point &mdash; creates the stack targeting account + region</td></tr>
+              <tr><td><strong>infra/src/.../SyncDropStack.java</strong></td><td>Defines all AWS resources: DynamoDB, S3, Lambda, API Gateway</td></tr>
+              <tr><td><strong>backend/src/.../ApiHandler.java</strong></td><td>Placeholder Lambda handler &mdash; returns {"status":"ok"}</td></tr>
+              <tr><td><strong>backend/pom.xml</strong></td><td>Backend dependencies: Lambda runtime, AWS SDK v2</td></tr>
+              <tr><td><strong>infra/pom.xml</strong></td><td>CDK dependencies: aws-cdk-lib</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>What is AWS Lambda?</h4>
+          <p>Lambda runs your code without managing servers. You upload a JAR, specify the handler class, and AWS runs it when triggered (in our case, by an API Gateway request). You pay only for execution time.</p>
+          <p><strong>Cold starts:</strong> The first invocation after a period of inactivity takes longer because AWS needs to set up the execution environment and load your JAR. SnapStart pre-initializes a snapshot of your function, reducing cold start time from ~5s to ~200ms for Java.</p>
+          <p><strong>Static clients:</strong> The DynamoDB and S3 SDK clients are declared as <code>static final</code> fields. They're initialized once when the Lambda container starts and reused across invocations &mdash; creating a new client per request would waste 200ms+ each time.</p>
+<pre><code>public class ApiHandler implements RequestHandler&lt;...&gt; {
+    // Created ONCE when the container starts, reused across invocations
+    private static final DynamoDbClient dynamoDb = DynamoDbClient.create();
+    private static final S3Client s3 = S3Client.create();
+
+    @Override
+    public APIGatewayProxyResponseEvent handleRequest(...) {
+        // This runs on every API request
+    }
+}</code></pre>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>REST API Gateway vs HTTP API</h4>
+          <p>AWS offers two types of API Gateway. We chose REST API because it supports <strong>usage plans</strong> with daily quotas (50,000 requests/day). HTTP API is cheaper and faster but doesn't have this feature.</p>
+          <p><strong>JWT Authorizer:</strong> API Gateway validates the Cognito JWT token before your Lambda even runs. Invalid tokens get a 401 immediately. This means your Lambda code never handles authentication &mdash; it just reads the user ID from the already-validated token.</p>
+        </div>
+
+        <div class="callout">
+          <strong>Gotcha:</strong> New AWS accounts have a Lambda concurrency limit of 10. Reserving 5 for our function would drop unreserved below the minimum of 10, causing the deploy to fail. Solution: deploy without reserved concurrency now, request a quota increase, then add it back.
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>How AI Agents Fit In</h4>
+          <p>This project is being built with AI coding agents (Claude, Codex). The workflow: the human writes the spec (PROJECT.md), then the agent writes the code in each session. PROGRESS.md is the handoff file &mdash; agents have no memory between sessions, so it records what's done, what's not, and gotchas encountered.</p>
+          <p><strong>Key pattern:</strong> The spec is the contract. The agent follows it exactly. If the agent thinks the spec is wrong (like the HTTP API / daily quota conflict), it flags it and stops rather than making a unilateral decision. The human decides.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Slice 2 &mdash; Cognito + Google Sign-In</h2>
+
+      <div class="journal-entry">
+        <div class="journal-date">2026-08-28 &mdash; Session 5</div>
+        <h3>Adding Authentication</h3>
+        <p>Added Cognito User Pool with Google as the identity provider, a Cognito authorizer on the REST API Gateway, and implemented <code>GET /v1/me</code> which creates a user profile on first sign-in and returns it on subsequent calls.</p>
+
+        <h3>What was deployed</h3>
+        <div class="data-table-wrap">
+          <table>
+            <thead><tr><th>Resource</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Cognito User Pool</strong></td><td>ap-south-1_FsQ2kedry</td></tr>
+              <tr><td><strong>App Client ID</strong></td><td>6n0hcghlc85skaml7ik45r539b</td></tr>
+              <tr><td><strong>Cognito Domain</strong></td><td>syncdrop.auth.ap-south-1.amazoncognito.com</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>Cognito User Pools</h4>
+          <p>A Cognito User Pool is a managed user directory. Instead of building your own user database, login forms, password reset, MFA, and session management, Cognito handles all of it. You configure identity providers (Google, Facebook, SAML, etc.) and Cognito issues JWTs.</p>
+          <p><strong>The flow:</strong> User clicks "Sign in with Google" &rarr; redirected to Cognito's hosted UI &rarr; Cognito handles the Google OAuth exchange &rarr; Cognito issues its own JWT tokens (id_token, access_token, refresh_token) &rarr; your frontend stores the tokens and sends them with API requests.</p>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>Cognito Authorizer on API Gateway</h4>
+          <p>A Cognito authorizer on REST API Gateway validates the JWT in the <code>Authorization</code> header before the request ever reaches Lambda. If the token is expired, malformed, or from the wrong user pool, API Gateway returns 401 immediately &mdash; Lambda never runs and you never pay for it.</p>
+          <p><strong>How Lambda gets user info:</strong> API Gateway passes the decoded JWT claims in <code>requestContext.authorizer.claims</code>. Lambda reads <code>claims.sub</code> for the user ID and <code>claims.email</code> for the email. The Lambda code never validates the token itself &mdash; that's already done.</p>
+<pre><code>// In the Lambda handler — the JWT is already validated by API Gateway
+Map&lt;String, String&gt; claims = request.getRequestContext()
+    .getAuthorizer().get("claims");
+String userId = claims.get("sub");    // unique, stable user ID
+String email = claims.get("email");   // from Google profile</code></pre>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>SSM Parameter Store for Secrets</h4>
+          <p>AWS Systems Manager Parameter Store is a free key-value store for configuration. We store the Google OAuth client ID and secret there instead of in code or environment variables. CDK reads them at deploy time and passes them to the Cognito configuration.</p>
+          <p><strong>Gotcha discovered:</strong> CloudFormation can't pass SSM SecureString parameters to all resource types (including Cognito identity providers). For this personal project, we store the Google secret as a plain String &mdash; it's still IAM-protected, and the secret alone is useless without the correct OAuth redirect URI registered in Google Console.</p>
+        </div>
+
+        <div class="concept">
+          <div class="concept-label">Interview Concept</div>
+          <h4>GET /v1/me &mdash; Auto-Create Pattern</h4>
+          <p>The <code>/v1/me</code> endpoint returns the user's profile. On first call, it creates the profile in DynamoDB using a conditional write (<code>attribute_not_exists(PK)</code>) to prevent race conditions from multiple devices signing in simultaneously. Subsequent calls just return the existing record.</p>
+          <p><strong>Why conditional write?</strong> If two devices sign in at the exact same moment, both would try to create the profile. The condition ensures only the first write succeeds &mdash; the second gets a <code>ConditionalCheckFailedException</code> and falls through to reading the existing profile.</p>
+        </div>
+
+        <h3>Still needed for Slice 2 completion</h3>
+        <p>The backend infrastructure is deployed. What remains: initialize the Next.js frontend with Google sign-in flow, call <code>GET /v1/me</code>, and display the user's email on screen. That completes the slice &mdash; "sign in on web, see your email."</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Build Order</h2>
+      <p>The project follows a vertical-slice approach. Each slice delivers a working feature end-to-end rather than building all the backend first, then all the frontend.</p>
+      <div class="data-table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Slice</th><th>Status</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><strong>CDK skeleton + cost ceilings</strong></td><td><span class="tag">DONE</span></td><td>cdk deploy succeeds, API responds</td></tr>
+            <tr><td>2</td><td><strong>Cognito + Google + GET /v1/me</strong></td><td><span class="tag">IN PROGRESS</span></td><td>Sign in on web, see your email</td></tr>
+            <tr><td>3</td><td><strong>Text items: POST / GET / DELETE</strong></td><td>&mdash;</td><td>Works in Postman</td></tr>
+            <tr><td>4</td><td><strong>Ugly web UI on slice 3</strong></td><td>&mdash;</td><td>Create and delete from browser</td></tr>
+            <tr><td>5</td><td><strong>/v1/sync + PWA</strong></td><td>&mdash;</td><td>Two devices show the same list</td></tr>
+            <tr><td>6</td><td><strong>File upload + quota</strong></td><td>&mdash;</td><td>25 MB PDF round-trips</td></tr>
+            <tr><td>7</td><td><strong>To-dos</strong></td><td>&mdash;</td><td>Check off on one device, updates on another</td></tr>
+            <tr><td>8</td><td><strong>UI polish</strong></td><td>&mdash;</td><td>Motion, dark mode, typography</td></tr>
+            <tr><td>9</td><td><strong>Ship</strong></td><td>&mdash;</td><td>Domain, audit, public repo</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    SyncDrop &mdash; Build journal &amp; design documentation. Updated as the project progresses.
+  </div>
+</div>
+
+<script>
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-selected', 'false');
+  });
+  document.getElementById('panel-' + id).classList.add('active');
+  const buttons = document.querySelectorAll('.nav button');
+  const map = { hld: 0, lld: 1, journal: 2 };
+  buttons[map[id]].classList.add('active');
+  buttons[map[id]].setAttribute('aria-selected', 'true');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
