@@ -4,13 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fifty Payment Requests Should Still Create One Charge | Daedalus Journal</title>
-    <meta name="description" content="An idempotency key turns an ambiguous network retry into a replay of one completed payment result.">
+    <meta name="description" content="A stable idempotency key turns an ambiguous retry into one durable payment result, but only when the business effect and result share an atomic boundary.">
     <meta name="author" content="Pratyush">
     <meta name="theme-color" content="#090b0b">
     <meta name="color-scheme" content="dark">
     <meta property="og:type" content="article">
     <meta property="og:title" content="Fifty Payment Requests Should Still Create One Charge">
-    <meta property="og:description" content="How one stable key turns uncertain payment retries into one durable result.">
+    <meta property="og:description" content="Why production idempotency needs one atomic business boundary, not only a Redis reservation.">
     <meta property="og:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/og.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -19,7 +19,7 @@
     <meta property="article:author" content="Pratyush">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Fifty Payment Requests Should Still Create One Charge">
-    <meta name="twitter:description" content="How one stable key turns uncertain payment retries into one durable result.">
+    <meta name="twitter:description" content="Why production idempotency needs one atomic business boundary, not only a Redis reservation.">
     <meta name="twitter:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/og.png">
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -192,7 +192,7 @@
         box-shadow: 0 30px 80px rgba(0, 0, 0, .28);
       }
       .claim-map::before {
-        content: "EXECUTABLE CLAIM";
+        content: "DEMO RESULT";
         display: block;
         margin-bottom: 1.4rem;
         color: var(--muted);
@@ -419,21 +419,21 @@
         <div>
           <p class="eyebrow">Distributed systems / Payments / Reliability</p>
           <h1>Fifty payment requests. <em>One charge.</em></h1>
-          <p class="dek">An idempotency key turns an ambiguous network retry into a replay of one completed payment result.</p>
+          <p class="dek">A stable key names one payment. Production safety comes from committing the charge and its result together.</p>
           <div class="meta">
             <span>By Pratyush</span>
             <time datetime="2026-08-31">31 August 2026</time>
-            <span>11 min read</span>
+            <span>8 min read</span>
           </div>
         </div>
 
-        <div class="claim-map" role="img" aria-label="Fifty matching payment attempts enter one atomic reservation. One owner creates a charge and forty nine callers replay the stored result.">
+        <div class="claim-map" role="img" aria-label="In the simplified demo, fifty matching payment attempts enter one reservation. One owner creates a charge and forty nine callers replay the stored result.">
           <div class="path-node">
-            <strong>50 payment attempts</strong>
+            <strong>50 demo attempts</strong>
             <span>same key / same payload</span>
           </div>
           <div class="path-node is-accent">
-            <strong>Atomic reservation</strong>
+            <strong>Demo reservation</strong>
             <span>one caller becomes owner</span>
           </div>
           <div class="result-row">
@@ -458,13 +458,13 @@
           </div>
           <div class="quick-card">
             <span class="quick-label">The mechanism</span>
-            <strong>One key names one business intention.</strong>
-            <p>Matching retries recall the winning status and body.</p>
+            <strong>Commit the charge and result together.</strong>
+            <p>One database transaction creates one durable history.</p>
           </div>
           <div class="quick-card">
             <span class="quick-label">The limit</span>
-            <strong>Redis cannot transact an external ledger.</strong>
-            <p>The crash window still needs durable recovery.</p>
+            <strong>Redis reservation alone is insufficient.</strong>
+            <p>External providers must receive the same stable key.</p>
           </div>
         </div>
 
@@ -473,7 +473,8 @@
           <ol>
             <li><a href="#obvious-handler">The obvious handler</a></li>
             <li><a href="#retry-question">A retry is a question</a></li>
-            <li><a href="#reserve-first">Reserve the key first</a></li>
+            <li><a href="#production-transaction">Commit both facts together</a></li>
+            <li><a href="#external-provider">Forward the provider key</a></li>
             <li><a href="#same-answer">Replay the same answer</a></li>
             <li><a href="#crash-window">Expose the crash window</a></li>
             <li><a href="#general-lesson">The general lesson</a></li>
@@ -539,33 +540,38 @@ different key                → a new intention</code></pre>
           <p>That is why the server stores a request fingerprint beside the result. A key identifies the operation. The fingerprint proves that later attempts still describe it.</p>
         </section>
 
-        <section class="section" id="reserve-first">
-          <p class="section-label">05 / Atomic ownership</p>
-          <h2>Reserve the Key Before Touching the Ledger</h2>
-          <p>Checking for a key and then inserting it is not enough. Two workers can both observe absence before either writes. The claim depends on an atomic reservation.</p>
-          <pre data-lang="race"><code>worker A: key absent ─┐
-worker B: key absent ─┼→ both charge
-worker A: store key  ─┤
-worker B: store key  ─┘</code></pre>
-          <p>Redis expresses the reservation as a conditional write. The repository’s Redis adapter uses <code>NX</code> so only one caller creates the processing marker, plus a time to live so abandoned state eventually expires.</p>
-          <pre data-lang="redis"><code>SET idempotency:&lt;key&gt; &lt;processing-record&gt; NX PX &lt;ttl&gt;</code></pre>
-          <p>The winner is allowed to touch the ledger. Every loser must inspect or await the record instead of starting another charge.</p>
+        <section class="section" id="production-transaction">
+          <p class="section-label">05 / Production protection</p>
+          <h2>Production Commits the Charge and Result Together</h2>
+          <p>If the service owns the ledger database, the protection is one database transaction. The transaction claims the unique key, creates the charge, and records the response. Either every fact commits or none does.</p>
+          <pre data-lang="sql"><code>BEGIN;
+INSERT INTO idempotency_keys(key, fingerprint, state)
+VALUES (:key, :hash, 'processing');
+INSERT INTO charges(id, amount_cents, currency)
+VALUES (:charge_id, :amount, :currency);
+UPDATE idempotency_keys
+SET state = 'completed', status = 201, body = :response
+WHERE key = :key;
+COMMIT;</code></pre>
+          <p>The key column must be unique. A concurrent insert loses before it can create another charge. The losing request reads the committed row and returns its result.</p>
+          <pre data-lang="outcome"><code>transaction commits     → charge exists + result exists
+transaction rolls back  → neither fact exists
+state the design forbids → charge exists alone</code></pre>
+          <p>This is the protection Redis reservation alone cannot provide when Redis and the ledger are separate systems.</p>
         </section>
 
-        <section class="section" id="owner">
-          <p class="section-label">06 / State machine</p>
-          <h2>The First Request Owns the Work</h2>
-          <p>The repository models three useful stored states: missing, processing, and completed. Payload mismatch is a decision made while reading either stored state.</p>
-          <pre data-lang="states"><code>MISSING    --reserve--&gt; PROCESSING
-PROCESSING --commit---&gt; COMPLETED
-COMPLETED  --retry----&gt; COMPLETED</code></pre>
-          <p>Only the transition from missing to processing grants ownership. The owner token prevents an old worker from overwriting a record acquired later after expiration.</p>
-          <pre data-lang="decision"><code>reserve(key, fingerprint)
-    acquired    → create the charge
-    in progress → wait for the owner
-    completed   → replay the result
-    mismatch    → reject the request</code></pre>
-          <p>This state machine is the core of the demo. The local adapter uses an atomic map operation. The Redis adapter uses conditional set and a compare and set script. Both express the same ownership rule.</p>
+        <section class="section" id="external-provider">
+          <p class="section-label">06 / External charging</p>
+          <h2>An External Provider Must Receive the Same Key</h2>
+          <p>Sometimes the service does not own the final charging transaction. Stripe or another provider does. The local service cannot wrap its database and the provider ledger in one transaction, so it must carry the same stable idempotency key across that boundary.</p>
+          <pre data-lang="http"><code>POST /v1/payment_intents
+Idempotency-Key: order-cart-alpha
+
+amount=&lt;amount&gt;&amp;currency=usd</code></pre>
+          <p>The provider recognizes repeated attempts as one named operation. The local database stores that provider result under the same key so later requests can replay it without calling the provider again.</p>
+          <pre data-lang="paths"><code>owned ledger      → charge + result in one database transaction
+external provider → forward the same key + persist provider result</code></pre>
+          <p>The stable identity must survive every hop that could repeat the business effect.</p>
         </section>
 
         <section class="section" id="same-answer">
@@ -601,13 +607,13 @@ fingerprint       = SHA-256(canonical request)</code></pre>
         <section class="section" id="concurrent-policy">
           <p class="section-label">09 / Concurrency policy</p>
           <h2>Concurrent Duplicates Need an Explicit Policy</h2>
-          <p>The demo makes concurrent duplicates wait for the owner, then replays the completed result. This makes the single effect property easy to observe in one burst.</p>
-          <pre data-lang="fan in"><code>50 callers → one owner → one charge
-           ↘ 49 waiters → one stored response</code></pre>
+          <p>The demo makes concurrent duplicates wait for the owner, then replays the completed result. This makes the local property easy to observe.</p>
+          <pre data-lang="fan in"><code>50 demo callers → one owner → one charge
+                ↘ 49 waiters → one stored response</code></pre>
           <p>That behavior should not be attributed to Stripe. Stripe’s <a href="https://docs.stripe.com/api/idempotent_requests">API reference</a> says a request that conflicts with another request executing concurrently is not saved as an idempotent result because endpoint execution did not begin. The caller can retry after the conflict.</p>
           <pre data-lang="comparison"><code>this demo: concurrent duplicate → wait, then replay
 Stripe docs: concurrent conflict → retryable conflict
-shared property: one key must not authorize duplicate work</code></pre>
+shared rule: one key names one operation</code></pre>
           <p>The transport policy can differ while the business invariant remains the same.</p>
         </section>
 
@@ -626,34 +632,34 @@ after expiration: same key → no record exists</code></pre>
         </section>
 
         <section class="section" id="transaction-boundary">
-          <p class="section-label">11 / System boundary</p>
-          <h2>Redis Coordinates but Cannot Transact the World</h2>
-          <p>Redis can choose one owner and hold the response. It cannot automatically join the transaction of an unrelated payment ledger. There are still two durable facts to write.</p>
+          <p class="section-label">11 / Demo boundary</p>
+          <h2>Redis Coordinates the Demo, Not the Ledger</h2>
+          <p>The repository uses an atomic in memory store by default and includes a Redis adapter using <code>SET NX PX</code>. Those stores can choose one owner and hold a response. They cannot automatically join a transaction in an unrelated payment ledger.</p>
           <pre data-lang="facts"><code>fact A: the charge exists in the ledger
 fact B: the idempotency result exists in Redis</code></pre>
-          <p>Conditional set makes ownership atomic inside Redis. The compare and set completion script prevents the wrong owner from replacing the marker. Neither operation commits the external ledger write.</p>
-          <pre data-lang="boundary"><code>Redis transaction boundary  | reservation + stored response
-Ledger transaction boundary | monetary side effect
-                             | ← gap remains</code></pre>
-          <p>Calling that gap “exactly once” does not close it. The implementation has to recover across it.</p>
+          <p>When those facts live in separate systems, conditional reservation narrows the race but leaves a crash gap.</p>
+          <pre data-lang="tradeoff"><code>separate stores → crash gap → reconciliation work
+      ↑                              ↓
+      └────── lost certainty ────────┘</code></pre>
+          <p>Redis is useful coordination. It is not a substitute for an atomic business boundary.</p>
         </section>
 
         <section class="section" id="crash-window">
           <p class="section-label">12 / Honest failure</p>
-          <h2>The Crash Window Is the Honest Part</h2>
-          <p>The most important adversarial test crashes after the ledger creates the charge but before the response is stored. The handler removes its abandoned reservation. A retry acquires the key and creates another charge.</p>
-          <pre data-lang="failure"><code>reserve → charge committed → CRASH → response never stored
-retry   → reserve again     → second charge</code></pre>
-          <p>The passing test asserts that two charges appear in this deliberately broken case. That is not a celebration of failure. It is executable documentation of the boundary a Redis only pattern cannot cross.</p>
+          <h2>The Crash Window Defines the Demo’s Limit</h2>
+          <p>The most important adversarial test crashes after the demo ledger creates the charge but before the response is stored. A retry acquires the abandoned key and creates another charge.</p>
+          <pre data-lang="failure"><code>reserve → charge committed → CRASH → result not stored
+retry   → reserve again     → second demo charge</code></pre>
+          <p>The passing test deliberately reports two charges in this broken ordering.</p>
           <pre data-lang="limit"><code>SETNX prevents simultaneous owners.
 SETNX does not atomically commit an external side effect.</code></pre>
-          <p>A credible demo should expose where its guarantee ends. Hiding the crash window would teach a stronger claim than the code can support.</p>
+          <p>That test documents a limit. It does not prove production crash safety. Production needs the shared database transaction or stable provider key described earlier.</p>
         </section>
 
         <section class="section" id="measurement">
-          <p class="section-label">13 / Executable evidence</p>
-          <h2>The Measurement Should Assert a Property</h2>
-          <p>This topic is about correctness, so the benchmark does not pretend that local latency generalizes. It fires real concurrent HTTP requests and counts business effects.</p>
+          <p class="section-label">13 / Demo evidence</p>
+          <h2>The Demo Measures One Property</h2>
+          <p>The repository fires real concurrent HTTP requests and counts local business effects.</p>
           <div class="benchmark" aria-label="Benchmark result">
             <div class="metric">
               <span>Naive mode</span>
@@ -669,20 +675,16 @@ SETNX does not atomically commit an external side effect.</code></pre>
           <pre data-lang="result"><code>mode              requests  successes  charges  replays
 naive                   50         50       50        0
 idempotency_key         50         50        1       49</code></pre>
-          <p>Those values came from the companion repository’s <code>benchmark.csv</code>, produced by the default Java run. Every caller received a successful response. The difference was the number of ledger writes.</p>
-          <pre data-lang="csv"><code>mode,requests,successful_responses,created_charges,replayed_responses
-naive,50,50,50,0
-idempotency_key,50,50,1,49</code></pre>
-          <p>The property can be stated without a stopwatch.</p>
-          <pre data-lang="invariant"><code>created_charges(idempotent burst) = 1
-response_bodies(unique)           = 1</code></pre>
-          <p>That is stronger evidence for the article’s claim than a fragile speed comparison on one laptop.</p>
+          <p>Those values came from the companion repository’s <code>benchmark.csv</code>. Every caller received a successful response. The idempotent demo created one charge and replayed the same body to the other callers.</p>
+          <pre data-lang="scope"><code>demo property: created_charges(idempotent burst) = 1
+demo limit:    crash after ledger write can duplicate</code></pre>
+          <p>This is evidence for the demo’s concurrent reservation behavior. It is not evidence that two separate production systems commit atomically.</p>
         </section>
 
-        <section class="section" id="state-machine">
-          <p class="section-label">14 / Small mechanism</p>
-          <h2>The Dumb Version Fits in One State Machine</h2>
-          <p>The core handler is small. Reserve the key. Branch on the stored state. Only the owner calls the ledger. Then store the response.</p>
+        <section class="section" id="build-one">
+          <p class="section-label">14 / Build one</p>
+          <h2>Build the Dumb Version Yourself</h2>
+          <p>The simplified handler remains small. It reserves the key, branches on stored state, and lets only the owner call the demo ledger.</p>
           <pre data-lang="java"><code>Decision decision = store.reserve(key, fingerprint, ttl);
 return switch (decision.state()) {
     case COMPLETED -&gt; replay(decision.response());
@@ -690,30 +692,18 @@ return switch (decision.state()) {
     case IN_PROGRESS -&gt; awaitOwner(key, fingerprint);
     case ACQUIRED -&gt; chargeAndStore(decision.owner());
 };</code></pre>
-          <p>The complexity is not in syntax. It is in choosing the state boundary, keeping request identity stable, and specifying crash behavior.</p>
-          <pre data-lang="review"><code>mechanism code: reservation + fingerprint + replay
-evidence:       property tests + CSV
-honesty:        crash test + Limits section</code></pre>
-          <p>Small code is useful here because every branch corresponds to a claim a reviewer can challenge.</p>
-        </section>
-
-        <section class="section" id="build-one">
-          <p class="section-label">15 / Build one</p>
-          <h2>Build the Dumb Version Yourself</h2>
-          <p>Run the whole experiment with one command. Java starts a local HTTP server, launches concurrent clients, prints the result, and writes the CSV.</p>
-          <pre data-lang="bash"><code>./gradlew run</code></pre>
-          <p>Then implement it again without copying the store. The task list is short enough to hold in your head.</p>
-          <pre data-lang="checklist"><code>[ ] name one business intention with one key
-[ ] atomically reserve that key
+          <p>Then build the production boundary deliberately.</p>
+          <pre data-lang="checklist"><code>[ ] name one intention with one stable key
 [ ] fingerprint every effect changing field
-[ ] persist the winning status and body
+[ ] commit the charge and result in one transaction
+[ ] forward the same key to an external provider
 [ ] replay matches and reject mismatches
-[ ] expire records under an explicit contract</code></pre>
-          <p>Add Redis only after the in memory state machine is correct. Infrastructure cannot repair an ambiguous protocol.</p>
+[ ] define retention and recovery contracts</code></pre>
+          <p>The repository stops before the shared transaction. Its value is making that boundary visible.</p>
         </section>
 
         <section class="section" id="break-it">
-          <p class="section-label">16 / Adversarial proof</p>
+          <p class="section-label">15 / Adversarial proof</p>
           <h2>Then Break It</h2>
           <p>Correctness claims become interesting under adversarial orderings. The repository turns each research question into a real test.</p>
           <pre data-lang="test plan"><code>same key, 50 simultaneous attempts
@@ -724,29 +714,16 @@ same key, expired record
 crash after ledger write</code></pre>
           <p>The first tests defend the useful property. The last test defines its limit. Run them whenever the reservation or storage code changes.</p>
           <pre data-lang="bash"><code>./gradlew test</code></pre>
-          <p>If the crash test unexpectedly reports one charge, inspect why. You may have genuinely introduced a shared transaction, or you may only have stopped simulating the dangerous ordering.</p>
-        </section>
-
-        <section class="section" id="production-recovery">
-          <p class="section-label">17 / Durable recovery</p>
-          <h2>Production Adds Recovery, Not Magic</h2>
-          <p>There are several honest ways to close or manage the crash gap. Put the idempotency record and charge in the same database transaction. Write a durable command first and let one worker apply it. Or reconcile incomplete records against a ledger whose own operation identifier is unique.</p>
-          <pre data-lang="options"><code>option A: idempotency row + ledger row in one transaction
-option B: durable command → worker → durable result
-option C: unique operation ID inside the ledger itself</code></pre>
-          <p>Each choice changes availability, storage, and operational recovery. None removes the need to decide what an in progress record means after its owner disappears.</p>
-          <pre data-lang="questions"><code>reservation answers: who may start?
-recovery answers:    what already happened?</code></pre>
-          <p>That second question is where production reliability lives.</p>
+          <p>For a production implementation, add a test that kills the process before commit and verifies that both the charge and result roll back together. For an external provider, assert that every retry forwards the identical key.</p>
         </section>
 
         <section class="section" id="general-lesson">
-          <p class="section-label">18 / The part that generalizes</p>
+          <p class="section-label">16 / The part that generalizes</p>
           <h2>The General Lesson Is Reconciliation</h2>
           <p>Idempotency is often introduced as duplicate suppression. That description is too small. The mechanism reconciles two parties after communication becomes ambiguous: the client retains the name of its intention, and the server retains the result associated with that name.</p>
           <pre data-lang="mental model"><code>wrong model: a retry is another request to perform work
 right model: a retry asks for the result of named work</code></pre>
-          <p>The same idea appears anywhere delivery can repeat while effects must not: provisioning, order creation, job submission, and message handling. The transport may deliver again. The business operation still needs a stable identity.</p>
+          <p>The same idea appears anywhere delivery can repeat while effects must not: provisioning, order creation, job submission, and message handling. The transport may deliver again. The business operation still needs a stable identity and an atomic place where history becomes true.</p>
           <p class="closing">The safest retry is not the one that guesses whether the first call failed. It is the one that never needs to guess.</p>
         </section>
 
@@ -754,7 +731,7 @@ right model: a retry asks for the result of named work</code></pre>
           <p class="source-label">Sources and evidence</p>
           <p>Primary source: Stripe’s engineering article, <a href="https://stripe.com/blog/idempotency">Designing robust and predictable APIs with idempotency</a>.</p>
           <p>Primary source: Stripe’s <a href="https://docs.stripe.com/api/idempotent_requests">idempotent request documentation</a> and <a href="https://docs.stripe.com/error-low-level#idempotency">low level error guidance</a>.</p>
-          <p>Original evidence: the companion Java repository’s test suite and <code>benchmark.csv</code>. The benchmark values were verified before publication. Latency is intentionally excluded because correctness is the claim under test.</p>
+          <p>Original evidence: the companion Java repository’s test suite and <code>benchmark.csv</code>. The measured result describes the simplified demo. It does not prove crash safety across separate production systems.</p>
         </aside>
 
         <footer class="article-footer">
