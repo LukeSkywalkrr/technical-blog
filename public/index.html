@@ -82,7 +82,7 @@
             <span class="eyebrow-dot" aria-hidden="true"></span>
             Engineering field notes
             <span aria-hidden="true">/</span>
-            13 deep dives
+            14 deep dives
           </p>
 
           <h1 id="hero-title">
@@ -101,7 +101,7 @@
                 <path d="M4 9h10M10 5l4 4-4 4"></path>
               </svg>
             </a>
-            <a class="text-link" href="articles/idempotency-keys.html">
+            <a class="text-link" href="articles/full-jitter-retry-storms.html">
               Read the latest
               <span aria-hidden="true">↗</span>
             </a>
@@ -109,11 +109,11 @@
 
           <dl class="hero-facts" aria-label="Journal at a glance">
             <div>
-              <dt>13</dt>
+              <dt>14</dt>
               <dd>Deep dives</dd>
             </div>
             <div>
-              <dt>203</dt>
+              <dt>210</dt>
               <dd>Minutes of reading</dd>
             </div>
             <div>
@@ -209,7 +209,7 @@
         <a href="#articles" data-topic-jump="system-design">
           <span>01</span>
           System design
-          <small>10 notes</small>
+          <small>11 notes</small>
         </a>
         <a href="#articles" data-topic-jump="payments">
           <span>02</span>
@@ -245,8 +245,8 @@
           <button class="filter-button" type="button" data-filter="payments" aria-pressed="false">Payments</button>
           <button class="filter-button" type="button" data-filter="database" aria-pressed="false">Databases</button>
           <button class="filter-button" type="button" data-filter="protocols" aria-pressed="false">Protocols</button>
-          <span class="filter-count" data-filter-count>13 notes</span>
-          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 13 notes</span>
+          <span class="filter-count" data-filter-count>14 notes</span>
+          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 14 notes</span>
         </div>
 
         <article class="featured-story reveal" data-article data-categories="system-design">
@@ -294,6 +294,21 @@
         </article>
 
         <div class="article-grid">
+          <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #d98272;">
+            <div class="card-topline">
+              <span>Retry engineering</span>
+              <span>7 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--files" aria-hidden="true">
+              <span>Burst</span><i></i><strong>Jitter</strong><i></i><span>Spread</span>
+              <small>fail · randomize · recover</small>
+            </div>
+            <p class="card-number">14 / 14</p>
+            <h3><a href="articles/full-jitter-retry-storms.html">Random Waits Cut Retry Work by 67.13%</a></h3>
+            <p>How one bounded random window breaks shared retry clocks, reduces repeated collisions, and exposes the difference between less work and faster completion.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
+
           <article class="article-card reveal" data-article data-categories="system-design payments" style="--card-accent: #d6b879;">
             <div class="card-topline">
               <span>Payments reliability</span>
