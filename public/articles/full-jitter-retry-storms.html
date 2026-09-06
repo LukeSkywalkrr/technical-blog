@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Random Waits Cut Retry Work by 67.13% | Daedalus Journal</title>
+    <meta name="description" content="A deterministic Spring Boot benchmark shows why capped exponential backoff needs full jitter when clients fail together.">
+    <meta name="author" content="Pratyush">
+    <meta name="theme-color" content="#090b0b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Random Waits Cut Retry Work by 67.13%">
+    <meta property="og:description" content="How full jitter breaks synchronized retry clocks and reduces work under contention.">
+    <meta property="og:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Daedalus Journal, systems explained from the inside out">
+    <meta property="article:published_time" content="2026-09-06">
+    <meta property="article:author" content="Pratyush">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Random Waits Cut Retry Work by 67.13%">
+    <meta name="twitter:description" content="How full jitter breaks synchronized retry clocks and reduces work under contention.">
+    <meta name="twitter:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/og.png">
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --ink: #f4f1ea;
+        --muted: #9d9890;
+        --soft: #c9c4ba;
+        --page: #090b0b;
+        --panel: #101413;
+        --panel-2: #151a18;
+        --line: #2a302e;
+        --gold: #d6b879;
+        --teal: #73d8c5;
+        --red: #d98272;
+        --sans: "IBM Plex Sans", system-ui, sans-serif;
+        --serif: "Newsreader", Georgia, serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 14% 8%, rgba(115, 216, 197, .08), transparent 28rem),
+          radial-gradient(circle at 86% 22%, rgba(214, 184, 121, .08), transparent 32rem),
+          var(--page);
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 1.08rem;
+        line-height: 1.76;
+        overflow-x: hidden;
+      }
+
+      a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: .2em; }
+      a:hover { color: var(--ink); }
+      a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+      .skip-link {
+        position: fixed;
+        left: 1rem;
+        top: -6rem;
+        z-index: 100;
+        padding: .65rem .85rem;
+        background: var(--gold);
+        color: #111;
+        font: 600 .82rem/1 var(--sans);
+      }
+      .skip-link:focus { top: 1rem; }
+      .progress {
+        position: fixed;
+        inset: 0 auto auto 0;
+        z-index: 80;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, var(--teal), var(--gold));
+        transform: scaleX(0);
+        transform-origin: left;
+      }
+      .masthead {
+        position: sticky;
+        top: 0;
+        z-index: 60;
+        border-bottom: 1px solid rgba(214, 184, 121, .15);
+        background: rgba(9, 11, 11, .9);
+        backdrop-filter: blur(18px);
+      }
+      .nav-shell {
+        width: min(1120px, calc(100% - 2rem));
+        min-height: 4.4rem;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: .7rem;
+        color: var(--ink);
+        text-decoration: none;
+        font-family: var(--sans);
+      }
+      .brand-mark {
+        width: 2.2rem;
+        height: 2.2rem;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--gold);
+        color: var(--gold);
+      }
+      .brand-mark svg { width: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.4; }
+      .brand-copy { display: grid; line-height: 1.05; }
+      .brand-copy strong { font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; }
+      .brand-copy small { color: var(--muted); font-size: .64rem; letter-spacing: .08em; }
+      .nav-link { color: var(--soft); font: 500 .8rem/1 var(--sans); text-decoration: none; }
+
+      main { display: block; }
+      .hero {
+        width: min(1120px, calc(100% - 2rem));
+        margin: 0 auto;
+        padding: clamp(4rem, 9vw, 8rem) 0 clamp(3rem, 7vw, 6rem);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, .55fr);
+        gap: clamp(2.5rem, 7vw, 7rem);
+        align-items: end;
+      }
+      .eyebrow, .section-label, .meta, .quick-label, .source-label {
+        font-family: var(--sans);
+        text-transform: uppercase;
+        letter-spacing: .12em;
+      }
+      .eyebrow { margin: 0 0 1.2rem; color: var(--teal); font-size: .72rem; font-weight: 600; }
+      h1 {
+        max-width: 13ch;
+        margin: 0;
+        font-family: var(--serif);
+        font-size: clamp(3.15rem, 8vw, 6.7rem);
+        font-weight: 500;
+        letter-spacing: -.055em;
+        line-height: .92;
+        text-wrap: balance;
+      }
+      h1 em { color: var(--gold); font-weight: 400; }
+      .dek { max-width: 42rem; margin: 1.7rem 0 0; color: var(--soft); font-size: clamp(1.2rem, 2vw, 1.45rem); line-height: 1.42; }
+      .meta { display: flex; flex-wrap: wrap; gap: .55rem 1rem; margin-top: 1.7rem; color: var(--muted); font-size: .68rem; }
+      .meta span + span::before, .meta time + span::before { content: "·"; margin-right: 1rem; color: var(--gold); }
+
+      .claim-map {
+        min-height: 25rem;
+        padding: 1.2rem;
+        border: 1px solid var(--line);
+        background: linear-gradient(145deg, rgba(21, 26, 24, .95), rgba(10, 13, 12, .95));
+        box-shadow: 0 30px 80px rgba(0, 0, 0, .28);
+      }
+      .claim-map::before {
+        content: "EXECUTABLE CLAIM";
+        display: block;
+        margin-bottom: 1.4rem;
+        color: var(--muted);
+        font: 600 .62rem/1 var(--mono);
+        letter-spacing: .14em;
+      }
+      .path-node { position: relative; padding: 1rem; border: 1px solid var(--line); background: var(--panel); }
+      .path-node + .path-node { margin-top: 2.2rem; }
+      .path-node + .path-node::before { content: "↓"; position: absolute; left: 50%; top: -2rem; color: var(--gold); transform: translateX(-50%); }
+      .path-node strong { display: block; font: 600 1rem/1.2 var(--sans); }
+      .path-node span { display: block; margin-top: .3rem; color: var(--muted); font: .75rem/1.5 var(--mono); }
+      .path-node.is-accent { border-color: rgba(115, 216, 197, .7); }
+      .path-node.is-result { border-color: rgba(214, 184, 121, .75); }
+
+      .article-shell { width: min(780px, calc(100% - 2rem)); margin: 0 auto; padding-bottom: 5rem; }
+      .quick-take { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin-bottom: 2rem; }
+      .quick-card { min-height: 9rem; padding: 1rem; border-top: 1px solid var(--gold); background: var(--panel); }
+      .quick-label { display: block; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .quick-card strong { display: block; margin-top: .65rem; font: 500 1.08rem/1.35 var(--serif); }
+      .quick-card p { margin: .5rem 0 0; color: var(--muted); font: .77rem/1.5 var(--sans); }
+      .evidence-figure { margin: 0 0 3.5rem; padding: .7rem; border: 1px solid var(--line); background: #111; }
+      .evidence-figure img { display: block; width: 100%; height: auto; }
+      .evidence-figure figcaption { padding: .75rem .35rem .15rem; color: var(--muted); font: .72rem/1.5 var(--sans); }
+      .toc { margin: 0 0 4rem; padding: 1.2rem 1.3rem; border: 1px solid var(--line); background: rgba(16, 20, 19, .75); }
+      .toc p { margin: 0 0 .75rem; color: var(--muted); font: 600 .65rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; }
+      .toc ol { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1.25rem; list-style: none; counter-reset: toc; }
+      .toc li { counter-increment: toc; }
+      .toc a { color: var(--soft); font: .78rem/1.35 var(--sans); text-decoration: none; }
+      .toc a::before { content: counter(toc, decimal-leading-zero) "  "; color: var(--gold); font-family: var(--mono); }
+
+      .section { padding: 3.5rem 0 1rem; scroll-margin-top: 5rem; }
+      .section + .section { border-top: 1px solid var(--line); }
+      .section-label { margin: 0 0 .8rem; color: var(--teal); font-size: .64rem; font-weight: 600; }
+      h2 { margin: 0 0 1.35rem; font-family: var(--serif); font-size: clamp(2rem, 5vw, 3.15rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
+      p { margin: 0; }
+      .section p + p { margin-top: 1.15rem; }
+      .section > p:first-of-type { color: var(--soft); font-size: 1.18rem; line-height: 1.65; }
+      code { font-family: var(--mono); }
+      p code { padding: .08em .3em; border: 1px solid var(--line); background: var(--panel-2); color: var(--gold); font-size: .82em; }
+      pre { position: relative; margin: 1.55rem 0; padding: 1.25rem; overflow-x: auto; border: 1px solid var(--line); border-left: 3px solid var(--gold); background: #070908; color: #ddd9d0; font: .78rem/1.68 var(--mono); tab-size: 2; }
+      pre[data-lang]::before { content: attr(data-lang); display: block; margin-bottom: .75rem; color: var(--muted); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; }
+      .callout { margin: 1.7rem 0; padding: 1.25rem; border-left: 3px solid var(--teal); background: rgba(115, 216, 197, .065); }
+      .callout strong { display: block; margin-bottom: .35rem; color: var(--teal); font: 600 .68rem/1.2 var(--sans); letter-spacing: .1em; text-transform: uppercase; }
+      .benchmark { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin: 1.7rem 0; }
+      .metric { padding: 1.1rem; border: 1px solid var(--line); background: var(--panel); }
+      .metric span { display: block; color: var(--muted); font: .65rem/1.2 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
+      .metric strong { display: block; margin-top: .45rem; color: var(--gold); font: 500 2rem/1 var(--serif); }
+      .metric small { display: block; margin-top: .45rem; color: var(--soft); font: .68rem/1.4 var(--mono); }
+      .closing { margin-top: 1.8rem; padding: 1.4rem; border: 1px solid var(--gold); color: var(--gold); font-size: 1.45rem; line-height: 1.35; }
+      .sources { margin-top: 4rem; padding: 1.35rem; border: 1px solid var(--line); background: var(--panel); }
+      .source-label { margin: 0 0 .7rem; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .sources p { color: var(--muted); font: .78rem/1.65 var(--sans); }
+      .sources p + p { margin-top: .6rem; }
+      .article-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--line); color: var(--muted); font: .73rem/1.5 var(--sans); }
+      .copy-button { padding: .55rem .75rem; border: 1px solid var(--line); background: var(--panel); color: var(--soft); cursor: pointer; font: 500 .72rem/1 var(--sans); }
+
+      @media (max-width: 820px) {
+        .hero { grid-template-columns: 1fr; }
+        .claim-map { min-height: auto; }
+      }
+      @media (max-width: 620px) {
+        body { font-size: 1rem; }
+        .brand-copy small { display: none; }
+        .quick-take, .toc ol, .benchmark { grid-template-columns: 1fr; }
+        .quick-card { min-height: auto; }
+        .meta span + span::before, .meta time + span::before { content: none; }
+        h1 { font-size: clamp(3rem, 16vw, 4.8rem); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#article">Skip to article</a>
+    <div class="progress" data-progress aria-hidden="true"></div>
+
+    <header class="masthead">
+      <div class="nav-shell">
+        <a class="brand" href="../index.html" aria-label="Daedalus Journal home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 42" role="presentation">
+              <path d="M8 31.5 21 7l13 24.5M12.5 26h17M16 19.5h10"></path>
+              <path d="M8.5 31.5h25"></path>
+            </svg>
+          </span>
+          <span class="brand-copy">
+            <strong>Daedalus</strong>
+            <small>Engineering journal</small>
+          </span>
+        </a>
+        <a class="nav-link" href="../index.html#articles">All articles</a>
+      </div>
+    </header>
+
+    <main id="article">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Distributed systems / Reliability / Retries</p>
+          <h1>Random waits cut retry work <em>by 67.13%.</em></h1>
+          <p class="dek">Full jitter turns one synchronized retry clock into a bounded distribution of independent arrivals.</p>
+          <div class="meta">
+            <span>By Pratyush</span>
+            <time datetime="2026-09-06">6 September 2026</time>
+            <span>7 min read</span>
+          </div>
+        </div>
+
+        <div class="claim-map" role="img" aria-label="One hundred clients fail together. Full jitter gives each client an independent delay. The local benchmark averages 796.24 attempts.">
+          <div class="path-node">
+            <strong>100 clients fail together</strong>
+            <span>same row / same starting clock</span>
+          </div>
+          <div class="path-node is-accent">
+            <strong>Full jitter samples a window</strong>
+            <span>independent bounded delay</span>
+          </div>
+          <div class="path-node is-result">
+            <strong>796.24 attempts</strong>
+            <span>local deterministic average</span>
+          </div>
+        </div>
+      </header>
+
+      <article class="article-shell">
+        <div class="quick-take" aria-label="Quick take">
+          <div class="quick-card">
+            <span class="quick-label">The failure</span>
+            <strong>Identical delays preserve the crowd.</strong>
+            <p>Clients remain synchronized across repeated failures.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The mechanism</span>
+            <strong>The delay becomes a random window.</strong>
+            <p>Independent samples spread the next arrivals.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The limit</span>
+            <strong>Timing cannot make retries safe.</strong>
+            <p>Idempotency and retry budgets remain separate requirements.</p>
+          </div>
+        </div>
+
+        <figure class="evidence-figure">
+          <img src="../assets/full-jitter-retry-storms.png" width="1980" height="1904" loading="lazy" alt="A retry burst enters a full jitter pipeline. Each client samples a bounded random delay before retrying a contended conditional write. The result is aggregated into a CSV.">
+          <figcaption>The measured mechanism, from synchronized failure through independent retry windows to the local CSV.</figcaption>
+        </figure>
+
+        <nav class="toc" aria-label="Article contents">
+          <p>Trace the retry storm and the fix</p>
+          <ol>
+            <li><a href="#obvious-loop">The obvious loop</a></li>
+            <li><a href="#shared-clocks">Shared retry clocks</a></li>
+            <li><a href="#full-jitter">The random window</a></li>
+            <li><a href="#benchmark">Executable evidence</a></li>
+            <li><a href="#break-it">Adversarial tests</a></li>
+            <li><a href="#general-lesson">The general lesson</a></li>
+          </ol>
+        </nav>
+
+        <section class="section" id="obvious-loop">
+          <p class="section-label">01 / The naive solution</p>
+          <h2>The Obvious Retry Loop Waits Longer</h2>
+          <p>The first implementation is almost embarrassingly reasonable. A request fails, so the client waits. Repeated failures increase the delay until a cap prevents absurd sleeps.</p>
+          <pre data-lang="java"><code>while (!request()) {
+    long ceiling = Math.min(capMillis, baseMillis * (1L &lt;&lt; attempt));
+    Thread.sleep(ceiling);
+    attempt++;
+}</code></pre>
+          <p>Each client becomes less aggressive over time. That sounds like exactly what an overloaded dependency needs.</p>
+          <pre data-lang="local view"><code>one failed client
+      ↓
+wait longer
+      ↓
+try again</code></pre>
+          <p>The catch is not inside one client. It appears between clients.</p>
+        </section>
+
+        <section class="section" id="shared-clocks">
+          <p class="section-label">02 / Coordinated failure</p>
+          <h2>Identical Clocks Turn Politeness Into a Crowd</h2>
+          <p>Many application instances can lose the same dependency together. They begin the same loop at nearly the same instant. Matching attempt counts and constants produce matching schedules.</p>
+          <pre data-lang="timeline"><code>failure → wait → retry → wait → retry
+failure → wait → retry → wait → retry
+failure → wait → retry → wait → retry
+                 ↑              ↑
+              collision      collision</code></pre>
+          <p>The clients are individually polite and collectively synchronized. Backoff creates quiet gaps, but it does not reduce the crowd at each wake up.</p>
+          <pre data-lang="load shape"><code>clients:    fail → same sleep → retry burst
+dependency: idle → overloaded → idle → overloaded</code></pre>
+          <p>This is the retry storm hiding inside sensible local code.</p>
+        </section>
+
+        <section class="section" id="optimistic-writes">
+          <p class="section-label">03 / Observable contention</p>
+          <h2>Optimistic Writes Make the Collision Visible</h2>
+          <p>Marc Brooker’s <a href="https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/">AWS Architecture Blog article</a> models clients updating one shared row with optimistic concurrency control. A client reads a version and conditionally writes it.</p>
+          <pre data-lang="state transition"><code>read version V
+      ↓
+write only if version is still V
+      ├─ match → commit and increment
+      └─ stale → retry</code></pre>
+          <p>One client succeeds each round. Everyone else repeats work that cannot win. The store remains correct while retry traffic becomes expensive.</p>
+        </section>
+
+        <section class="section" id="quadratic-work">
+          <p class="section-label">04 / Work amplification</p>
+          <h2>The Work Grows Faster Than the Winners</h2>
+          <p>With N clients arriving together, AWS explains that completion needs N rounds while total work grows with N². Early rounds contain almost the entire crowd.</p>
+          <pre data-lang="arithmetic"><code>round work = N + (N - 1) + … + 1
+           = N × (N + 1) / 2
+           = quadratic growth</code></pre>
+          <p>Success grows one writer at a time. Attempted work accumulates across every loser.</p>
+          <pre data-lang="cost model"><code>business outcomes: one successful update per client
+system pressure:    every read and conditional write</code></pre>
+          <p>Retries can preserve correctness while making recovery slower.</p>
+        </section>
+
+        <section class="section" id="fixed-cap">
+          <p class="section-label">05 / Incomplete control</p>
+          <h2>A Cap Limits Sleep, Not Synchronization</h2>
+          <p>The AWS formula multiplies a base delay exponentially and stops at a cap.</p>
+          <pre data-lang="fixed backoff"><code>sleep = min(cap, base × 2^attempt)</code></pre>
+          <p>The linked simulator uses a 5 ms base and a 2,000 ms cap. The cap bounds the worst individual sleep. It does not make neighboring clients choose different durations.</p>
+          <pre data-lang="shared appointment"><code>client A ceiling ──────────────────→ retry
+client B ceiling ──────────────────→ retry
+client C ceiling ──────────────────→ retry
+                                     same instant</code></pre>
+          <p>The algorithm changes frequency but preserves phase.</p>
+        </section>
+
+        <section class="section" id="full-jitter">
+          <p class="section-label">06 / Randomized coordination</p>
+          <h2>Full Jitter Turns a Deadline Into a Window</h2>
+          <p>Full jitter keeps exponential growth but changes what the result means. The computed value becomes the upper boundary of a sampling window.</p>
+          <pre data-lang="full jitter"><code>ceiling = min(cap, base × 2^attempt)
+sleep   = random_between(0, ceiling)</code></pre>
+          <p>Every client samples independently. Some retry near the beginning, some near the end, and most stop colliding with the same neighbors.</p>
+          <pre data-lang="retry window"><code>window start                         window end
+│ A       C              B      D              │
+└───────────────────────────────────────────────┘
+  each letter is one independently timed retry</code></pre>
+          <p>AWS adds randomness to each wait so the aggregate traffic becomes more orderly.</p>
+        </section>
+
+        <section class="section" id="flattened-arrivals">
+          <p class="section-label">07 / Arrival distribution</p>
+          <h2>Random Arrivals Flatten the Retry Spikes</h2>
+          <p>Fixed backoff produces clusters separated by empty periods. Full jitter spreads those calls toward an approximately constant arrival rate, matching the time series in the AWS article.</p>
+          <pre data-lang="traffic shape"><code>fixed:  ████████________██████________████________
+jitter: ██_██_█_██_█_██_█_██_█_█_██_█_██_█_█_██
+time  ───────────────────────────────────────────→</code></pre>
+          <p>This is not random load. It is randomized coordination. The retry window stays bounded while clients stop sharing a single clock edge.</p>
+        </section>
+
+        <section class="section" id="assumptions">
+          <p class="section-label">08 / Source assumptions</p>
+          <h2>The Benchmark Keeps AWS's Assumptions Visible</h2>
+          <p>The repository ports AWS’s discrete event mechanism into Spring Boot. Its defaults use the article’s 10 ms mean network delay and reported variance of 4 ms. The linked AWS simulator expresses that distribution with a 2 ms standard deviation.</p>
+          <pre data-lang="configuration"><code>clients               100
+runs per strategy     100
+network mean           10 ms
+network variance        4 ms²
+base backoff             5 ms
+backoff cap          2,000 ms</code></pre>
+          <p>Each strategy receives deterministic seeds. The simulator records attempted conditional writes and simulated completion time, then averages the run set.</p>
+          <div class="callout">
+            <strong>Scope of the evidence</strong>
+            These are local model results. They are not AWS production measurements.
+          </div>
+        </section>
+
+        <section class="section" id="benchmark">
+          <p class="section-label">09 / Executable evidence</p>
+          <h2>Local Full Jitter Performs Far Less Work</h2>
+          <p>The checked in benchmark CSV contains one row per strategy.</p>
+          <div class="benchmark" aria-label="Local benchmark result">
+            <div class="metric">
+              <span>No backoff</span>
+              <strong>2,422.21</strong>
+              <small>average attempts</small>
+            </div>
+            <div class="metric">
+              <span>Fixed backoff</span>
+              <strong>1,868.00</strong>
+              <small>average attempts</small>
+            </div>
+            <div class="metric">
+              <span>Full jitter</span>
+              <strong>796.24</strong>
+              <small>average attempts</small>
+            </div>
+          </div>
+          <pre data-lang="csv"><code>strategy,avg_attempts,avg_completion_ms
+no_backoff,2422.21,2029.38
+capped_exponential,1868.00,63778.62
+full_jitter,796.24,4910.71</code></pre>
+          <p>Full jitter used 67.13% fewer attempts than no backoff in this repository. It also completed 92.30% sooner than capped exponential backoff without jitter.</p>
+          <pre data-lang="calculation"><code>attempt reduction
+= (2422.21 - 796.24) / 2422.21
+= 67.13%
+
+completion reduction
+= (63778.62 - 4910.71) / 63778.62
+= 92.30%</code></pre>
+          <p>AWS independently reports that full jitter cut calls by more than half for 100 contending clients.</p>
+        </section>
+
+        <section class="section" id="two-claims">
+          <p class="section-label">10 / Honest comparison</p>
+          <h2>Less Work And Faster Completion Are Different Claims</h2>
+          <p>No backoff finished the local simulation in 2,029.38 ms but spent 2,422.21 attempts. Full jitter took 4,910.71 ms and only 796.24 attempts. Fixed exponential backoff stretched completion to 63,778.62 ms.</p>
+          <pre data-lang="tradeoff"><code>no backoff:          faster here, much more work
+capped exponential: less work, synchronized long waits
+full jitter:         low work, far shorter than fixed backoff</code></pre>
+          <p>Jitter protects shared capacity. It does not promise that every client finishes before an aggressive retry loop.</p>
+        </section>
+
+        <section class="section" id="small-change">
+          <p class="section-label">11 / Load bearing code</p>
+          <h2>The Code Needs Only One Changed Decision</h2>
+          <p>The Java strategy treats the exponential value as a ceiling. The simulator owns the retry lifecycle while the strategy owns the sampling decision.</p>
+          <pre data-lang="java"><code>FULL_JITTER("full_jitter") {
+    @Override
+    double delayMillis(int attempt, SimulationConfig config,
+                       RandomGenerator random) {
+        double ceiling = ceilingMillis(attempt, config);
+        return random.nextDouble(ceiling);
+    }
+};</code></pre>
+          <p>Every client needs an independent random stream. Sharing one sampled delay across the fleet recreates synchronization with extra steps.</p>
+        </section>
+
+        <section class="section" id="source-units">
+          <p class="section-label">12 / Statistical precision</p>
+          <h2>The Source's Units Deserve Careful Reading</h2>
+          <p>The article describes network delay with a 10 ms mean and variance of 4 ms. Its source code constructs the normal distribution with <code>Net(10, 2)</code>, where the second argument is standard deviation.</p>
+          <pre data-lang="statistics"><code>standard deviation = 2 ms
+variance           = 2²
+                   = 4 ms²</code></pre>
+          <p>The benchmark exposes variance as squared time units. This keeps the source model while making the statistical parameter explicit.</p>
+        </section>
+
+        <section class="section" id="safe-retries">
+          <p class="section-label">13 / Semantic boundary</p>
+          <h2>Jitter Cannot Make An Unsafe Retry Safe</h2>
+          <p>A randomized duplicate payment can still be a duplicate payment. The operation must already tolerate repetition through an idempotency key, conditional write, deduplication record, or equivalent protocol.</p>
+          <pre data-lang="boundary"><code>safe operation + jitter   = safer retry traffic
+unsafe operation + jitter = delayed duplicate effects</code></pre>
+          <p>Jitter also needs a retry limit, a timeout budget, and overload controls. The algorithm spreads attempts. It does not decide whether another attempt is responsible.</p>
+        </section>
+
+        <section class="section" id="tradeoff">
+          <p class="section-label">14 / The cost</p>
+          <h2>Randomness Trades Predictability For Coordination</h2>
+          <p>Full jitter gives up a fixed client schedule. Neighboring clients may complete in a different order on every seed, and an individual may draw an inconveniently long wait.</p>
+          <pre data-lang="feedback loop"><code>predictable sleeps
+      ↓
+synchronized arrivals
+      ↓
+collisions and more retries
+      ↓
+larger synchronized sleeps
+      └──────────── feedback loop</code></pre>
+          <p>Predictable local timing can create unpredictable aggregate failure. Random local timing can create stable aggregate pressure.</p>
+        </section>
+
+        <section class="section" id="build-one">
+          <p class="section-label">15 / Build one</p>
+          <h2>Build The Dumb Version Yourself</h2>
+          <p>Start with a single versioned resource and keep the model small enough to inspect.</p>
+          <pre data-lang="checklist"><code>[ ] enqueue every client at the same logical instant
+[ ] read the current resource version
+[ ] conditionally write the version that was read
+[ ] retry stale writes with a pluggable delay strategy
+[ ] write attempts and completion time to CSV</code></pre>
+          <p>Then run the Spring Boot entrypoint. It produces the exact evidence used above.</p>
+          <pre data-lang="bash"><code>./gradlew bootRun
+./gradlew bootRun --args="--clients=100 --runs=100 --seed=42"</code></pre>
+          <p>Keep wall clock performance out of the claim. The program advances a simulated clock so laptop scheduling does not become data.</p>
+        </section>
+
+        <section class="section" id="break-it">
+          <p class="section-label">16 / Adversarial proof</p>
+          <h2>Then Break It</h2>
+          <p>Tests should attack properties, not copy a golden console string.</p>
+          <pre data-lang="test plan"><code>simultaneous start → every client eventually succeeds
+single client      → every strategy needs one attempt
+fixed seed         → metrics repeat exactly
+higher contention  → jitter still reduces work
+late attempts      → delays never exceed the cap
+parallel run set   → random state never leaks</code></pre>
+          <p>The last case runs independent simulations on Java virtual threads. The measured model remains deterministic while the implementation faces real concurrent execution.</p>
+          <pre data-lang="bash"><code>./gradlew test</code></pre>
+          <p>If a strategy loses clients, crosses its cap, or depends on execution order, its attractive average is irrelevant.</p>
+        </section>
+
+        <section class="section" id="general-lesson">
+          <p class="section-label">17 / The part that generalizes</p>
+          <h2>The Part That Generalizes Is Shared Timing</h2>
+          <p>Retry storms are one instance of a larger systems mistake. Independent actors become coupled through identical deterministic schedules. Cache refreshes, lease renewal, polling, and reconnect loops can all acquire the same accidental clock.</p>
+          <p>Jitter is useful when harmful coordination comes from timing, not when the operation or retry policy is wrong. The better question is what the fleet will do when every client runs the same rule.</p>
+          <pre data-lang="mental model"><code>wrong model: choose the perfect retry time for one client
+right model: choose a safe arrival distribution for the fleet</code></pre>
+          <p class="closing">Predictable waits make distributed failures synchronize. Random waits let collective recovery disperse.</p>
+        </section>
+
+        <aside class="sources" aria-label="Sources and evidence">
+          <p class="source-label">Sources and evidence</p>
+          <p>Primary source: Marc Brooker’s <a href="https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/">Exponential Backoff And Jitter</a> on the AWS Architecture Blog.</p>
+          <p>Primary source code: AWS’s <a href="https://github.com/aws-samples/aws-arch-backoff-simulator">architecture backoff simulator</a>.</p>
+          <p>Original evidence: the companion <a href="https://github.com/LukeSkywalkrr/jitter-bench/pull/1">Java implementation pull request</a>, its test suite, and its benchmark CSV. The completion values are simulated time, not wall clock or AWS production latency.</p>
+        </aside>
+
+        <footer class="article-footer">
+          <span>Daedalus Journal / Field note 14</span>
+          <button class="copy-button" type="button" data-copy-link>Copy article link</button>
+        </footer>
+      </article>
+    </main>
+
+    <script>
+      (() => {
+        const progress = document.querySelector('[data-progress]');
+        const copyButton = document.querySelector('[data-copy-link]');
+        let ticking = false;
+
+        function updateProgress() {
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          const value = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+          progress.style.transform = `scaleX(${value})`;
+          ticking = false;
+        }
+
+        window.addEventListener('scroll', () => {
+          if (!ticking) {
+            window.requestAnimationFrame(updateProgress);
+            ticking = true;
+          }
+        }, { passive: true });
+
+        copyButton.addEventListener('click', async () => {
+          const original = copyButton.textContent;
+          try {
+            await navigator.clipboard.writeText(window.location.href);
+            copyButton.textContent = 'Link copied';
+          } catch (error) {
+            copyButton.textContent = 'Copy failed';
+          }
+          window.setTimeout(() => { copyButton.textContent = original; }, 1600);
+        });
+
+        updateProgress();
+      })();
+    </script>
+  </body>
+</html>
