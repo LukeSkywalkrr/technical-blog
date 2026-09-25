@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>A Bloom Filter Trades Perfect Memory for Honest Maybes | Daedalus Journal</title>
+    <meta name="description" content="Bloom filters make huge membership checks fit in memory by allowing false positives, never false negatives.">
+    <meta name="author" content="Pratyush">
+    <meta name="theme-color" content="#090b0b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="A Bloom Filter Trades Perfect Memory for Honest Maybes">
+    <meta property="og:description" content="How a Bloom filter stores bits instead of values, rejects absence locally, and spends exactness only on rare maybes.">
+    <meta property="og:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/assets/bloom-filter.png">
+    <meta property="og:image:width" content="1980">
+    <meta property="og:image:height" content="1392">
+    <meta property="og:image:alt" content="Bloom filter architecture showing URL checks, local bits, and exact confirmation">
+    <meta property="article:published_time" content="2026-09-27">
+    <meta property="article:author" content="Pratyush">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="A Bloom Filter Trades Perfect Memory for Honest Maybes">
+    <meta name="twitter:description" content="How a Bloom filter stores bits instead of values, rejects absence locally, and spends exactness only on rare maybes.">
+    <meta name="twitter:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/assets/bloom-filter.png">
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --ink: #f4f1ea;
+        --muted: #9d9890;
+        --soft: #c9c4ba;
+        --page: #090b0b;
+        --panel: #101413;
+        --panel-2: #151a18;
+        --line: #2a302e;
+        --gold: #d6b879;
+        --teal: #73d8c5;
+        --sans: "IBM Plex Sans", system-ui, sans-serif;
+        --serif: "Newsreader", Georgia, serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 14% 8%, rgba(115, 216, 197, .08), transparent 28rem),
+          radial-gradient(circle at 86% 22%, rgba(214, 184, 121, .08), transparent 32rem),
+          var(--page);
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 1.08rem;
+        line-height: 1.76;
+        overflow-x: hidden;
+      }
+
+      a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: .2em; }
+      a:hover { color: var(--ink); }
+      a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+      .skip-link { position: fixed; left: 1rem; top: -6rem; z-index: 100; padding: .65rem .85rem; background: var(--gold); color: #111; font: 600 .82rem/1 var(--sans); }
+      .skip-link:focus { top: 1rem; }
+      .progress { position: fixed; inset: 0 auto auto 0; z-index: 80; width: 100%; height: 3px; background: linear-gradient(90deg, var(--teal), var(--gold)); transform: scaleX(0); transform-origin: left; }
+      .masthead { position: sticky; top: 0; z-index: 60; border-bottom: 1px solid rgba(214, 184, 121, .15); background: rgba(9, 11, 11, .9); backdrop-filter: blur(18px); }
+      .nav-shell { width: min(1120px, calc(100% - 2rem)); min-height: 4.4rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .brand { display: inline-flex; align-items: center; gap: .7rem; color: var(--ink); text-decoration: none; font-family: var(--sans); }
+      .brand-mark { width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border: 1px solid var(--gold); color: var(--gold); }
+      .brand-mark svg { width: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.4; }
+      .brand-copy { display: grid; line-height: 1.05; }
+      .brand-copy strong { font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; }
+      .brand-copy small { color: var(--muted); font-size: .64rem; letter-spacing: .08em; }
+      .nav-link { color: var(--soft); font: 500 .8rem/1 var(--sans); text-decoration: none; }
+
+      main { display: block; }
+      .hero { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(4rem, 9vw, 8rem) 0 clamp(3rem, 7vw, 6rem); display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .55fr); gap: clamp(2.5rem, 7vw, 7rem); align-items: end; }
+      .eyebrow, .section-label, .meta, .quick-label, .source-label { font-family: var(--sans); text-transform: uppercase; letter-spacing: .12em; }
+      .eyebrow { margin: 0 0 1.2rem; color: var(--teal); font-size: .72rem; font-weight: 600; }
+      h1 { max-width: 13ch; margin: 0; font-family: var(--serif); font-size: clamp(3.15rem, 8vw, 6.7rem); font-weight: 500; letter-spacing: -.055em; line-height: .92; text-wrap: balance; }
+      h1 em { color: var(--gold); font-weight: 400; }
+      .dek { max-width: 42rem; margin: 1.7rem 0 0; color: var(--soft); font-size: clamp(1.2rem, 2vw, 1.45rem); line-height: 1.42; }
+      .meta { display: flex; flex-wrap: wrap; gap: .55rem 1rem; margin-top: 1.7rem; color: var(--muted); font-size: .68rem; }
+      .meta span + span::before, .meta time + span::before { content: "·"; margin-right: 1rem; color: var(--gold); }
+      .claim-map { min-height: 25rem; padding: 1.2rem; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(21, 26, 24, .95), rgba(10, 13, 12, .95)); box-shadow: 0 30px 80px rgba(0, 0, 0, .28); }
+      .claim-map::before { content: "EXECUTABLE CLAIM"; display: block; margin-bottom: 1.4rem; color: var(--muted); font: 600 .62rem/1 var(--mono); letter-spacing: .14em; }
+      .path-node { position: relative; padding: 1rem; border: 1px solid var(--line); background: var(--panel); }
+      .path-node + .path-node { margin-top: 2.2rem; }
+      .path-node + .path-node::before { content: "↓"; position: absolute; left: 50%; top: -2rem; color: var(--gold); transform: translateX(-50%); }
+      .path-node strong { display: block; font: 600 1rem/1.2 var(--sans); }
+      .path-node span { display: block; margin-top: .3rem; color: var(--muted); font: .75rem/1.5 var(--mono); }
+      .path-node.is-accent { border-color: rgba(115, 216, 197, .7); }
+      .path-node.is-result { border-color: rgba(214, 184, 121, .75); }
+
+      .article-shell { width: min(780px, calc(100% - 2rem)); margin: 0 auto; padding-bottom: 5rem; }
+      .quick-take { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin-bottom: 2rem; }
+      .quick-card { min-height: 9rem; padding: 1rem; border-top: 1px solid var(--gold); background: var(--panel); }
+      .quick-label { display: block; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .quick-card strong { display: block; margin-top: .65rem; font: 500 1.08rem/1.35 var(--serif); }
+      .quick-card p { margin: .5rem 0 0; color: var(--muted); font: .77rem/1.5 var(--sans); }
+      .evidence-figure { margin: 0 0 3.5rem; padding: .7rem; border: 1px solid var(--line); background: #111; }
+      .evidence-figure img { display: block; width: 100%; height: auto; }
+      .evidence-figure figcaption { padding: .75rem .35rem .15rem; color: var(--muted); font: .72rem/1.5 var(--sans); }
+      .toc { margin: 0 0 4rem; padding: 1.2rem 1.3rem; border: 1px solid var(--line); background: rgba(16, 20, 19, .75); }
+      .toc p { margin: 0 0 .75rem; color: var(--muted); font: 600 .65rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; }
+      .toc ol { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1.25rem; list-style: none; counter-reset: toc; }
+      .toc li { counter-increment: toc; }
+      .toc a { color: var(--soft); font: .78rem/1.35 var(--sans); text-decoration: none; }
+      .toc a::before { content: counter(toc, decimal-leading-zero) "  "; color: var(--gold); font-family: var(--mono); }
+      .section { padding: 3.5rem 0 1rem; scroll-margin-top: 5rem; }
+      .section + .section { border-top: 1px solid var(--line); }
+      .section-label { margin: 0 0 .8rem; color: var(--teal); font-size: .64rem; font-weight: 600; }
+      h2 { margin: 0 0 1.35rem; font-family: var(--serif); font-size: clamp(2rem, 5vw, 3.15rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
+      p { margin: 0; }
+      .section p + p { margin-top: 1.15rem; }
+      .section > p:first-of-type { color: var(--soft); font-size: 1.18rem; line-height: 1.65; }
+      code { font-family: var(--mono); }
+      p code { padding: .08em .3em; border: 1px solid var(--line); background: var(--panel-2); color: var(--gold); font-size: .82em; }
+      pre { position: relative; margin: 1.55rem 0; padding: 1.25rem; overflow-x: auto; border: 1px solid var(--line); border-left: 3px solid var(--gold); background: #070908; color: #ddd9d0; font: .78rem/1.68 var(--mono); tab-size: 2; }
+      pre[data-lang]::before { content: attr(data-lang); display: block; margin-bottom: .75rem; color: var(--muted); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; }
+      .callout { margin: 1.7rem 0; padding: 1.25rem; border-left: 3px solid var(--teal); background: rgba(115, 216, 197, .065); }
+      .callout strong { display: block; margin-bottom: .35rem; color: var(--teal); font: 600 .68rem/1.2 var(--sans); letter-spacing: .1em; text-transform: uppercase; }
+      .benchmark { display: grid; grid-template-columns: repeat(2, 1fr); gap: .8rem; margin: 1.7rem 0; }
+      .metric { padding: 1.1rem; border: 1px solid var(--line); background: var(--panel); }
+      .metric span { display: block; color: var(--muted); font: .65rem/1.2 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
+      .metric strong { display: block; margin-top: .45rem; color: var(--gold); font: 500 2rem/1 var(--serif); }
+      .metric small { display: block; margin-top: .45rem; color: var(--soft); font: .68rem/1.4 var(--mono); }
+      .closing { margin-top: 1.8rem; padding: 1.4rem; border: 1px solid var(--gold); color: var(--gold); font-size: 1.45rem; line-height: 1.35; }
+      .sources { margin-top: 4rem; padding: 1.35rem; border: 1px solid var(--line); background: var(--panel); }
+      .source-label { margin: 0 0 .7rem; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .sources p { color: var(--muted); font: .78rem/1.65 var(--sans); }
+      .sources p + p { margin-top: .6rem; }
+      .article-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--line); color: var(--muted); font: .73rem/1.5 var(--sans); }
+      .copy-button { padding: .55rem .75rem; border: 1px solid var(--line); background: var(--panel); color: var(--soft); cursor: pointer; font: 500 .72rem/1 var(--sans); }
+
+      @media (max-width: 820px) {
+        .hero { grid-template-columns: 1fr; }
+        .claim-map { min-height: auto; }
+      }
+      @media (max-width: 620px) {
+        body { font-size: 1rem; }
+        .brand-copy small { display: none; }
+        .quick-take, .toc ol, .benchmark { grid-template-columns: 1fr; }
+        .quick-card { min-height: auto; }
+        .meta span + span::before, .meta time + span::before { content: none; }
+        h1 { font-size: clamp(3rem, 16vw, 4.8rem); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#article">Skip to article</a>
+    <div class="progress" data-progress aria-hidden="true"></div>
+
+    <header class="masthead">
+      <div class="nav-shell">
+        <a class="brand" href="../index.html" aria-label="Daedalus Journal home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 42" role="presentation">
+              <path d="M8 31.5 21 7l13 24.5M12.5 26h17M16 19.5h10"></path>
+              <path d="M8.5 31.5h25"></path>
+            </svg>
+          </span>
+          <span class="brand-copy">
+            <strong>Daedalus</strong>
+            <small>Engineering journal</small>
+          </span>
+        </a>
+        <a class="nav-link" href="../index.html#articles">All articles</a>
+      </div>
+    </header>
+
+    <main id="article">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Distributed systems / Storage / Membership</p>
+          <h1>Forget the list. <em>Keep the bits.</em></h1>
+          <p class="dek">A Bloom filter stores a compact shadow of membership so the common no stays local and cheap.</p>
+          <div class="meta">
+            <span>By Pratyush</span>
+            <time datetime="2026-09-27">27 September 2026</time>
+            <span>7 min read</span>
+          </div>
+        </div>
+
+        <div class="claim-map" role="img" aria-label="One million hashes are inserted into a Bloom filter. A ten bit per item filter uses one point two five megabytes and reports zero false negatives.">
+          <div class="path-node">
+            <strong>1,000,000 hashes inserted</strong>
+            <span>synthetic unsafe URL set</span>
+          </div>
+          <div class="path-node is-accent">
+            <strong>10 bits per item</strong>
+            <span>1,250,000 bytes</span>
+          </div>
+          <div class="path-node is-result">
+            <strong>0 false negatives</strong>
+            <span>8,112 local maybes</span>
+          </div>
+        </div>
+      </header>
+
+      <article class="article-shell">
+        <div class="quick-take" aria-label="Quick take">
+          <div class="quick-card">
+            <span class="quick-label">The policy</span>
+            <strong>Never miss an inserted item.</strong>
+            <p>Absence must be exact. Presence may be a maybe.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The mechanism</span>
+            <strong>Each value sets several bits.</strong>
+            <p>The original value is not stored in the filter.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The cost</span>
+            <strong>Some absent values look present.</strong>
+            <p>The system needs an exact second check.</p>
+          </div>
+        </div>
+
+        <figure class="evidence-figure">
+          <img src="../assets/bloom-filter.png" width="1980" height="1392" loading="lazy" alt="Bloom filter path from URL check through canonicalization, hashing, local bits, exact confirmation, and final verdict.">
+          <figcaption>The local filter answers absence cheaply. A maybe flows to slower exact confirmation.</figcaption>
+        </figure>
+
+        <nav class="toc" aria-label="Article contents">
+          <p>Trace the filter and the tradeoff</p>
+          <ol>
+            <li><a href="#obvious-set">The obvious set</a></li>
+            <li><a href="#local-list">The local list</a></li>
+            <li><a href="#bit-shadow">The bit shadow</a></li>
+            <li><a href="#benchmark">Executable evidence</a></li>
+            <li><a href="#second-door">The second door</a></li>
+            <li><a href="#general-lesson">The general lesson</a></li>
+          </ol>
+        </nav>
+
+        <section class="section" id="obvious-set">
+          <p class="section-label">01 / The naive solution</p>
+          <h2>The Set Is The Obvious Solution</h2>
+          <p>The solution is almost embarrassingly obvious. If there is a list of bad URL hashes, keep it in a set and check the URL before loading the page.</p>
+          <pre data-lang="java"><code>Set&lt;Hash&gt; unsafe = loadUnsafeHashes();
+
+if (unsafe.contains(urlHash)) {
+    block();
+} else {
+    load();
+}</code></pre>
+          <p>That first draft is exact and easy to explain. It also asks every client to keep the exact list close enough for the hot path.</p>
+          <pre data-lang="membership"><code>url hash in set     =&gt; block
+url hash not in set =&gt; load</code></pre>
+          <p>Then memory walks into the room.</p>
+        </section>
+
+        <section class="section" id="local-list">
+          <p class="section-label">02 / Local rejection</p>
+          <h2>The Trouble Starts When The List Must Stay Local</h2>
+          <p>Google's current Safe Browsing docs say clients canonicalize URLs, make host suffixes and path prefixes, and hash those combinations. The full hash is 32 bytes. The request form may send a 4 byte prefix when it must ask the service.</p>
+          <pre data-lang="pipeline"><code>canonical URL
+host suffixes
+path prefixes
+SHA 256 hashes
+local lookup</code></pre>
+          <p>The 2022 Google Security post says Chrome can make up to 5 host suffixes, up to 6 path prefixes, and 30 combined checks. It also says more than 99% of checked URLs are cleared by the local list.</p>
+          <pre data-lang="safe browsing"><code>5 hosts * 6 paths = 30 combinations
+99%+ cleared locally</code></pre>
+          <p>That fast local rejection is the point. Asking a server about every page would be slower and more revealing.</p>
+        </section>
+
+        <section class="section" id="bloom-paper">
+          <p class="section-label">03 / The bargain</p>
+          <h2>Bloom's Old Paper Names The Bargain</h2>
+          <p>Burton Bloom's 1970 paper studied membership tests where most queries are not in the set. It named three costs: space, reject time, and allowable error.</p>
+          <pre data-lang="tradeoff"><code>space
+reject time
+allowable error</code></pre>
+          <p>The phrase that matters is errors of commission. The filter may say a nonmember looks like a member. It must not say a real member is absent.</p>
+          <pre data-lang="contract"><code>member    =&gt; maybe
+nonmember =&gt; no, or maybe</code></pre>
+          <p>Bloom's sample was hyphenation, not browsers. The structure still generalizes: reject easy cases locally and send the rare maybe to a slower check.</p>
+        </section>
+
+        <section class="section" id="bit-shadow">
+          <p class="section-label">04 / Bit storage</p>
+          <h2>First, Stop Storing The Thing</h2>
+          <p>A Bloom filter stores bits. To insert a value, hash it several ways and set those bit positions to one.</p>
+          <pre data-lang="insert"><code>bad.example/a
+  =&gt; bit 18
+  =&gt; bit 41
+  =&gt; bit 77</code></pre>
+          <p>A lookup checks those same positions.</p>
+          <pre data-lang="lookup"><code>all checked bits are 1 =&gt; maybe present
+any checked bit is 0   =&gt; definitely absent</code></pre>
+          <p>The filter never stores the URL. It does not store the SHA 256 hash either. It stores the shadow those hashes cast on a bit array.</p>
+          <div class="callout">
+            <strong>The counterintuitive core</strong>
+            The browser can forget the URL list and still reject almost every safe URL locally.
+          </div>
+        </section>
+
+        <section class="section" id="absence-proof">
+          <p class="section-label">05 / Strong no</p>
+          <h2>Empty Bits Are The Proof Of Absence</h2>
+          <p>The no answer is stronger than the yes answer. A zero bit proves this value was never inserted, because insertion would have set that bit.</p>
+          <pre data-lang="absence"><code>lookup bits: 1 1 0 1
+                  ^
+                  absence proof</code></pre>
+          <p>The maybe answer is weaker. Another value may have set the same positions earlier.</p>
+          <pre data-lang="collision"><code>Alice set bit 10
+Bob set bit 44
+Carol set bit 10 and bit 44</code></pre>
+          <p>That collision is the whole trick. It is also the whole cost.</p>
+        </section>
+
+        <section class="section" id="formula">
+          <p class="section-label">06 / Error curve</p>
+          <h2>The Formula Predicts The Pain</h2>
+          <p>The usual false positive estimate is compact enough to fit on a napkin.</p>
+          <pre data-lang="formula"><code>p = (1 - e^(-k*n/m))^k
+
+n = inserted items
+m = bits in the filter
+k = hash positions</code></pre>
+          <p>More bits lower the chance that unrelated items collide. More hashes help until they fill too much of the array.</p>
+          <pre data-lang="hash count"><code>k ~= bits_per_item * ln(2)</code></pre>
+          <p>At that setting, the bit array tends to hover near half full. That is why the measured fill ratio in the repository sits near 0.50 for the larger rows.</p>
+        </section>
+
+        <section class="section" id="benchmark">
+          <p class="section-label">07 / Executable evidence</p>
+          <h2>The Local Benchmark Makes The Curve Visible</h2>
+          <p>The repository inserts 1,000,000 synthetic unsafe URL hashes. It probes 1,000,000 different safe URL hashes. The output is evidence from the local model, not a claim about Google's production systems.</p>
+          <div class="benchmark" aria-label="Local benchmark result">
+            <div class="metric">
+              <span>10 bits per item</span>
+              <strong>1.25 MB</strong>
+              <small>0.8112 percent false positives</small>
+            </div>
+            <div class="metric">
+              <span>25 bits per item</span>
+              <strong>6</strong>
+              <small>false positives in 1,000,000 probes</small>
+            </div>
+          </div>
+          <pre data-lang="csv"><code>bits_per_element,bloom_bytes,false_positives,measured_fp_rate
+6,750000,55736,0.05573600
+10,1250000,8112,0.00811200
+25,3125000,6,0.00000600</code></pre>
+          <p>At 10 bits per element, the filter used 1,250,000 bytes. The exact 32 byte hashes alone would take 32,000,000 bytes for the same 1,000,000 entries.</p>
+          <pre data-lang="memory"><code>exact hashes: 32,000,000 bytes
+Bloom bits:    1,250,000 bytes</code></pre>
+          <p>That is not free. The 10 bit filter also reported 8,112 false positives.</p>
+        </section>
+
+        <section class="section" id="chromium-history">
+          <p class="section-label">08 / Historical implementation</p>
+          <h2>Twenty Five Bits Makes The Maybe Rare</h2>
+          <p>The old Chromium Bloom filter header is useful historical evidence. It describes a simple Bloom filter, says it used 20 hashes, and sets a 25 bit per item sizing ratio.</p>
+          <pre data-lang="chromium constants"><code>hashes: 20
+bits per item: 25
+minimum file: 250,000 bytes
+maximum file: 3 * 1024 * 1024 bytes</code></pre>
+          <p>The local implementation does not copy Chromium. It uses 17 hash positions at 25 bits per element because that is the rounded formula. The row explains the same tradeoff.</p>
+          <pre data-lang="csv"><code>inserted,bits_per_element,hash_count,false_positives
+1000000,25,17,6</code></pre>
+          <p>More memory buys fewer maybes.</p>
+        </section>
+
+        <section class="section" id="current-safe-browsing">
+          <p class="section-label">09 / Current docs</p>
+          <h2>Current Safe Browsing Uses Hash Prefixes</h2>
+          <p>This distinction matters. Current Google documentation describes hash prefix lists and real time privacy preserving checks, not the old Bloom filter path.</p>
+          <pre data-lang="current docs"><code>local hash prefixes
+server full hash lookup
+privacy preserving real time checks</code></pre>
+          <p>The Bloom filter is still the clean teaching object. It shows why a browser shaped system wants local negative answers and remote confirmation only on rare candidates.</p>
+          <pre data-lang="decision path"><code>local no    =&gt; continue
+local maybe =&gt; ask slower system
+confirmed   =&gt; warn</code></pre>
+        </section>
+
+        <section class="section" id="second-door">
+          <p class="section-label">10 / Confirmation</p>
+          <h2>False Positives Need A Second Door</h2>
+          <p>A Bloom filter should not be the final security verdict. It is a prefilter.</p>
+          <pre data-lang="verdict"><code>Bloom says no      =&gt; safe from this list
+Bloom says maybe   =&gt; do the exact check
+exact check hits   =&gt; block
+exact check misses =&gt; load</code></pre>
+          <p>Without the second door, a false positive becomes a false accusation. With the second door, it becomes a little extra work.</p>
+          <pre data-lang="mental model"><code>wrong model: maybe means guilty
+right model: maybe means inspect</code></pre>
+          <p>That is the systems lesson hiding under the math.</p>
+        </section>
+
+        <section class="section" id="deletion">
+          <p class="section-label">11 / Deletion cost</p>
+          <h2>Deletion Is Where The Simple Version Lies</h2>
+          <p>The simple bit array cannot safely delete. Clearing a bit for one value may erase evidence needed by another value.</p>
+          <pre data-lang="delete"><code>A sets bit 7
+B sets bit 7
+delete A clears bit 7
+B now disappears</code></pre>
+          <p>Counting Bloom filters solve this with counters instead of bits, but that spends more memory.</p>
+          <pre data-lang="variant"><code>bit filter:      0 or 1
+counting filter: 0, 1, 2, 3...</code></pre>
+          <p>The cheap structure has a cheap operation set: add and query.</p>
+        </section>
+
+        <section class="section" id="build-one">
+          <p class="section-label">12 / Build one</p>
+          <h2>Build The Dumb Version Yourself</h2>
+          <p>Start with a bit array and one deterministic benchmark. The useful version is the one that makes the bargain executable.</p>
+          <pre data-lang="checklist"><code>[ ] choose n
+[ ] choose bits per item
+[ ] compute k
+[ ] insert known bad hashes
+[ ] probe absent hashes
+[ ] compare measured and predicted false positives</code></pre>
+          <p>The core code is just this idea.</p>
+          <pre data-lang="java"><code>for (int i = 0; i &lt; hashCount; i++) {
+    bits.set(index(hash, i));
+}</code></pre>
+          <p>And the lookup is the mirror image.</p>
+          <pre data-lang="java"><code>for (int i = 0; i &lt; hashCount; i++) {
+    if (!bits.get(index(hash, i))) return false;
+}
+return true;</code></pre>
+        </section>
+
+        <section class="section" id="break-it">
+          <p class="section-label">13 / Adversarial proof</p>
+          <h2>Then Break It</h2>
+          <p>Try to make the filter lie in the forbidden direction. Insert every bad URL, then query every inserted value.</p>
+          <pre data-lang="test"><code>expected false negatives: 0
+measured false negatives: 0</code></pre>
+          <p>Then overfill it. A filter sized for 10,000 entries should get noisy after 20,000 insertions.</p>
+          <pre data-lang="overfill"><code>sized for 10,000
+inserted 20,000
+false positives rise</code></pre>
+          <p>Then compare the curve. If 25 bits per element does not beat 10, and 10 does not beat 6, the implementation is broken.</p>
+          <pre data-lang="curve"><code>6 bits  =&gt; noisy
+10 bits =&gt; quieter
+25 bits =&gt; very quiet</code></pre>
+        </section>
+
+        <section class="section" id="general-lesson">
+          <p class="section-label">14 / The part that generalizes</p>
+          <h2>The Larger Lesson Is To Respect Maybe</h2>
+          <p>The mistake is thinking every question deserves a perfect local answer. Sometimes the better design is a cheap local no and an honest path for maybe.</p>
+          <pre data-lang="mental model"><code>wrong:
+store the whole truth everywhere
+
+right:
+store enough to reject most work locally
+confirm the rare maybe exactly</code></pre>
+          <p>A Bloom filter is not magic compression. It is a contract. You give up perfect yes answers, and in return the common no becomes small enough to keep close.</p>
+          <p>A Bloom filter does not prove danger. It earns the right to ask.</p>
+          <p class="closing">Do not ask whether the structure is clever. Ask whether the product can tolerate a maybe.</p>
+        </section>
+
+        <aside class="sources" aria-label="Sources and evidence">
+          <p class="source-label">Sources and evidence</p>
+          <p>Primary sources: Burton Bloom's <a href="https://www.cs.princeton.edu/courses/archive/spr05/cos598E/bib/p422-bloom.pdf">1970 Bloom filter paper</a>, the historical <a href="https://chromium.googlesource.com/chromium/chromium/+/refs/heads/main/chrome/browser/safe_browsing/bloom_filter.h">Chromium Safe Browsing BloomFilter header</a>, and Google's current Safe Browsing <a href="https://security.googleblog.com/2022/08/how-hash-based-safe-browsing-works-in.html">hash based design explanation</a>.</p>
+          <p>Original evidence: the companion Spring Boot implementation, its test suite, and its benchmark CSV. Local measurements are not claims about Google's production systems.</p>
+        </aside>
+
+        <footer class="article-footer">
+          <span>Daedalus Journal / Field note 16</span>
+          <button class="copy-button" type="button" data-copy-link>Copy article link</button>
+        </footer>
+      </article>
+    </main>
+
+    <script>
+      (() => {
+        const progress = document.querySelector('[data-progress]');
+        const copyButton = document.querySelector('[data-copy-link]');
+        let ticking = false;
+
+        function updateProgress() {
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          const value = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+          progress.style.transform = `scaleX(${value})`;
+          ticking = false;
+        }
+
+        window.addEventListener('scroll', () => {
+          if (!ticking) {
+            window.requestAnimationFrame(updateProgress);
+            ticking = true;
+          }
+        }, { passive: true });
+
+        copyButton.addEventListener('click', async () => {
+          const original = copyButton.textContent;
+          try {
+            await navigator.clipboard.writeText(window.location.href);
+            copyButton.textContent = 'Link copied';
+          } catch (error) {
+            copyButton.textContent = 'Copy failed';
+          }
+          window.setTimeout(() => { copyButton.textContent = original; }, 1600);
+        });
+
+        updateProgress();
+      })();
+    </script>
+  </body>
+</html>
