@@ -82,7 +82,7 @@
             <span class="eyebrow-dot" aria-hidden="true"></span>
             Engineering field notes
             <span aria-hidden="true">/</span>
-            14 deep dives
+            15 deep dives
           </p>
 
           <h1 id="hero-title">
@@ -101,7 +101,7 @@
                 <path d="M4 9h10M10 5l4 4-4 4"></path>
               </svg>
             </a>
-            <a class="text-link" href="articles/full-jitter-retry-storms.html">
+            <a class="text-link" href="articles/token-bucket-rate-limiting.html">
               Read the latest
               <span aria-hidden="true">↗</span>
             </a>
@@ -109,11 +109,11 @@
 
           <dl class="hero-facts" aria-label="Journal at a glance">
             <div>
-              <dt>14</dt>
+              <dt>15</dt>
               <dd>Deep dives</dd>
             </div>
             <div>
-              <dt>207</dt>
+              <dt>215</dt>
               <dd>Minutes of reading</dd>
             </div>
             <div>
@@ -209,7 +209,7 @@
         <a href="#articles" data-topic-jump="system-design">
           <span>01</span>
           System design
-          <small>11 notes</small>
+          <small>12 notes</small>
         </a>
         <a href="#articles" data-topic-jump="payments">
           <span>02</span>
@@ -245,8 +245,8 @@
           <button class="filter-button" type="button" data-filter="payments" aria-pressed="false">Payments</button>
           <button class="filter-button" type="button" data-filter="database" aria-pressed="false">Databases</button>
           <button class="filter-button" type="button" data-filter="protocols" aria-pressed="false">Protocols</button>
-          <span class="filter-count" data-filter-count>14 notes</span>
-          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 14 notes</span>
+          <span class="filter-count" data-filter-count>15 notes</span>
+          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 15 notes</span>
         </div>
 
         <article class="featured-story reveal" data-article data-categories="system-design">
@@ -294,6 +294,21 @@
         </article>
 
         <div class="article-grid">
+          <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #73d8c5;">
+            <div class="card-topline">
+              <span>Traffic control</span>
+              <span>8 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--files" aria-hidden="true">
+              <span>Burst</span><i></i><strong>Bucket</strong><i></i><span>Service</span>
+              <small>save · spend · refill</small>
+            </div>
+            <p class="card-number">15 / 15</p>
+            <h3><a href="articles/token-bucket-rate-limiting.html">A Token Bucket Enforces a Rate by Allowing a Burst</a></h3>
+            <p>How saved capacity admits a bounded burst, how refill controls sustained traffic, and why a leaky bucket makes a different waiting choice.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
+
           <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #d98272;">
             <div class="card-topline">
               <span>Retry engineering</span>
