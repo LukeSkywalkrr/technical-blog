@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>A Token Bucket Enforces a Rate by Allowing a Burst | Daedalus Journal</title>
+    <meta name="description" content="Token buckets separate sustained traffic from burst capacity, making an apparent rate limit loophole an explicit design choice.">
+    <meta name="author" content="Pratyush">
+    <meta name="theme-color" content="#090b0b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="A Token Bucket Enforces a Rate by Allowing a Burst">
+    <meta property="og:description" content="How saved capacity lets a token bucket admit a bounded burst without abandoning its sustained rate.">
+    <meta property="og:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/assets/token-bucket-rate-limiting.png">
+    <meta property="og:image:width" content="1980">
+    <meta property="og:image:height" content="1392">
+    <meta property="og:image:alt" content="Token bucket request path showing a bounded burst, a shared bucket, and a protected service">
+    <meta property="article:published_time" content="2026-09-25">
+    <meta property="article:author" content="Pratyush">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="A Token Bucket Enforces a Rate by Allowing a Burst">
+    <meta name="twitter:description" content="How saved capacity lets a token bucket admit a bounded burst without abandoning its sustained rate.">
+    <meta name="twitter:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/assets/token-bucket-rate-limiting.png">
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --ink: #f4f1ea;
+        --muted: #9d9890;
+        --soft: #c9c4ba;
+        --page: #090b0b;
+        --panel: #101413;
+        --panel-2: #151a18;
+        --line: #2a302e;
+        --gold: #d6b879;
+        --teal: #73d8c5;
+        --sans: "IBM Plex Sans", system-ui, sans-serif;
+        --serif: "Newsreader", Georgia, serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 14% 8%, rgba(115, 216, 197, .08), transparent 28rem),
+          radial-gradient(circle at 86% 22%, rgba(214, 184, 121, .08), transparent 32rem),
+          var(--page);
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 1.08rem;
+        line-height: 1.76;
+        overflow-x: hidden;
+      }
+
+      a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: .2em; }
+      a:hover { color: var(--ink); }
+      a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+      .skip-link { position: fixed; left: 1rem; top: -6rem; z-index: 100; padding: .65rem .85rem; background: var(--gold); color: #111; font: 600 .82rem/1 var(--sans); }
+      .skip-link:focus { top: 1rem; }
+      .progress { position: fixed; inset: 0 auto auto 0; z-index: 80; width: 100%; height: 3px; background: linear-gradient(90deg, var(--teal), var(--gold)); transform: scaleX(0); transform-origin: left; }
+      .masthead { position: sticky; top: 0; z-index: 60; border-bottom: 1px solid rgba(214, 184, 121, .15); background: rgba(9, 11, 11, .9); backdrop-filter: blur(18px); }
+      .nav-shell { width: min(1120px, calc(100% - 2rem)); min-height: 4.4rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .brand { display: inline-flex; align-items: center; gap: .7rem; color: var(--ink); text-decoration: none; font-family: var(--sans); }
+      .brand-mark { width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border: 1px solid var(--gold); color: var(--gold); }
+      .brand-mark svg { width: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.4; }
+      .brand-copy { display: grid; line-height: 1.05; }
+      .brand-copy strong { font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; }
+      .brand-copy small { color: var(--muted); font-size: .64rem; letter-spacing: .08em; }
+      .nav-link { color: var(--soft); font: 500 .8rem/1 var(--sans); text-decoration: none; }
+
+      main { display: block; }
+      .hero { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(4rem, 9vw, 8rem) 0 clamp(3rem, 7vw, 6rem); display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .55fr); gap: clamp(2.5rem, 7vw, 7rem); align-items: end; }
+      .eyebrow, .section-label, .meta, .quick-label, .source-label { font-family: var(--sans); text-transform: uppercase; letter-spacing: .12em; }
+      .eyebrow { margin: 0 0 1.2rem; color: var(--teal); font-size: .72rem; font-weight: 600; }
+      h1 { max-width: 13ch; margin: 0; font-family: var(--serif); font-size: clamp(3.15rem, 8vw, 6.7rem); font-weight: 500; letter-spacing: -.055em; line-height: .92; text-wrap: balance; }
+      h1 em { color: var(--gold); font-weight: 400; }
+      .dek { max-width: 42rem; margin: 1.7rem 0 0; color: var(--soft); font-size: clamp(1.2rem, 2vw, 1.45rem); line-height: 1.42; }
+      .meta { display: flex; flex-wrap: wrap; gap: .55rem 1rem; margin-top: 1.7rem; color: var(--muted); font-size: .68rem; }
+      .meta span + span::before, .meta time + span::before { content: "·"; margin-right: 1rem; color: var(--gold); }
+      .claim-map { min-height: 25rem; padding: 1.2rem; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(21, 26, 24, .95), rgba(10, 13, 12, .95)); box-shadow: 0 30px 80px rgba(0, 0, 0, .28); }
+      .claim-map::before { content: "EXECUTABLE CLAIM"; display: block; margin-bottom: 1.4rem; color: var(--muted); font: 600 .62rem/1 var(--mono); letter-spacing: .14em; }
+      .path-node { position: relative; padding: 1rem; border: 1px solid var(--line); background: var(--panel); }
+      .path-node + .path-node { margin-top: 2.2rem; }
+      .path-node + .path-node::before { content: "↓"; position: absolute; left: 50%; top: -2rem; color: var(--gold); transform: translateX(-50%); }
+      .path-node strong { display: block; font: 600 1rem/1.2 var(--sans); }
+      .path-node span { display: block; margin-top: .3rem; color: var(--muted); font: .75rem/1.5 var(--mono); }
+      .path-node.is-accent { border-color: rgba(115, 216, 197, .7); }
+      .path-node.is-result { border-color: rgba(214, 184, 121, .75); }
+
+      .article-shell { width: min(780px, calc(100% - 2rem)); margin: 0 auto; padding-bottom: 5rem; }
+      .quick-take { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin-bottom: 2rem; }
+      .quick-card { min-height: 9rem; padding: 1rem; border-top: 1px solid var(--gold); background: var(--panel); }
+      .quick-label { display: block; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .quick-card strong { display: block; margin-top: .65rem; font: 500 1.08rem/1.35 var(--serif); }
+      .quick-card p { margin: .5rem 0 0; color: var(--muted); font: .77rem/1.5 var(--sans); }
+      .evidence-figure { margin: 0 0 3.5rem; padding: .7rem; border: 1px solid var(--line); background: #111; }
+      .evidence-figure img { display: block; width: 100%; height: auto; }
+      .evidence-figure figcaption { padding: .75rem .35rem .15rem; color: var(--muted); font: .72rem/1.5 var(--sans); }
+      .toc { margin: 0 0 4rem; padding: 1.2rem 1.3rem; border: 1px solid var(--line); background: rgba(16, 20, 19, .75); }
+      .toc p { margin: 0 0 .75rem; color: var(--muted); font: 600 .65rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; }
+      .toc ol { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1.25rem; list-style: none; counter-reset: toc; }
+      .toc li { counter-increment: toc; }
+      .toc a { color: var(--soft); font: .78rem/1.35 var(--sans); text-decoration: none; }
+      .toc a::before { content: counter(toc, decimal-leading-zero) "  "; color: var(--gold); font-family: var(--mono); }
+      .section { padding: 3.5rem 0 1rem; scroll-margin-top: 5rem; }
+      .section + .section { border-top: 1px solid var(--line); }
+      .section-label { margin: 0 0 .8rem; color: var(--teal); font-size: .64rem; font-weight: 600; }
+      h2 { margin: 0 0 1.35rem; font-family: var(--serif); font-size: clamp(2rem, 5vw, 3.15rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
+      p { margin: 0; }
+      .section p + p { margin-top: 1.15rem; }
+      .section > p:first-of-type { color: var(--soft); font-size: 1.18rem; line-height: 1.65; }
+      code { font-family: var(--mono); }
+      p code { padding: .08em .3em; border: 1px solid var(--line); background: var(--panel-2); color: var(--gold); font-size: .82em; }
+      pre { position: relative; margin: 1.55rem 0; padding: 1.25rem; overflow-x: auto; border: 1px solid var(--line); border-left: 3px solid var(--gold); background: #070908; color: #ddd9d0; font: .78rem/1.68 var(--mono); tab-size: 2; }
+      pre[data-lang]::before { content: attr(data-lang); display: block; margin-bottom: .75rem; color: var(--muted); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; }
+      .callout { margin: 1.7rem 0; padding: 1.25rem; border-left: 3px solid var(--teal); background: rgba(115, 216, 197, .065); }
+      .callout strong { display: block; margin-bottom: .35rem; color: var(--teal); font: 600 .68rem/1.2 var(--sans); letter-spacing: .1em; text-transform: uppercase; }
+      .benchmark { display: grid; grid-template-columns: repeat(2, 1fr); gap: .8rem; margin: 1.7rem 0; }
+      .metric { padding: 1.1rem; border: 1px solid var(--line); background: var(--panel); }
+      .metric span { display: block; color: var(--muted); font: .65rem/1.2 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
+      .metric strong { display: block; margin-top: .45rem; color: var(--gold); font: 500 2rem/1 var(--serif); }
+      .metric small { display: block; margin-top: .45rem; color: var(--soft); font: .68rem/1.4 var(--mono); }
+      .closing { margin-top: 1.8rem; padding: 1.4rem; border: 1px solid var(--gold); color: var(--gold); font-size: 1.45rem; line-height: 1.35; }
+      .sources { margin-top: 4rem; padding: 1.35rem; border: 1px solid var(--line); background: var(--panel); }
+      .source-label { margin: 0 0 .7rem; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .sources p { color: var(--muted); font: .78rem/1.65 var(--sans); }
+      .sources p + p { margin-top: .6rem; }
+      .article-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--line); color: var(--muted); font: .73rem/1.5 var(--sans); }
+      .copy-button { padding: .55rem .75rem; border: 1px solid var(--line); background: var(--panel); color: var(--soft); cursor: pointer; font: 500 .72rem/1 var(--sans); }
+
+      @media (max-width: 820px) {
+        .hero { grid-template-columns: 1fr; }
+        .claim-map { min-height: auto; }
+      }
+      @media (max-width: 620px) {
+        body { font-size: 1rem; }
+        .brand-copy small { display: none; }
+        .quick-take, .toc ol, .benchmark { grid-template-columns: 1fr; }
+        .quick-card { min-height: auto; }
+        .meta span + span::before, .meta time + span::before { content: none; }
+        h1 { font-size: clamp(3rem, 16vw, 4.8rem); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#article">Skip to article</a>
+    <div class="progress" data-progress aria-hidden="true"></div>
+
+    <header class="masthead">
+      <div class="nav-shell">
+        <a class="brand" href="../index.html" aria-label="Daedalus Journal home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 42" role="presentation">
+              <path d="M8 31.5 21 7l13 24.5M12.5 26h17M16 19.5h10"></path>
+              <path d="M8.5 31.5h25"></path>
+            </svg>
+          </span>
+          <span class="brand-copy">
+            <strong>Daedalus</strong>
+            <small>Engineering journal</small>
+          </span>
+        </a>
+        <a class="nav-link" href="../index.html#articles">All articles</a>
+      </div>
+    </header>
+
+    <main id="article">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Distributed systems / Reliability / Traffic control</p>
+          <h1>Enforce the rate. <em>Let the burst through.</em></h1>
+          <p class="dek">A token bucket turns idle capacity into explicit permission for a bounded burst.</p>
+          <div class="meta">
+            <span>By Pratyush</span>
+            <time datetime="2026-09-25">25 September 2026</time>
+            <span>8 min read</span>
+          </div>
+        </div>
+
+        <div class="claim-map" role="img" aria-label="Twenty concurrent requests reach a token bucket with ten saved tokens. Ten pass immediately and ten are rejected.">
+          <div class="path-node">
+            <strong>20 requests arrive together</strong>
+            <span>one logical instant</span>
+          </div>
+          <div class="path-node is-accent">
+            <strong>10 saved tokens</strong>
+            <span>5 tokens return each second</span>
+          </div>
+          <div class="path-node is-result">
+            <strong>10 pass immediately</strong>
+            <span>10 receive rejection</span>
+          </div>
+        </div>
+      </header>
+
+      <article class="article-shell">
+        <div class="quick-take" aria-label="Quick take">
+          <div class="quick-card">
+            <span class="quick-label">The policy</span>
+            <strong>A sustained rate is not a burst limit.</strong>
+            <p>They protect different time horizons.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The mechanism</span>
+            <strong>Idle time becomes saved permission.</strong>
+            <p>Each admitted request spends one token.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The cost</span>
+            <strong>A larger bucket permits a sharper spike.</strong>
+            <p>Responsiveness now reduces permission later.</p>
+          </div>
+        </div>
+
+        <figure class="evidence-figure">
+          <img src="../assets/token-bucket-rate-limiting.png" width="1980" height="1392" loading="lazy" alt="A concurrent burst enters a request pipeline that identifies the caller, refills a shared token bucket, spends one token, and protects the downstream service.">
+          <figcaption>The bounded write path, from one concurrent burst through shared permission to the protected service.</figcaption>
+        </figure>
+
+        <nav class="toc" aria-label="Article contents">
+          <p>Trace the burst and the tradeoff</p>
+          <ol>
+            <li><a href="#obvious-counter">The obvious counter</a></li>
+            <li><a href="#saved-capacity">Saved capacity</a></li>
+            <li><a href="#leaky-comparison">The leaky comparison</a></li>
+            <li><a href="#benchmark">Executable evidence</a></li>
+            <li><a href="#break-it">Adversarial tests</a></li>
+            <li><a href="#general-lesson">The general lesson</a></li>
+          </ol>
+        </nav>
+
+        <section class="section" id="obvious-counter">
+          <p class="section-label">01 / The naive solution</p>
+          <h2>The Obvious Counter Hides a Boundary</h2>
+          <p>The first rate limiter almost writes itself. Count requests during a fixed interval. Reject anything above the configured limit. The code is small enough to trust at a glance.</p>
+          <pre data-lang="java"><code>long second = clock.instant().getEpochSecond();
+AtomicInteger count = counters.computeIfAbsent(
+    second, ignored -&gt; new AtomicInteger());
+if (count.incrementAndGet() &gt; limitPerSecond) {
+    throw new TooManyRequestsException();
+}</code></pre>
+          <p>That limiter enforces a number. It does not enforce the traffic shape most people imagine. Dense groups can land on opposite sides of a reset and reach the backend almost together.</p>
+          <pre data-lang="window boundary"><code>window A                  window B
+...............||||| | |||||...............
+               reset ^</code></pre>
+          <p>The counter is reasonable. The clock boundary is the hidden policy.</p>
+        </section>
+
+        <section class="section" id="flash-sale">
+          <p class="section-label">02 / Legitimate bursts</p>
+          <h2>A Flash Sale Arrives Between Ticks</h2>
+          <p>Alice opens a flash sale. A legitimate checkout batch reaches the API at once. The service was quiet before the event, so it has spare capacity, but a rigid smoother makes every caller wait.</p>
+          <pre data-lang="traffic shape"><code>quiet traffic → flash sale burst → quiet traffic
+...............██████████.................</code></pre>
+          <p>A fixed window can fail in the other direction. It forgets the cluster immediately before its reset, then admits the next cluster as if the first never happened.</p>
+          <pre data-lang="counter state"><code>counter before reset: full
+counter after reset:  empty
+backend sees:          adjacent bursts</code></pre>
+          <p>The useful question is how much accumulated capacity may be spent at once.</p>
+        </section>
+
+        <section class="section" id="two-policies">
+          <p class="section-label">03 / Separate controls</p>
+          <h2>A Rate Is Not a Burst Policy</h2>
+          <p>A sustained rate and a burst limit answer different operational questions. The sustained rate protects long running capacity. The burst limit decides how much short lived concurrency the backend may see.</p>
+          <pre data-lang="policy"><code>steady rate  → long term admission pace
+burst limit  → maximum saved permission</code></pre>
+          <p>Stripe’s engineering article says its request rate limiter can <a href="https://stripe.com/blog/rate-limiters">briefly burst above the cap</a> for sudden real time events. That behavior defines the desired traffic shape. It does not bypass it.</p>
+        </section>
+
+        <section class="section" id="saved-capacity">
+          <p class="section-label">04 / Token state</p>
+          <h2>Saved Capacity Becomes Tokens</h2>
+          <p>A token bucket makes the policy tangible. The bucket starts full. Every admitted request removes a token. Passing time adds tokens until capacity is reached. An empty bucket rejects new work.</p>
+          <pre data-lang="mechanism"><code>time passes          request arrives
+    |                      |
+    v                      v
+refill tokens ------&gt; spend one token
+    |                      |
+    +---- cap bucket &lt;-----+</code></pre>
+          <p>Stripe describes a centralized bucket, with one bucket per user, and says its limiter implementation uses Redis. The small repository keeps state in memory so the algorithm stays visible.</p>
+          <div class="callout">
+            <strong>The counterintuitive core</strong>
+            Idle time becomes permission for future work. A burst is saved capacity being spent.
+          </div>
+        </section>
+
+        <section class="section" id="capacity-rate">
+          <p class="section-label">05 / Independent parameters</p>
+          <h2>Capacity And Refill Rate Answer Different Questions</h2>
+          <p>The local demo uses capacity <code>10</code> and refill rate <code>5</code> requests per second. Those values are benchmark parameters, not Stripe settings.</p>
+          <pre data-lang="configuration"><code>capacity = 10 tokens
+refill   = 5 tokens / second</code></pre>
+          <p>Capacity bounds the immediate burst. Refill rate bounds sustained admission after the saved tokens disappear. Raising capacity does not improve the long term rate. It only makes the next cluster sharper.</p>
+          <pre data-lang="tradeoff"><code>larger bucket → faster burst → deeper later drought
+smaller bucket → smoother load → earlier rejection</code></pre>
+        </section>
+
+        <section class="section" id="atomic-spend">
+          <p class="section-label">06 / Atomic permission</p>
+          <h2>A Token Bucket Spends Credit Immediately</h2>
+          <p>The executable implementation needs bounded state and a monotonic timestamp. It accounts for elapsed time, then spends one token if possible.</p>
+          <pre data-lang="java"><code>public synchronized RateLimitDecision tryAcquire(long nowNanos) {
+    if (nowNanos &gt; lastRefillNanos) {
+        double elapsed = (nowNanos - lastRefillNanos) / NANOS_PER_SECOND;
+        tokens = Math.min(capacity, tokens + elapsed * refillPerSecond);
+        lastRefillNanos = nowNanos;
+    }
+    if (tokens &lt; 1.0) return RateLimitDecision.rejected();
+    tokens -= 1.0;
+    return RateLimitDecision.accepted(0L);
+}</code></pre>
+          <p>The synchronization is load bearing. Without one atomic decision around refill and spend, concurrent callers can observe the same remaining token.</p>
+          <pre data-lang="atomic boundary"><code>read tokens → refill → compare → decrement → persist
+              one atomic decision</code></pre>
+        </section>
+
+        <section class="section" id="leaky-comparison">
+          <p class="section-label">07 / Smoothing instead</p>
+          <h2>A Leaky Bucket Turns Credit Into Waiting</h2>
+          <p>A leaky bucket answers the burst question differently. It accepts a bounded queue, then dispatches work at a steady pace. Incoming callers may be admitted without reaching the protected service immediately.</p>
+          <pre data-lang="queue"><code>burst → [ queued work ] → one paced stream
+          finite depth       constant leak</code></pre>
+          <p>With the demo’s rate, the final accepted request waits <code>2,000 ms</code>. The measured mean wait is <code>1,100 ms</code>.</p>
+          <pre data-lang="dispatch"><code>leaky: paced dispatch slots ... final delay 2000 ms
+token: immediate dispatch    ... final delay    0 ms</code></pre>
+          <p>The token bucket favors short event responsiveness. The leaky bucket favors a smoother downstream arrival pattern.</p>
+        </section>
+
+        <section class="section" id="benchmark">
+          <p class="section-label">08 / Executable evidence</p>
+          <h2>The Local Benchmark Makes the Tradeoff Visible</h2>
+          <p>The Spring Boot entrypoint releases <code>20</code> virtual threads against each limiter at one logical instant. Both limiters have identical capacity and rate. Concurrent admission is real, while the logical clock makes the result reproducible.</p>
+          <div class="benchmark" aria-label="Local benchmark result">
+            <div class="metric">
+              <span>Token bucket</span>
+              <strong>10</strong>
+              <small>immediate dispatches</small>
+            </div>
+            <div class="metric">
+              <span>Leaky bucket</span>
+              <strong>2,000 ms</strong>
+              <small>maximum dispatch delay</small>
+            </div>
+          </div>
+          <pre data-lang="csv"><code>mode,total_requests,accepted,rejected,immediate_dispatch,max_dispatch_delay_ms
+token_bucket,20,10,10,10,0
+leaky_bucket,20,10,10,0,2000</code></pre>
+          <p>The token bucket admits <code>10</code> immediately and rejects <code>10</code> after capacity is spent. The leaky bucket also admits <code>10</code> and rejects <code>10</code>, but only <code>5</code> accepted requests dispatch within the first second. These are local repository measurements.</p>
+        </section>
+
+        <section class="section" id="four-controls">
+          <p class="section-label">09 / Protection scopes</p>
+          <h2>Four Production Controls Protect Different Things</h2>
+          <p>The source article names <a href="https://stripe.com/blog/rate-limiters">four limiter types used in production</a>. Their scopes are distinct, so a token bucket should not become a universal overload story.</p>
+          <pre data-lang="scope"><code>request rate       → one user's sustained traffic
+concurrent work    → expensive in flight endpoints
+fleet reservation → capacity for critical methods
+worker shedding   → available server workers</code></pre>
+          <p>The first controls traffic that can be paced. The next controls work already in progress. The final pair make system wide decisions when capacity is threatened.</p>
+        </section>
+
+        <section class="section" id="shared-state">
+          <p class="section-label">10 / Distributed authority</p>
+          <h2>Redis Makes the Decision Shared</h2>
+          <p>An in memory bucket protects one application instance. Put the same user through another instance and a second bucket appears. Each process can believe it is within the limit while the shared backend receives their sum.</p>
+          <pre data-lang="topology"><code>instance A bucket --+
+                    +--&gt; protected backend
+instance B bucket --+</code></pre>
+          <p>Every participant must spend from one authoritative budget, with refill and decrement performed atomically.</p>
+          <pre data-lang="shared decision"><code>identity → shared bucket key → atomic acquire</code></pre>
+          <p>Shared state adds network latency, expiry, partition behavior, and hot key risk. The repository states that it does not model those production concerns.</p>
+        </section>
+
+        <section class="section" id="failure-policy">
+          <p class="section-label">11 / Operational behavior</p>
+          <h2>Failure Policy Belongs Inside the Limiter</h2>
+          <p>The limiter will eventually fail. Its store can time out. Configuration can be wrong. Stripe recommends catching operational errors so limiter failures do not take the API down, plus a kill switch and clear responses.</p>
+          <pre data-lang="responses"><code>empty user bucket → 429 Too Many Requests
+system shedding   → 503 Service Unavailable
+limiter failure   → explicit fail open policy</code></pre>
+          <p>Fail open preserves the API but weakens protection. Fail closed protects capacity but turns limiter trouble into an outage. The route decides which failure is more dangerous.</p>
+        </section>
+
+        <section class="section" id="dark-launch">
+          <p class="section-label">12 / Safe rollout</p>
+          <h2>A Dark Launch Reveals the Missing Policy</h2>
+          <p>The safest first deployment observes rather than rejects. Stripe recommends dark launching each limiter, inspecting what it would block, tuning thresholds, and adding safeguards before enforcement.</p>
+          <pre data-lang="rollout"><code>observe → record would reject → tune → enforce</code></pre>
+          <p>This stage exposes identities with surprising traffic, endpoints that cannot tolerate pacing, and bursts that represent ordinary business rather than abuse.</p>
+        </section>
+
+        <section class="section" id="build-one">
+          <p class="section-label">13 / Build one</p>
+          <h2>Build The Dumb Version Yourself</h2>
+          <p>Start with one process and one clock. Keep the mechanism small enough to inspect quickly.</p>
+          <pre data-lang="checklist"><code>[ ] create a full token bucket
+[ ] release concurrent callers together
+[ ] record every admission decision
+[ ] compare immediate and paced dispatch
+[ ] write the evidence as CSV</code></pre>
+          <p>Then run the Spring Boot entrypoint. It prints and writes the exact evidence used above.</p>
+          <pre data-lang="bash"><code>./gradlew bootRun</code></pre>
+          <p>Add shared storage only after the property is clear. Infrastructure should make the atomic boundary durable, not hide an undefined policy.</p>
+        </section>
+
+        <section class="section" id="break-it">
+          <p class="section-label">14 / Adversarial proof</p>
+          <h2>Then Break It</h2>
+          <p>Correctness lives at the edges: the simultaneous spend, the partial refill, and the broken clock. The test suite attacks those edges directly.</p>
+          <pre data-lang="test plan"><code>many callers at one instant → accepted never exceeds capacity
+long idle period            → refill never exceeds capacity
+clock moves backwards       → no tokens appear
+fractional refill           → no extra admission
+invalid configuration       → fail before traffic</code></pre>
+          <p>Also compare both algorithms under the identical burst. If the token bucket stops dispatching immediately, or the leaky bucket stops spacing work, the implementation has lost the behavior being explained.</p>
+          <pre data-lang="bash"><code>./gradlew test</code></pre>
+        </section>
+
+        <section class="section" id="general-lesson">
+          <p class="section-label">15 / The part that generalizes</p>
+          <h2>The Larger Lesson Is To Name the Budget</h2>
+          <p>Rate limiting is resource allocation with time attached. A bucket names the budget, the identity that owns it, the rate at which it recovers, and the maximum pressure the backend will accept as a burst.</p>
+          <p>A limit is not a wall. It is a budget with a clock.</p>
+          <pre data-lang="mental model"><code>wrong model: limit = one rigid ceiling
+right model: rate + burst + scope + failure policy</code></pre>
+          <p>The naive question asks for a requests per second number. The better question asks which resource is protected, how much saved capacity may arrive together, and what happens when the limiter itself fails.</p>
+          <p class="closing">A burst does not break the limit when burst capacity is part of the limit.</p>
+        </section>
+
+        <aside class="sources" aria-label="Sources and evidence">
+          <p class="source-label">Sources and evidence</p>
+          <p>Primary source: Paul Tarjan’s <a href="https://stripe.com/blog/rate-limiters">Scaling your API with rate limiters</a> on the Stripe Engineering blog.</p>
+          <p>Original evidence: the companion <a href="https://github.com/LukeSkywalkrr/token-bucket/pull/1">Spring Boot implementation pull request</a>, its test suite, and its benchmark CSV. All timing values are deterministic dispatch delays from the local model, not Stripe production latency.</p>
+        </aside>
+
+        <footer class="article-footer">
+          <span>Daedalus Journal / Field note 15</span>
+          <button class="copy-button" type="button" data-copy-link>Copy article link</button>
+        </footer>
+      </article>
+    </main>
+
+    <script>
+      (() => {
+        const progress = document.querySelector('[data-progress]');
+        const copyButton = document.querySelector('[data-copy-link]');
+        let ticking = false;
+
+        function updateProgress() {
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          const value = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+          progress.style.transform = `scaleX(${value})`;
+          ticking = false;
+        }
+
+        window.addEventListener('scroll', () => {
+          if (!ticking) {
+            window.requestAnimationFrame(updateProgress);
+            ticking = true;
+          }
+        }, { passive: true });
+
+        copyButton.addEventListener('click', async () => {
+          const original = copyButton.textContent;
+          try {
+            await navigator.clipboard.writeText(window.location.href);
+            copyButton.textContent = 'Link copied';
+          } catch (error) {
+            copyButton.textContent = 'Copy failed';
+          }
+          window.setTimeout(() => { copyButton.textContent = original; }, 1600);
+        });
+
+        updateProgress();
+      })();
+    </script>
+  </body>
+</html>
