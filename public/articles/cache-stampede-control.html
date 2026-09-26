@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>One Expired Cache Key Can Become Five Thousand Database Calls, Daedalus Journal</title>
+    <meta name="description" content="Cache stampedes happen when many readers cross the same expiry boundary, and leases or probabilistic early refresh turn that cliff into controlled work.">
+    <meta name="theme-color" content="#090b0b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="One Expired Cache Key Can Become Five Thousand Database Calls">
+    <meta property="og:description" content="A practical walkthrough of cache stampedes, Facebook memcache leases, XFetch, and a local Spring Boot benchmark.">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="One Expired Cache Key Can Become Five Thousand Database Calls">
+    <meta name="twitter:description" content="A practical walkthrough of cache stampedes, Facebook memcache leases, XFetch, and a local Spring Boot benchmark.">
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../assets/styles.css">
+    <style>
+      body.post-page {
+        --surface-0: #000000;
+        --surface-1: #060707;
+        --surface-2: #070808;
+        --surface-3: #101214;
+        --text-primary: #f4f1ea;
+        --text-secondary: #c9c4ba;
+        --text-muted: #8f887d;
+        --text-accent: #c9a46a;
+        --text-accent-2: #9ab3ad;
+        --border: #282724;
+        --border-strong: #665b48;
+      }
+      .stampede-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 2rem; }
+      .stampede-grid > div { min-height: 7rem; padding: 1rem; border: 1px solid var(--border); border-radius: 8px; background: #070808; }
+      .stampede-grid span { display: block; margin-bottom: 0.65rem; color: var(--text-muted); font-size: 0.72rem; font-weight: 760; letter-spacing: 0.11em; text-transform: uppercase; }
+      .stampede-grid strong { display: block; color: var(--text-primary); font-size: 0.95rem; line-height: 1.55; }
+      .meta { gap: 0.9rem !important; }
+      .meta-dot { display: inline-block !important; flex: 0 0 3px; background: var(--border-strong) !important; }
+      .metric-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 1.5rem 0 2.25rem; }
+      .metric-strip div { border: 1px solid var(--border); border-radius: 8px; background: #060707; padding: 1rem; }
+      .metric-strip b { display: block; color: var(--text-accent); font-family: var(--font-mono); font-size: 1.05rem; margin-bottom: 0.35rem; }
+      .metric-strip span { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.55; }
+      .code-block code { border: 0; padding: 0; }
+      .source-note a { color: var(--text-accent); }
+      @media (max-width: 760px) { .stampede-grid, .metric-strip { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body class="post-page">
+    <header class="site-header">
+      <a class="brand" href="../index.html" aria-label="Daedalus Journal home">
+        <span class="brand-mark">DJ</span>
+        <span>Daedalus Journal</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation"><a href="../index.html">Articles</a></nav>
+    </header>
+    <main>
+      <div class="article-shell"><a class="article-back" href="../index.html">Back to articles</a></div>
+      <article class="article">
+        <div class="hero">
+          <div class="eyebrow">Distributed Systems</div>
+          <h1>One Expired Cache Key Can Become Five Thousand Database Calls</h1>
+          <p class="hero-sub">A cache expiry looks like deletion, but under load it behaves like a schedule. Every reader reaches the same boundary with the same information.</p>
+          <div class="meta"><span>8 min read</span><span class="meta-dot"></span><span>Java 21 Spring Boot demo</span><span class="meta-dot"></span><span>Facebook memcache and XFetch</span></div>
+          <div class="stampede-grid" aria-label="Article summary">
+            <div><span>Failure mode</span><strong>One hot key expires and 1,000 readers all rebuild it.</strong></div>
+            <div><span>Lease rule</span><strong>One reader gets the repair token. Everyone else waits.</strong></div>
+            <div><span>Local result</span><strong>The demo reduces 5,000 origin calls to 5 with leases.</strong></div>
+          </div>
+        </div>
+
+        <nav class="toc" aria-label="Table of contents">
+          <div class="toc-title">In this article</div>
+          <ol>
+            <li><a href="#s1">The Simple Cache Code Is Almost Embarrassingly Obvious</a></li>
+            <li><a href="#s2">The Bug Is A Boundary Shared By Everyone</a></li>
+            <li><a href="#s3">Facebook Names This A Thundering Herd</a></li>
+            <li><a href="#s4">A Lease Makes The Miss Conditional</a></li>
+            <li><a href="#s5">XFetch Fixes The Cliff Before It Arrives</a></li>
+            <li><a href="#s6">The Local Run Makes The Claim Executable</a></li>
+            <li><a href="#s7">The Tradeoff Is Control Complexity</a></li>
+            <li><a href="#s8">The Part That Generalizes</a></li>
+          </ol>
+        </nav>
+
+        <div class="metric-strip" aria-label="Benchmark summary">
+          <div><b>5,000</b><span>Origin fetches from naive cache aside in the local run.</span></div>
+          <div><b>5</b><span>Origin fetches when the lease path owns each repair window.</span></div>
+          <div><b>25</b><span>Origin fetches with XFetch early refresh in the same run.</span></div>
+        </div>
+
+        <section class="section" id="s1">
+          <div class="section-label">Part 1</div>
+          <h2>The Simple Cache Code Is Almost Embarrassingly Obvious</h2>
+          <p>The schema more or less writes itself. Keep a value. Keep an expiry. When the value is missing, rebuild it and put it back.</p>
+          <div class="code-block">
+            <div class="code-label">Java</div>
+            <pre><code>Value get(String key) {
+    Value value = cache.get(key);
+    if (value == null || value.isExpired(now())) {
+        value = origin.load(key);
+        cache.put(key, value, ttl);
+    }
+    return value;
+}</code></pre>
+          </div>
+          <p>This is not foolish code. It is the pattern most teams mean when they say cache aside. It only breaks when many callers make the same reasonable decision together.</p>
+          <div class="code-block">
+            <div class="code-label">Trace</div>
+            <pre><code>read key
+miss
+query database
+write cache
+return value</code></pre>
+          </div>
+          <p>The single request trace looks perfect. One user pays the cost, the next user gets the cached value, and the database avoids repeated work. The trace stops being true when the miss path takes longer than the gap between readers.</p>
+        </section>
+
+        <section class="section" id="s2">
+          <div class="section-label">Part 2</div>
+          <h2>The Bug Is A Boundary Shared By Everyone</h2>
+          <p>A cache expiry is a public deadline. Every reader sees the same wall clock and the same missing value.</p>
+          <div class="code-block">
+            <div class="code-label">Timeline</div>
+            <pre><code>09:00:00.000  key expires
+09:00:00.001  reader 1 misses
+09:00:00.001  reader 2 misses
+09:00:00.001  reader 3 misses</code></pre>
+          </div>
+          <p>The XFetch paper gives the simple arithmetic: if a cache item is accessed 10 times per second and recomputation takes 3 seconds, then 30 requests can recompute it. The cache did not reduce work. It synchronized it.</p>
+          <p>That example does not need exotic traffic. Ten requests per second is an ordinary hot page. Three seconds is an ordinary expensive regeneration. The multiplication is the outage hiding inside normal numbers.</p>
+        </section>
+
+        <section class="section" id="s3">
+          <div class="section-label">Part 3</div>
+          <h2>Facebook Names This A Thundering Herd</h2>
+          <p>Facebook's memcache paper says its system processed over a billion requests per second and stored trillions of items. At that scale, a hot key is not just a local inefficiency.</p>
+          <div class="code-block">
+            <div class="code-label">Trace</div>
+            <pre><code>one key
+many readers
+one expiry
+many database trips</code></pre>
+          </div>
+          <p>The paper describes a thundering herd as what happens when heavy read and write activity repeatedly invalidates a key, so reads fall back to the more costly path.</p>
+          <p>Notice the write side in that sentence. This is not only about a key aging out peacefully. A busy object can be invalidated repeatedly by writes, and each invalidation sends readers back toward the database before the cache has a stable answer again.</p>
+        </section>
+
+        <section class="section" id="s4">
+          <div class="section-label">Part 4</div>
+          <h2>A Lease Makes The Miss Conditional</h2>
+          <p>Facebook's fix is to make a cache miss carry authority. Memcached gives one client a lease token for the key. The token is 64 bits, and the client must present it when writing the regenerated value.</p>
+          <div class="code-block">
+            <div class="code-label">Trace</div>
+            <pre><code>reader A misses -&gt; receives lease token
+reader B misses -&gt; told to wait
+reader C misses -&gt; told to wait
+reader A writes -&gt; token is verified</code></pre>
+          </div>
+          <p>This changes the question from who noticed the miss to who is allowed to repair it.</p>
+          <div class="code-block">
+            <div class="code-label">Rule</div>
+            <pre><code>without lease: every miss can rebuild
+with lease:    one miss can rebuild</code></pre>
+          </div>
+          <p>For herds, Facebook adds a small rule: by default, memcached returns a token only once every 10 seconds per key. Other readers receive a special notification telling them to wait briefly.</p>
+          <p>In the paper's measurement for herd prone keys, peak database query rate fell from 17K/s without leases to 1.3K/s with leases. The number matters because databases are provisioned for peaks.</p>
+        </section>
+
+        <section class="section" id="s5">
+          <div class="section-label">Part 5</div>
+          <h2>XFetch Fixes The Cliff Before It Arrives</h2>
+          <p>Leases control the miss after it happens. XFetch asks a stranger question: what if the cache refreshes before the hard expiry?</p>
+          <div class="code-block">
+            <div class="code-label">XFetch sketch</div>
+            <pre><code>value, delta, expiry = cache.read(key)
+gap = -delta * beta * log(rand())
+if now + gap &gt;= expiry:
+    value = origin.load(key)</code></pre>
+          </div>
+          <p>The delta is the last recomputation time. The random gap is exponential. The default beta in the paper is 1.</p>
+          <p>Scaling by recomputation time is what makes the rule practical. A value that takes longer to rebuild starts asking for earlier refreshes. A cheap value can wait closer to expiry because its stampede window is smaller.</p>
+          <div class="code-block">
+            <div class="code-label">Shape</div>
+            <pre><code>hard expiry:
+                 |||||||||||||||||| origin
+
+exponential early expiry:
+          |       |    |       |     origin</code></pre>
+          </div>
+          <p>In the paper's experiment with 10 second regeneration, exponential gaps produced stampedes mostly of size 1 or 2, with none larger than 8. Uniform gaps were closer to 10 on average and sometimes 20 or more.</p>
+        </section>
+
+        <section class="section" id="s6">
+          <div class="section-label">Part 6</div>
+          <h2>The Local Run Makes The Claim Executable</h2>
+          <p>The Spring Boot repo simulates one hot key, 1,000 readers, 5 expiry cycles, a 1,000 ms TTL, and a 100 ms recomputation time.</p>
+          <div class="code-block">
+            <div class="code-label">CSV</div>
+            <pre><code>strategy,origin_fetches,max_origin_fetches_per_expiry
+naive,5000,1000
+lease,5,1
+xfetch,25,6</code></pre>
+          </div>
+          <p>These are local measurements from the repo, not Facebook production numbers. They are useful because they make the shape testable.</p>
+          <div class="code-block">
+            <div class="code-label">Invariant</div>
+            <pre><code>naive  = readers * expiry cycles
+lease  = one repair per expiry cycle
+xfetch = a few early repairs before the cliff</code></pre>
+          </div>
+          <p>The benchmark is intentionally narrow. It does not claim a universal reduction factor. It answers one concrete question: when a single hot key expires under 1,000 readers, does the strategy make origin work scale with readers or with repair windows?</p>
+        </section>
+
+        <section class="section" id="s7">
+          <div class="section-label">Part 7</div>
+          <h2>The Tradeoff Is Control Complexity</h2>
+          <p>Leases add server cooperation. XFetch adds early work. Both are real costs.</p>
+          <div class="code-block">
+            <div class="code-label">Tradeoff</div>
+            <pre><code>more coordination -&gt; fewer duplicate origin calls
+more early refresh -&gt; fewer synchronized misses</code></pre>
+          </div>
+          <p>The wrong trade is pretending expiry is free. A cache is a shared coordination system once enough clients depend on it.</p>
+          <p>XFetch pays in earlier work. Leases pay in coordination. Naive cache aside pays at the worst moment, because the bill arrives exactly when the key is hot and empty.</p>
+          <p>Some products can serve stale data while the repair runs. Some must block. Some can return a partial response. The lease only decides who rebuilds. The product still decides what everyone else experiences while the rebuild is happening.</p>
+        </section>
+
+        <section class="section" id="s8">
+          <div class="section-label">Part 8</div>
+          <h2>The Part That Generalizes</h2>
+          <p>The system lesson is not use leases or use XFetch. The lesson is that a shared deadline can be a hidden broadcast.</p>
+          <div class="code-block">
+            <div class="code-label">Mental model</div>
+            <pre><code>wrong model:
+expiry removes one cached value
+
+better model:
+expiry schedules many clients at once</code></pre>
+          </div>
+          <p>Once you see expiry as scheduling, the fixes become clearer. Either elect one repairer, or spread repair attempts before the deadline.</p>
+          <p>This generalizes beyond caches. Cron jobs, retry timers, deployment waves, and client reconnect loops all become dangerous when many machines share the same trigger. The fix is often the same: ownership, jitter, or a budgeted gate.</p>
+          <p>A cache miss is not only a lookup outcome. It is also permission to create expensive work.</p>
+          <div class="code-block">
+            <div class="code-label">Question</div>
+            <pre><code>naive question:
+is the value missing?
+
+better question:
+who is allowed to rebuild it?</code></pre>
+          </div>
+          <p>The cliff is not made of bad requests. It is made of good requests arriving with the same information.</p>
+        </section>
+
+        <div class="footnote source-note">
+          Sources: <a href="https://www.usenix.org/system/files/conference/nsdi13/nsdi13-final170_update.pdf">Scaling Memcache at Facebook</a> and <a href="https://cseweb.ucsd.edu/~avattani/papers/cache_stampede.pdf">Optimal Probabilistic Cache Stampede Prevention</a>. Local measurements come from the Spring Boot benchmark.
+        </div>
+      </article>
+    </main>
+    <footer class="site-footer"><span>Daedalus Journal</span><span>Static site hosted on Cloudflare Workers.</span></footer>
+  </body>
+</html>

@@ -82,7 +82,7 @@
             <span class="eyebrow-dot" aria-hidden="true"></span>
             Engineering field notes
             <span aria-hidden="true">/</span>
-            17 deep dives
+            18 deep dives
           </p>
 
           <h1 id="hero-title">
@@ -101,7 +101,7 @@
                 <path d="M4 9h10M10 5l4 4-4 4"></path>
               </svg>
             </a>
-            <a class="text-link" href="articles/consistent-hashing.html">
+            <a class="text-link" href="articles/cache-stampede-control.html">
               Read the latest
               <span aria-hidden="true">↗</span>
             </a>
@@ -109,11 +109,11 @@
 
           <dl class="hero-facts" aria-label="Journal at a glance">
             <div>
-              <dt>17</dt>
+              <dt>18</dt>
               <dd>Deep dives</dd>
             </div>
             <div>
-              <dt>230</dt>
+              <dt>238</dt>
               <dd>Minutes of reading</dd>
             </div>
             <div>
@@ -209,7 +209,7 @@
         <a href="#articles" data-topic-jump="system-design">
           <span>01</span>
           System design
-          <small>14 notes</small>
+          <small>15 notes</small>
         </a>
         <a href="#articles" data-topic-jump="payments">
           <span>02</span>
@@ -245,8 +245,8 @@
           <button class="filter-button" type="button" data-filter="payments" aria-pressed="false">Payments</button>
           <button class="filter-button" type="button" data-filter="database" aria-pressed="false">Databases</button>
           <button class="filter-button" type="button" data-filter="protocols" aria-pressed="false">Protocols</button>
-          <span class="filter-count" data-filter-count>17 notes</span>
-          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 17 notes</span>
+          <span class="filter-count" data-filter-count>18 notes</span>
+          <span class="sr-only" aria-live="polite" data-filter-status>Showing all 18 notes</span>
         </div>
 
         <article class="featured-story reveal" data-article data-categories="system-design">
@@ -294,6 +294,21 @@
         </article>
 
         <div class="article-grid">
+          <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #d6b879;">
+            <div class="card-topline">
+              <span>Cache reliability</span>
+              <span>8 min</span>
+            </div>
+            <div class="mini-schematic mini-schematic--files" aria-hidden="true">
+              <span>Miss</span><i></i><strong>Lease</strong><i></i><span>Fill</span>
+              <small>wait · repair · retry</small>
+            </div>
+            <p class="card-number">18 / 18</p>
+            <h3><a href="articles/cache-stampede-control.html">One Expired Cache Key Can Become Five Thousand Database Calls</a></h3>
+            <p>How a hot key expiry turns readers into duplicate origin work, and how leases or XFetch turn the cliff into controlled repair.</p>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </article>
+
           <article class="article-card reveal" data-article data-categories="system-design" style="--card-accent: #c9a46a;">
             <div class="card-topline">
               <span>Distributed systems</span>
