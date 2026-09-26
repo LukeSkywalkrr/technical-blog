@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Consistent Hashing Saves the Cache When Servers Move, Daedalus Journal</title>
+    <meta name="description" content="Modulo hashing makes membership changes destroy cache locality, while a consistent hash ring moves only the affected ranges.">
+    <meta name="theme-color" content="#090b0b">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Consistent Hashing Saves the Cache When Servers Move">
+    <meta property="og:description" content="A practical walkthrough of Dynamo style consistent hashing, virtual nodes, movement, and load skew.">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Consistent Hashing Saves the Cache When Servers Move">
+    <meta name="twitter:description" content="A practical walkthrough of Dynamo style consistent hashing, virtual nodes, movement, and load skew.">
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../assets/styles.css">
+    <style>
+      .hash-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 2rem; }
+      .hash-grid > div { min-height: 7.2rem; padding: 1rem; border: 1px solid var(--border); border-radius: 8px; background: #070808; }
+      .hash-grid strong { display: block; color: var(--text-primary); font-size: 0.95rem; line-height: 1.55; }
+      .hash-grid span { display: block; margin-bottom: 0.65rem; color: var(--text-muted); font-size: 0.72rem; font-weight: 760; letter-spacing: 0.11em; text-transform: uppercase; }
+      .metric-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 1.5rem 0 2.25rem; }
+      .metric-strip div { border: 1px solid var(--border); border-radius: 8px; background: #060707; padding: 1rem; }
+      .metric-strip b { display: block; color: var(--text-accent); font-family: var(--font-mono); font-size: 1.05rem; margin-bottom: 0.35rem; }
+      .metric-strip span { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.55; }
+      .code-block code { border: 0; padding: 0; }
+      .source-note a { color: var(--text-accent); }
+      @media (max-width: 760px) { .hash-grid, .metric-strip { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body class="post-page">
+    <header class="site-header">
+      <a class="brand" href="../index.html" aria-label="Daedalus Journal home">
+        <span class="brand-mark">DJ</span>
+        <span>Daedalus Journal</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation"><a href="../index.html">Articles</a></nav>
+    </header>
+    <main>
+      <div class="article-shell"><a class="article-back" href="../index.html">Back to articles</a></div>
+      <article class="article">
+        <div class="hero">
+          <div class="eyebrow">Distributed Systems</div>
+          <h1>Consistent Hashing Saves the Cache When Servers Move</h1>
+          <p class="hero-sub">Modulo hashing hides membership inside division. A consistent hash ring keeps the coordinate system stable when the server list changes.</p>
+          <div class="meta"><span>8 min read</span><span class="meta-dot"></span><span>Java 21 Spring Boot demo</span><span class="meta-dot"></span><span>Dynamo paper</span></div>
+          <div class="hash-grid" aria-label="Article summary">
+            <div><span>Failure mode</span><strong>Modulo removal moved 89.9740 percent of local demo keys.</strong></div>
+            <div><span>Mechanism</span><strong>A key walks clockwise on a fixed ring to find its owner.</strong></div>
+            <div><span>Tradeoff</span><strong>Stable ownership requires explicit membership and token maps.</strong></div>
+          </div>
+        </div>
+        <nav class="toc" aria-label="Table of contents"><div class="toc-title">In this article</div><ol>
+      <li><a href="#s1">The Obvious Cache Shard Starts With Modulo</a></li>
+      <li><a href="#s2">The Divisor Is The Hidden Dependency</a></li>
+      <li><a href="#s3">Dynamo Turns The Server List Into A Ring</a></li>
+      <li><a href="#s4">A Key Walks Clockwise Until It Finds An Owner</a></li>
+      <li><a href="#s5">One Leaving Node Should Only Move Its Own Range</a></li>
+      <li><a href="#s6">Virtual Nodes Make One Machine Look Like Many</a></li>
+      <li><a href="#s7">More Tokens Trade Metadata For Smoother Load</a></li>
+      <li><a href="#s8">The Local Run Makes The Failure Visible</a></li>
+        </ol></nav>
+        <div class="metric-strip" aria-label="Benchmark summary"><div><b>89.9740%</b><span>Keys moved after removing one modulo node.</span></div><div><b>10.4490%</b><span>Keys moved after removing one ring node with 200 tokens.</span></div><div><b>12.2955%</b><span>Hottest survivor share after the ring removal.</span></div></div>
+  <section class="section" id="s1">
+    <div class="section-label">Part 1</div>
+    <h2>The Obvious Cache Shard Starts With Modulo</h2>
+    <p>The schema more or less writes itself. A key arrives. The cache has a list of servers. Hash the key, divide by the server count, and use the remainder.</p>
+    <div class="code-block">
+      <div class="code-label">Java</div>
+      <pre><code>Server owner(String key) {
+    int slot = Math.floorMod(hash(key), servers.size());
+    return servers.get(slot);
+}</code></pre>
+    </div>
+    <p>That code is sympathetic because it has the right local properties. It is deterministic. It is fast. With a stable server list, it spreads traffic well enough.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>hash(cart:7) % 10 = 3
+hash(cart:8) % 10 = 6
+hash(cart:9) % 10 = 1</code></pre>
+    </div>
+    <p>The mistake is not in the hash. The mistake is hiding membership inside the divisor.</p>
+    <p>Modulo treats the server list as if it were a constant. In real systems, membership is one of the least constant things in the room. Machines leave for deploys, hardware faults, capacity shifts, kernel upgrades, and plain bad luck. A shard function that changes meaning whenever the list changes is calm only during the part of the story that is already easy.</p>
+  </section>
+  <section class="section" id="s2">
+    <div class="section-label">Part 2</div>
+    <h2>The Divisor Is The Hidden Dependency</h2>
+    <p>Remove one cache server and the divisor changes. The key did not change. The hash did not change. Almost every remainder did.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>before: hash(key) % 10
+after:  hash(key) % 9
+
+same key
+new remainder
+new server</code></pre>
+    </div>
+    <p>In the local Spring Boot benchmark, removing one node from a 10 node modulo map moved 89.9740 percent of 200,000 synthetic cart keys. That number is local evidence from the repo, not an Amazon production number.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>mode    event   nodes   moved
+modulo  remove  10 -&gt; 9 89.9740%</code></pre>
+    </div>
+    <p>The cache did not lose one server. It lost the warmed map.</p>
+    <p>That distinction matters because misses are not evenly painful. A cold cache often pushes work into the slower system it was protecting. The database sees the recovery event as fresh demand, even though user traffic may not have increased at all. The outage can therefore be caused by arithmetic that looked harmless in code review.</p>
+  </section>
+  <section class="section" id="s3">
+    <div class="section-label">Part 3</div>
+    <h2>Dynamo Turns The Server List Into A Ring</h2>
+    <p>Amazon&#x27;s Dynamo paper says the system hashes keys into a fixed circular space. Section 4.1 says Dynamo applies MD5 to generate a 128 bit identifier. Section 4.2 says the range is treated as a ring.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>0 ------------------------------------------------ 2^128
+^                                                |
+|________________________________________________|</code></pre>
+    </div>
+    <p>The server count is no longer part of the formula. A node owns positions on the circle. A key lands somewhere on the same circle.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>key hash
+   |
+   v
+---x---------A---------B---------C---------D------
+             ^
+             first node clockwise owns it</code></pre>
+    </div>
+    <p>This sounds like ceremony until membership changes.</p>
+    <p>The ring gives the system a stable vocabulary. Keys do not belong to array indexes anymore. They belong to intervals. Membership changes can then be described as interval transfer, which is the kind of operation a storage system can test, audit, throttle, and retry.</p>
+  </section>
+  <section class="section" id="s4">
+    <div class="section-label">Part 4</div>
+    <h2>A Key Walks Clockwise Until It Finds An Owner</h2>
+    <p>The core rule is small enough to fit in one function. Hash the key. Find the first token greater than that hash. If none exists, wrap around.</p>
+    <div class="code-block">
+      <div class="code-label">Java</div>
+      <pre><code>String owner(String key) {
+    long h = hash64(key);
+    var token = tokens.ceilingEntry(h);
+    return token == null ? tokens.firstEntry().getValue()
+                         : token.getValue();
+}</code></pre>
+    </div>
+    <p>The ring makes ownership a property of ranges, not array indexes.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>(A, B] -&gt; B
+(B, C] -&gt; C
+(C, D] -&gt; D</code></pre>
+    </div>
+    <p>That is the useful shift. The key map can survive a changing server list because the coordinate system stays fixed.</p>
+    <p>This is also why consistent hashing shows up in caches, storage systems, and routers. The point is not that a circle is magical. The point is that the circle is independent of the number of live machines currently serving it.</p>
+  </section>
+  <section class="section" id="s5">
+    <div class="section-label">Part 5</div>
+    <h2>One Leaving Node Should Only Move Its Own Range</h2>
+    <p>Dynamo&#x27;s section 4.2 states the principle advantage: a node&#x27;s departure or arrival affects its immediate neighbors while other nodes remain unaffected.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>before: A ---- B ---- C ---- D
+after:  A ---------- C ---- D
+
+B&#x27;s range moves.
+C and D keep their old ranges.</code></pre>
+    </div>
+    <p>The local benchmark with 200 virtual nodes per physical node measured 10.4490 percent movement when one node left a 10 node ring.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>mode             event   vnodes  moved
+consistent-ring  remove  200     10.4490%</code></pre>
+    </div>
+    <p>That is the whole cache story. A 10 node cache loses roughly one node&#x27;s share instead of almost everything.</p>
+    <p>The exact percentage depends on the token placement and the key sample. The invariant is more important than any one run: keys outside the departed ranges keep the same owner. That invariant is what modulo hashing cannot offer.</p>
+  </section>
+  <section class="section" id="s6">
+    <div class="section-label">Part 6</div>
+    <h2>Virtual Nodes Make One Machine Look Like Many</h2>
+    <p>The basic ring has a problem. If every machine gets one random position, the ranges can be wildly uneven.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>A----------------------B--C-------D
+|        huge A range       tiny C |</code></pre>
+    </div>
+    <p>Dynamo addresses this with virtual nodes. Section 4.2 says each node gets multiple positions, called tokens. The physical machine owns all of its token ranges.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>A1---B1---C1---A2---D1---B2---C2---D2---A3</code></pre>
+    </div>
+    <p>Now a leaving machine gives up many small ranges, not one large range.</p>
+    <p>Virtual nodes also make capacity a dial. A larger machine can receive more tokens. A smaller machine can receive fewer. The paper calls out this heterogeneity benefit explicitly, because real fleets rarely contain perfectly identical machines for long.</p>
+  </section>
+  <section class="section" id="s7">
+    <div class="section-label">Part 7</div>
+    <h2>More Tokens Trade Metadata For Smoother Load</h2>
+    <p>The trade is not free. More virtual nodes mean more membership metadata and more token maps to gossip or refresh.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>few tokens:
+A owns one unlucky huge range
+
+many tokens:
+A owns many smaller scattered ranges</code></pre>
+    </div>
+    <p>Dynamo&#x27;s section 6.2 compares partitioning strategies on a system with 30 nodes and N=3. The paper says Strategy 3 improved efficiency and reduced membership information by three orders of magnitude compared with Strategy 1.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>Strategy 1: random tokens decide ranges
+Strategy 3: fixed partitions decouple placement</code></pre>
+    </div>
+    <p>The lesson is not &quot;always add tokens.&quot; The lesson is to separate stable partitions from changing placement when the system grows up.</p>
+  </section>
+  <section class="section" id="s8">
+    <div class="section-label">Part 8</div>
+    <h2>The Local Run Makes The Failure Visible</h2>
+    <p>The repo maps 200,000 synthetic cart keys onto 10 nodes. Then it removes and adds nodes using modulo hashing and the ring.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>mode,event,nodes_before,nodes_after,virtual_nodes_per_node,
+keys,moved_keys,moved_percent,min_load_percent,
+max_load_percent,load_efficiency</code></pre>
+    </div>
+    <p>The removal contrast is the headline.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>modulo remove:          89.9740% moved
+ring remove, 200 tokens: 10.4490% moved</code></pre>
+    </div>
+    <p>The add path tells the same story.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>modulo add:             90.9350% moved
+ring add, 200 tokens:    9.3160% moved</code></pre>
+    </div>
+    <p>Those numbers come from the default <code>./gradlew bootRun</code> output.</p>
+  </section>
+  <section class="section" id="s9">
+    <div class="section-label">Part 9</div>
+    <h2>The Useful Number Is Movement, Not Hash Speed</h2>
+    <p>Hashing speed is the wrong benchmark for this idea. The system is protecting cache locality during membership changes.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>bad question:
+how fast is the hash?
+
+better question:
+how much ownership changes?</code></pre>
+    </div>
+    <p>The benchmark also reports the hottest node after the change. With 200 virtual nodes per machine, the hottest node after removal held 12.2955 percent of keys.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>10 nodes -&gt; 9 nodes
+ideal after removal:  11.1111%
+measured hottest:     12.2955%</code></pre>
+    </div>
+    <p>That is not perfect balance. It is a workable trade for keeping the cache warm.</p>
+    <p>The benchmark intentionally reports movement and skew together. Movement alone can make a broken ring look good. Skew alone can make modulo look fine before the first membership change. The pair tells the actual operational story.</p>
+  </section>
+  <section class="section" id="s10">
+    <div class="section-label">Part 10</div>
+    <h2>The Real Code Is Almost The Whole Trick</h2>
+    <p>The implementation is intentionally small. A sorted map stores token positions. Lookup is a ceiling search.</p>
+    <div class="code-block">
+      <div class="code-label">Java</div>
+      <pre><code>Map.Entry&lt;Long, String&gt; entry = tokens.ceilingEntry(hash);
+if (entry == null) {
+    entry = tokens.firstEntry();
+}
+return entry.getValue();</code></pre>
+    </div>
+    <p>The modulo baseline stays in the repo because it is the bug in executable form.</p>
+    <div class="code-block">
+      <div class="code-label">Java</div>
+      <pre><code>int index = Math.floorMod(hash(key), nodes.size());
+return nodes.get(index);</code></pre>
+    </div>
+    <p>A mechanism article is stronger when the wrong version is runnable too.</p>
+    <p>The implementation avoids networking on purpose. Adding HTTP would make the demo feel more realistic while hiding the one property under test. The useful artifact is the ownership table before and after membership changes.</p>
+  </section>
+  <section class="section" id="s11">
+    <div class="section-label">Part 11</div>
+    <h2>Membership Becomes A Thing You Operate</h2>
+    <p>Consistent hashing does not delete complexity. It moves complexity from every key lookup into membership management.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>tokens must be:
+chosen
+persisted
+gossiped
+refreshed
+rebalanced</code></pre>
+    </div>
+    <p>Dynamo&#x27;s paper makes that cost visible. Clients may poll a random Dynamo node every 10 seconds for membership updates, according to section 6.4. Section 6.2 also says one refined strategy required coordination when membership changed.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>less key movement
+more explicit membership state</code></pre>
+    </div>
+    <p>That is a good trade only when warm ownership matters.</p>
+    <p>There are systems where it does not matter. If every request is cheap, stateless, and recomputable, modulo may be perfectly fine. Consistent hashing earns its keep when moving ownership has a real cost: cache warmth, disk transfer, replica repair, or downstream load.</p>
+  </section>
+  <section class="section" id="s12">
+    <div class="section-label">Part 12</div>
+    <h2>Build The Dumb Version Yourself</h2>
+    <p>Build the smallest thing that proves the property.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>1. implement modulo ownership
+2. implement ring ownership
+3. generate deterministic keys
+4. remove one node
+5. count changed owners
+6. write the CSV</code></pre>
+    </div>
+    <p>Do not start with replication, quorum reads, hinted handoff, or vector clocks. Those are Dynamo ideas too. They are not needed to see why the ring exists.</p>
+    <div class="code-block">
+      <div class="code-label">Shell</div>
+      <pre><code>./gradlew bootRun
+./gradlew test</code></pre>
+    </div>
+    <p>The repo should make the central claim executable before it tries to look complete.</p>
+  </section>
+  <section class="section" id="s13">
+    <div class="section-label">Part 13</div>
+    <h2>Then Break It</h2>
+    <p>The adversarial tests are more important than the happy path.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>remove one server
+add one server
+use one virtual node
+use many virtual nodes
+verify removed nodes own nothing
+verify the CSV is written</code></pre>
+    </div>
+    <p>The one token test is deliberately ugly. In the local run, one virtual node per machine left the hottest node with 27.4315 percent of keys after removal.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>consistent-ring remove, 1 token:
+moved:        2.7995%
+hottest node: 27.4315%</code></pre>
+    </div>
+    <p>Low movement alone can be a trap. A ring that barely moves keys but overloads one survivor is still a bad ring.</p>
+  </section>
+  <section class="section" id="s14">
+    <div class="section-label">Part 14</div>
+    <h2>The Part That Generalizes</h2>
+    <p>The larger lesson is that scalable systems often make the hidden coordinate system explicit. Modulo hashing smuggles membership into arithmetic. Consistent hashing gives membership a shape the system can change deliberately.</p>
+    <div class="code-block">
+      <div class="code-label">Trace</div>
+      <pre><code>wrong model:
+server = hash(key) % current_server_count
+
+better model:
+key position stays fixed
+membership moves around it</code></pre>
+    </div>
+    <p>Stable ownership is not magic. It is membership made explicit.</p>
+  </section>
+        <div class="footnote source-note">Source: Amazon Dynamo paper, SOSP 2007. Local measurements come from the Spring Boot benchmark. Code branch: <a href="https://github.com/LukeSkywalkrr/consistent-hash-ring/tree/feature/consistent-hash-ring">public GitHub branch</a>.</div>
+      </article>
+    </main>
+    <footer class="site-footer"><span>Daedalus Journal</span><span>Static site hosted on Cloudflare Workers.</span></footer>
+  </body>
+</html>
