@@ -3,362 +3,525 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consistent Hashing Saves the Cache When Servers Move, Daedalus Journal</title>
+    <title>Consistent Hashing Saves the Cache When Servers Move | Daedalus Journal</title>
     <meta name="description" content="Modulo hashing makes membership changes destroy cache locality, while a consistent hash ring moves only the affected ranges.">
+    <meta name="author" content="Pratyush">
     <meta name="theme-color" content="#090b0b">
     <meta name="color-scheme" content="dark">
     <meta property="og:type" content="article">
     <meta property="og:title" content="Consistent Hashing Saves the Cache When Servers Move">
-    <meta property="og:description" content="A practical walkthrough of Dynamo style consistent hashing, virtual nodes, movement, and load skew.">
-    <meta name="twitter:card" content="summary">
+    <meta property="og:description" content="How a consistent hash ring keeps most key ownership stable when servers join or leave.">
+    <meta property="og:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/assets/consistent-hashing.png">
+    <meta property="og:image:width" content="1980">
+    <meta property="og:image:height" content="1392">
+    <meta property="og:image:alt" content="Consistent hashing architecture showing cart key hashing, ring ownership, virtual nodes, node removal, load checks, and a modulo baseline">
+    <meta property="article:published_time" content="2026-09-27">
+    <meta property="article:author" content="Pratyush">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Consistent Hashing Saves the Cache When Servers Move">
-    <meta name="twitter:description" content="A practical walkthrough of Dynamo style consistent hashing, virtual nodes, movement, and load skew.">
+    <meta name="twitter:description" content="How a consistent hash ring keeps most key ownership stable when servers join or leave.">
+    <meta name="twitter:image" content="https://black-fog-d30f.pratyushktiwari99.workers.dev/assets/consistent-hashing.png">
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="../assets/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
     <style>
-      .hash-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 2rem; }
-      .hash-grid > div { min-height: 7.2rem; padding: 1rem; border: 1px solid var(--border); border-radius: 8px; background: #070808; }
-      .hash-grid strong { display: block; color: var(--text-primary); font-size: 0.95rem; line-height: 1.55; }
-      .hash-grid span { display: block; margin-bottom: 0.65rem; color: var(--text-muted); font-size: 0.72rem; font-weight: 760; letter-spacing: 0.11em; text-transform: uppercase; }
-      .metric-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 1.5rem 0 2.25rem; }
-      .metric-strip div { border: 1px solid var(--border); border-radius: 8px; background: #060707; padding: 1rem; }
-      .metric-strip b { display: block; color: var(--text-accent); font-family: var(--font-mono); font-size: 1.05rem; margin-bottom: 0.35rem; }
-      .metric-strip span { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.55; }
-      .code-block code { border: 0; padding: 0; }
-      .source-note a { color: var(--text-accent); }
-      @media (max-width: 760px) { .hash-grid, .metric-strip { grid-template-columns: 1fr; } }
+      :root {
+        --ink: #f4f1ea;
+        --muted: #9d9890;
+        --soft: #c9c4ba;
+        --page: #090b0b;
+        --panel: #101413;
+        --panel-2: #151a18;
+        --line: #2a302e;
+        --gold: #d6b879;
+        --teal: #73d8c5;
+        --sans: "IBM Plex Sans", system-ui, sans-serif;
+        --serif: "Newsreader", Georgia, serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 14% 8%, rgba(115, 216, 197, .08), transparent 28rem),
+          radial-gradient(circle at 86% 22%, rgba(214, 184, 121, .08), transparent 32rem),
+          var(--page);
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 1.08rem;
+        line-height: 1.76;
+        overflow-x: hidden;
+      }
+
+      a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: .2em; }
+      a:hover { color: var(--ink); }
+      a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+      .skip-link { position: fixed; left: 1rem; top: -6rem; z-index: 100; padding: .65rem .85rem; background: var(--gold); color: #111; font: 600 .82rem/1 var(--sans); }
+      .skip-link:focus { top: 1rem; }
+      .progress { position: fixed; inset: 0 auto auto 0; z-index: 80; width: 100%; height: 3px; background: linear-gradient(90deg, var(--teal), var(--gold)); transform: scaleX(0); transform-origin: left; }
+      .masthead { position: sticky; top: 0; z-index: 60; border-bottom: 1px solid rgba(214, 184, 121, .15); background: rgba(9, 11, 11, .9); backdrop-filter: blur(18px); }
+      .nav-shell { width: min(1120px, calc(100% - 2rem)); min-height: 4.4rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .brand { display: inline-flex; align-items: center; gap: .7rem; color: var(--ink); text-decoration: none; font-family: var(--sans); }
+      .brand-mark { width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border: 1px solid var(--gold); color: var(--gold); }
+      .brand-mark svg { width: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.4; }
+      .brand-copy { display: grid; line-height: 1.05; }
+      .brand-copy strong { font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; }
+      .brand-copy small { color: var(--muted); font-size: .64rem; letter-spacing: .08em; }
+      .nav-link { color: var(--soft); font: 500 .8rem/1 var(--sans); text-decoration: none; }
+
+      main { display: block; }
+      .hero { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(4rem, 9vw, 8rem) 0 clamp(3rem, 7vw, 6rem); display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .55fr); gap: clamp(2.5rem, 7vw, 7rem); align-items: end; }
+      .eyebrow, .section-label, .meta, .quick-label, .source-label { font-family: var(--sans); text-transform: uppercase; letter-spacing: .12em; }
+      .eyebrow { margin: 0 0 1.2rem; color: var(--teal); font-size: .72rem; font-weight: 600; }
+      h1 { max-width: 13ch; margin: 0; font-family: var(--serif); font-size: clamp(3.15rem, 8vw, 6.7rem); font-weight: 500; letter-spacing: -.055em; line-height: .92; text-wrap: balance; }
+      h1 em { color: var(--gold); font-weight: 400; }
+      .dek { max-width: 42rem; margin: 1.7rem 0 0; color: var(--soft); font-size: clamp(1.2rem, 2vw, 1.45rem); line-height: 1.42; }
+      .meta { display: flex; flex-wrap: wrap; gap: .55rem 1rem; margin-top: 1.7rem; color: var(--muted); font-size: .68rem; }
+      .meta span + span::before, .meta time + span::before { content: "\00b7"; margin-right: 1rem; color: var(--gold); }
+      .claim-map { min-height: 25rem; padding: 1.2rem; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(21, 26, 24, .95), rgba(10, 13, 12, .95)); box-shadow: 0 30px 80px rgba(0, 0, 0, .28); }
+      .claim-map::before { content: "EXECUTABLE CLAIM"; display: block; margin-bottom: 1.4rem; color: var(--muted); font: 600 .62rem/1 var(--mono); letter-spacing: .14em; }
+      .path-node { position: relative; padding: 1rem; border: 1px solid var(--line); background: var(--panel); }
+      .path-node + .path-node { margin-top: 2.2rem; }
+      .path-node + .path-node::before { content: "\2193"; position: absolute; left: 50%; top: -2rem; color: var(--gold); transform: translateX(-50%); }
+      .path-node strong { display: block; font: 600 1rem/1.2 var(--sans); }
+      .path-node span { display: block; margin-top: .3rem; color: var(--muted); font: .75rem/1.5 var(--mono); }
+      .path-node.is-accent { border-color: rgba(115, 216, 197, .7); }
+      .path-node.is-result { border-color: rgba(214, 184, 121, .75); }
+
+      .article-shell { width: min(780px, calc(100% - 2rem)); margin: 0 auto; padding-bottom: 5rem; }
+      .quick-take { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin-bottom: 2rem; }
+      .quick-card { min-height: 9rem; padding: 1rem; border-top: 1px solid var(--gold); background: var(--panel); }
+      .quick-label { display: block; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .quick-card strong { display: block; margin-top: .65rem; font: 500 1.08rem/1.35 var(--serif); }
+      .quick-card p { margin: .5rem 0 0; color: var(--muted); font: .77rem/1.5 var(--sans); }
+      .evidence-figure { margin: 0 0 3.5rem; padding: .7rem; border: 1px solid var(--line); background: #111; }
+      .evidence-figure img { display: block; width: 100%; height: auto; }
+      .evidence-figure figcaption { padding: .75rem .35rem .15rem; color: var(--muted); font: .72rem/1.5 var(--sans); }
+      .toc { margin: 0 0 4rem; padding: 1.2rem 1.3rem; border: 1px solid var(--line); background: rgba(16, 20, 19, .75); }
+      .toc p { margin: 0 0 .75rem; color: var(--muted); font: 600 .65rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; }
+      .toc ol { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1.25rem; list-style: none; counter-reset: toc; }
+      .toc li { counter-increment: toc; }
+      .toc a { color: var(--soft); font: .78rem/1.35 var(--sans); text-decoration: none; }
+      .toc a::before { content: counter(toc, decimal-leading-zero) "  "; color: var(--gold); font-family: var(--mono); }
+      .section { padding: 3.5rem 0 1rem; scroll-margin-top: 5rem; }
+      .section + .section { border-top: 1px solid var(--line); }
+      .section-label { margin: 0 0 .8rem; color: var(--teal); font-size: .64rem; font-weight: 600; }
+      h2 { margin: 0 0 1.35rem; font-family: var(--serif); font-size: clamp(2rem, 5vw, 3.15rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
+      p { margin: 0; }
+      .section p + p { margin-top: 1.15rem; }
+      .section > p:first-of-type { color: var(--soft); font-size: 1.18rem; line-height: 1.65; }
+      code { font-family: var(--mono); }
+      p code { padding: .08em .3em; border: 1px solid var(--line); background: var(--panel-2); color: var(--gold); font-size: .82em; }
+      pre { position: relative; margin: 1.55rem 0; padding: 1.25rem; overflow-x: auto; border: 1px solid var(--line); border-left: 3px solid var(--gold); background: #070908; color: #ddd9d0; font: .78rem/1.68 var(--mono); tab-size: 2; }
+      pre[data-lang]::before { content: attr(data-lang); display: block; margin-bottom: .75rem; color: var(--muted); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; }
+      .callout { margin: 1.7rem 0; padding: 1.25rem; border-left: 3px solid var(--teal); background: rgba(115, 216, 197, .065); }
+      .callout strong { display: block; margin-bottom: .35rem; color: var(--teal); font: 600 .68rem/1.2 var(--sans); letter-spacing: .1em; text-transform: uppercase; }
+      .benchmark { display: grid; grid-template-columns: repeat(2, 1fr); gap: .8rem; margin: 1.7rem 0; }
+      .metric { padding: 1.1rem; border: 1px solid var(--line); background: var(--panel); }
+      .metric span { display: block; color: var(--muted); font: .65rem/1.2 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
+      .metric strong { display: block; margin-top: .45rem; color: var(--gold); font: 500 2rem/1 var(--serif); }
+      .metric small { display: block; margin-top: .45rem; color: var(--soft); font: .68rem/1.4 var(--mono); }
+      .closing { margin-top: 1.8rem; padding: 1.4rem; border: 1px solid var(--gold); color: var(--gold); font-size: 1.45rem; line-height: 1.35; }
+      .sources { margin-top: 4rem; padding: 1.35rem; border: 1px solid var(--line); background: var(--panel); }
+      .source-label { margin: 0 0 .7rem; color: var(--gold); font-size: .62rem; font-weight: 600; }
+      .sources p { color: var(--muted); font: .78rem/1.65 var(--sans); }
+      .sources p + p { margin-top: .6rem; }
+      .article-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--line); color: var(--muted); font: .73rem/1.5 var(--sans); }
+      .copy-button { padding: .55rem .75rem; border: 1px solid var(--line); background: var(--panel); color: var(--soft); cursor: pointer; font: 500 .72rem/1 var(--sans); }
+
+      @media (max-width: 820px) {
+        .hero { grid-template-columns: 1fr; }
+        .claim-map { min-height: auto; }
+      }
+      @media (max-width: 620px) {
+        body { font-size: 1rem; }
+        .brand-copy small { display: none; }
+        .quick-take, .toc ol, .benchmark { grid-template-columns: 1fr; }
+        .quick-card { min-height: auto; }
+        .meta span + span::before, .meta time + span::before { content: none; }
+        h1 { font-size: clamp(3rem, 16vw, 4.8rem); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+      }
     </style>
   </head>
-  <body class="post-page">
-    <header class="site-header">
-      <a class="brand" href="../index.html" aria-label="Daedalus Journal home">
-        <span class="brand-mark">DJ</span>
-        <span>Daedalus Journal</span>
-      </a>
-      <nav class="site-nav" aria-label="Primary navigation"><a href="../index.html">Articles</a></nav>
+  <body>
+    <a class="skip-link" href="#article">Skip to article</a>
+    <div class="progress" data-progress aria-hidden="true"></div>
+
+    <header class="masthead">
+      <div class="nav-shell">
+        <a class="brand" href="../index.html" aria-label="Daedalus Journal home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 42" role="presentation">
+              <path d="M8 31.5 21 7l13 24.5M12.5 26h17M16 19.5h10"></path>
+              <path d="M8.5 31.5h25"></path>
+            </svg>
+          </span>
+          <span class="brand-copy">
+            <strong>Daedalus</strong>
+            <small>Engineering journal</small>
+          </span>
+        </a>
+        <a class="nav-link" href="../index.html#articles">All articles</a>
+      </div>
     </header>
-    <main>
-      <div class="article-shell"><a class="article-back" href="../index.html">Back to articles</a></div>
-      <article class="article">
-        <div class="hero">
-          <div class="eyebrow">Distributed Systems</div>
-          <h1>Consistent Hashing Saves the Cache When Servers Move</h1>
-          <p class="hero-sub">Modulo hashing hides membership inside division. A consistent hash ring keeps the coordinate system stable when the server list changes.</p>
-          <div class="meta"><span>8 min read</span><span class="meta-dot"></span><span>Java 21 Spring Boot demo</span><span class="meta-dot"></span><span>Dynamo paper</span></div>
-          <div class="hash-grid" aria-label="Article summary">
-            <div><span>Failure mode</span><strong>Modulo removal moved 89.9740 percent of local demo keys.</strong></div>
-            <div><span>Mechanism</span><strong>A key walks clockwise on a fixed ring to find its owner.</strong></div>
-            <div><span>Tradeoff</span><strong>Stable ownership requires explicit membership and token maps.</strong></div>
+
+    <main id="article">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Distributed systems / Storage / Membership</p>
+          <h1>Move the server. <em>Keep the keys.</em></h1>
+          <p class="dek">Modulo hashing hides membership inside division. A consistent hash ring keeps most key ownership stable when servers join or leave.</p>
+          <div class="meta">
+            <span>By Pratyush</span>
+            <time datetime="2026-09-27">27 September 2026</time>
+            <span>8 min read</span>
           </div>
         </div>
-        <nav class="toc" aria-label="Table of contents"><div class="toc-title">In this article</div><ol>
-      <li><a href="#s1">The Obvious Cache Shard Starts With Modulo</a></li>
-      <li><a href="#s2">The Divisor Is The Hidden Dependency</a></li>
-      <li><a href="#s3">Dynamo Turns The Server List Into A Ring</a></li>
-      <li><a href="#s4">A Key Walks Clockwise Until It Finds An Owner</a></li>
-      <li><a href="#s5">One Leaving Node Should Only Move Its Own Range</a></li>
-      <li><a href="#s6">Virtual Nodes Make One Machine Look Like Many</a></li>
-      <li><a href="#s7">More Tokens Trade Metadata For Smoother Load</a></li>
-      <li><a href="#s8">The Local Run Makes The Failure Visible</a></li>
-        </ol></nav>
-        <div class="metric-strip" aria-label="Benchmark summary"><div><b>89.9740%</b><span>Keys moved after removing one modulo node.</span></div><div><b>10.4490%</b><span>Keys moved after removing one ring node with 200 tokens.</span></div><div><b>12.2955%</b><span>Hottest survivor share after the ring removal.</span></div></div>
-  <section class="section" id="s1">
-    <div class="section-label">Part 1</div>
-    <h2>The Obvious Cache Shard Starts With Modulo</h2>
-    <p>The schema more or less writes itself. A key arrives. The cache has a list of servers. Hash the key, divide by the server count, and use the remainder.</p>
-    <div class="code-block">
-      <div class="code-label">Java</div>
-      <pre><code>Server owner(String key) {
+
+        <div class="claim-map" role="img" aria-label="Two hundred thousand cart keys are mapped across ten nodes. Removing one node from the consistent ring moves ten point four four nine zero percent of keys.">
+          <div class="path-node">
+            <strong>200,000 cart keys</strong>
+            <span>synthetic benchmark sample</span>
+          </div>
+          <div class="path-node is-accent">
+            <strong>10 nodes become 9</strong>
+            <span>one cache server leaves</span>
+          </div>
+          <div class="path-node is-result">
+            <strong>10.4490% moved</strong>
+            <span>200 virtual nodes per machine</span>
+          </div>
+        </div>
+      </header>
+
+      <article class="article-shell">
+        <div class="quick-take" aria-label="Quick take">
+          <div class="quick-card">
+            <span class="quick-label">The failure</span>
+            <strong>Modulo makes the divisor part of identity.</strong>
+            <p>Remove one server and most remainders change.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The mechanism</span>
+            <strong>The key walks clockwise on a ring.</strong>
+            <p>The next token owns the interval.</p>
+          </div>
+          <div class="quick-card">
+            <span class="quick-label">The cost</span>
+            <strong>Membership becomes explicit state.</strong>
+            <p>Tokens must be chosen, stored, and refreshed.</p>
+          </div>
+        </div>
+
+        <figure class="evidence-figure">
+          <img src="../assets/consistent-hashing.png" width="1980" height="1392" loading="lazy" alt="Consistent hashing architecture showing cart key hashing, clockwise ring ownership, virtual nodes, node removal, load checks, and a modulo baseline.">
+          <figcaption>The ring turns changing server membership into interval movement instead of a full cache map rewrite.</figcaption>
+        </figure>
+
+        <nav class="toc" aria-label="Article contents">
+          <p>Trace the movement and the tradeoff</p>
+          <ol>
+            <li><a href="#obvious-modulo">The obvious modulo map</a></li>
+            <li><a href="#hidden-divisor">The hidden divisor</a></li>
+            <li><a href="#ring">The ring coordinate system</a></li>
+            <li><a href="#virtual-nodes">Virtual nodes</a></li>
+            <li><a href="#benchmark">Executable evidence</a></li>
+            <li><a href="#general-lesson">The general lesson</a></li>
+          </ol>
+        </nav>
+
+        <section class="section" id="obvious-modulo">
+          <p class="section-label">01 / The naive solution</p>
+          <h2>The Obvious Cache Shard Starts With Modulo</h2>
+          <p>The schema more or less writes itself. A key arrives. The cache has a list of servers. Hash the key, divide by the server count, and use the remainder.</p>
+          <pre data-lang="java"><code>Server owner(String key) {
     int slot = Math.floorMod(hash(key), servers.size());
     return servers.get(slot);
 }</code></pre>
-    </div>
-    <p>That code is sympathetic because it has the right local properties. It is deterministic. It is fast. With a stable server list, it spreads traffic well enough.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>hash(cart:7) % 10 = 3
+          <p>That code is sympathetic because it has the right local properties. It is deterministic. It is fast. With a stable server list, it spreads traffic well enough.</p>
+          <pre data-lang="text"><code>hash(cart:7) % 10 = 3
 hash(cart:8) % 10 = 6
 hash(cart:9) % 10 = 1</code></pre>
-    </div>
-    <p>The mistake is not in the hash. The mistake is hiding membership inside the divisor.</p>
-    <p>Modulo treats the server list as if it were a constant. In real systems, membership is one of the least constant things in the room. Machines leave for deploys, hardware faults, capacity shifts, kernel upgrades, and plain bad luck. A shard function that changes meaning whenever the list changes is calm only during the part of the story that is already easy.</p>
-  </section>
-  <section class="section" id="s2">
-    <div class="section-label">Part 2</div>
-    <h2>The Divisor Is The Hidden Dependency</h2>
-    <p>Remove one cache server and the divisor changes. The key did not change. The hash did not change. Almost every remainder did.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>before: hash(key) % 10
+          <p>The mistake is not in the hash. The mistake is hiding membership inside the divisor.</p>
+          <p>Modulo treats the server list as if it were a constant. In real systems, membership is one of the least constant things in the room.</p>
+        </section>
+
+        <section class="section" id="hidden-divisor">
+          <p class="section-label">02 / Membership change</p>
+          <h2>The Divisor Is The Hidden Dependency</h2>
+          <p>Remove one cache server and the divisor changes. The key did not change. The hash did not change. Almost every remainder did.</p>
+          <pre data-lang="text"><code>before: hash(key) % 10
 after:  hash(key) % 9
 
 same key
 new remainder
 new server</code></pre>
-    </div>
-    <p>In the local Spring Boot benchmark, removing one node from a 10 node modulo map moved 89.9740 percent of 200,000 synthetic cart keys. That number is local evidence from the repo, not an Amazon production number.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>mode    event   nodes   moved
-modulo  remove  10 -&gt; 9 89.9740%</code></pre>
-    </div>
-    <p>The cache did not lose one server. It lost the warmed map.</p>
-    <p>That distinction matters because misses are not evenly painful. A cold cache often pushes work into the slower system it was protecting. The database sees the recovery event as fresh demand, even though user traffic may not have increased at all. The outage can therefore be caused by arithmetic that looked harmless in code review.</p>
-  </section>
-  <section class="section" id="s3">
-    <div class="section-label">Part 3</div>
-    <h2>Dynamo Turns The Server List Into A Ring</h2>
-    <p>Amazon&#x27;s Dynamo paper says the system hashes keys into a fixed circular space. Section 4.1 says Dynamo applies MD5 to generate a 128 bit identifier. Section 4.2 says the range is treated as a ring.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>0 ------------------------------------------------ 2^128
+          <p>In the local Spring Boot benchmark, removing one node from a 10 node modulo map moved 89.9740 percent of 200,000 synthetic cart keys. That number is local evidence from the repo, not an Amazon production number.</p>
+          <pre data-lang="csv"><code>mode,event,nodes_before,nodes_after,moved_percent
+modulo,remove,10,9,89.9740</code></pre>
+          <p>The cache did not lose one server. It lost the warmed map.</p>
+          <div class="callout">
+            <strong>The counterintuitive core</strong>
+            The dangerous part is not the hash. It is the changing server count hidden inside the ownership rule.
+          </div>
+        </section>
+
+        <section class="section" id="ring">
+          <p class="section-label">03 / Stable coordinates</p>
+          <h2>Dynamo Turns The Server List Into A Ring</h2>
+          <p>Amazon's Dynamo paper says the system hashes keys into a fixed circular space. Section 4.1 says Dynamo applies MD5 to generate a 128 bit identifier. Section 4.2 says the range is treated as a ring.</p>
+          <pre data-lang="ring"><code>0 ------------------------------------------------ 2^128
 ^                                                |
 |________________________________________________|</code></pre>
-    </div>
-    <p>The server count is no longer part of the formula. A node owns positions on the circle. A key lands somewhere on the same circle.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>key hash
+          <p>The server count is no longer part of the formula. A node owns positions on the circle. A key lands somewhere on the same circle.</p>
+          <pre data-lang="ownership"><code>key hash
    |
    v
 ---x---------A---------B---------C---------D------
              ^
              first node clockwise owns it</code></pre>
-    </div>
-    <p>This sounds like ceremony until membership changes.</p>
-    <p>The ring gives the system a stable vocabulary. Keys do not belong to array indexes anymore. They belong to intervals. Membership changes can then be described as interval transfer, which is the kind of operation a storage system can test, audit, throttle, and retry.</p>
-  </section>
-  <section class="section" id="s4">
-    <div class="section-label">Part 4</div>
-    <h2>A Key Walks Clockwise Until It Finds An Owner</h2>
-    <p>The core rule is small enough to fit in one function. Hash the key. Find the first token greater than that hash. If none exists, wrap around.</p>
-    <div class="code-block">
-      <div class="code-label">Java</div>
-      <pre><code>String owner(String key) {
+          <p>The ring gives the system a stable vocabulary. Keys do not belong to array indexes anymore. They belong to intervals.</p>
+        </section>
+
+        <section class="section" id="clockwise-owner">
+          <p class="section-label">04 / Lookup rule</p>
+          <h2>A Key Walks Clockwise Until It Finds An Owner</h2>
+          <p>The core rule is small enough to fit in one function. Hash the key. Find the first token greater than that hash. If none exists, wrap around.</p>
+          <pre data-lang="java"><code>String owner(String key) {
     long h = hash64(key);
     var token = tokens.ceilingEntry(h);
     return token == null ? tokens.firstEntry().getValue()
                          : token.getValue();
 }</code></pre>
-    </div>
-    <p>The ring makes ownership a property of ranges, not array indexes.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>(A, B] -&gt; B
-(B, C] -&gt; C
-(C, D] -&gt; D</code></pre>
-    </div>
-    <p>That is the useful shift. The key map can survive a changing server list because the coordinate system stays fixed.</p>
-    <p>This is also why consistent hashing shows up in caches, storage systems, and routers. The point is not that a circle is magical. The point is that the circle is independent of the number of live machines currently serving it.</p>
-  </section>
-  <section class="section" id="s5">
-    <div class="section-label">Part 5</div>
-    <h2>One Leaving Node Should Only Move Its Own Range</h2>
-    <p>Dynamo&#x27;s section 4.2 states the principle advantage: a node&#x27;s departure or arrival affects its immediate neighbors while other nodes remain unaffected.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>before: A ---- B ---- C ---- D
+          <p>The ring makes ownership a property of ranges, not array indexes.</p>
+          <pre data-lang="ranges"><code>(A, B] =&gt; B
+(B, C] =&gt; C
+(C, D] =&gt; D</code></pre>
+          <p>That is the useful shift. The key map can survive a changing server list because the coordinate system stays fixed.</p>
+        </section>
+
+        <section class="section" id="leaving-node">
+          <p class="section-label">05 / Local movement</p>
+          <h2>One Leaving Node Should Only Move Its Own Range</h2>
+          <p>Dynamo section 4.2 states the principle advantage: a node departure or arrival affects immediate neighbors while other nodes remain unaffected.</p>
+          <pre data-lang="membership"><code>before: A ---- B ---- C ---- D
 after:  A ---------- C ---- D
 
-B&#x27;s range moves.
+B range moves.
 C and D keep their old ranges.</code></pre>
-    </div>
-    <p>The local benchmark with 200 virtual nodes per physical node measured 10.4490 percent movement when one node left a 10 node ring.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>mode             event   vnodes  moved
-consistent-ring  remove  200     10.4490%</code></pre>
-    </div>
-    <p>That is the whole cache story. A 10 node cache loses roughly one node&#x27;s share instead of almost everything.</p>
-    <p>The exact percentage depends on the token placement and the key sample. The invariant is more important than any one run: keys outside the departed ranges keep the same owner. That invariant is what modulo hashing cannot offer.</p>
-  </section>
-  <section class="section" id="s6">
-    <div class="section-label">Part 6</div>
-    <h2>Virtual Nodes Make One Machine Look Like Many</h2>
-    <p>The basic ring has a problem. If every machine gets one random position, the ranges can be wildly uneven.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>A----------------------B--C-------D
+          <p>The local benchmark with 200 virtual nodes per physical node measured 10.4490 percent movement when one node left a 10 node ring.</p>
+          <pre data-lang="csv"><code>mode,event,virtual_nodes_per_node,moved_percent
+consistent-ring,remove,200,10.4490</code></pre>
+          <p>That is the whole cache story. A 10 node cache loses roughly one node share instead of almost everything.</p>
+        </section>
+
+        <section class="section" id="virtual-nodes">
+          <p class="section-label">06 / Token placement</p>
+          <h2>Virtual Nodes Make One Machine Look Like Many</h2>
+          <p>The basic ring has a problem. If every machine gets one random position, the ranges can be wildly uneven.</p>
+          <pre data-lang="skew"><code>A----------------------B--C-------D
 |        huge A range       tiny C |</code></pre>
-    </div>
-    <p>Dynamo addresses this with virtual nodes. Section 4.2 says each node gets multiple positions, called tokens. The physical machine owns all of its token ranges.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>A1---B1---C1---A2---D1---B2---C2---D2---A3</code></pre>
-    </div>
-    <p>Now a leaving machine gives up many small ranges, not one large range.</p>
-    <p>Virtual nodes also make capacity a dial. A larger machine can receive more tokens. A smaller machine can receive fewer. The paper calls out this heterogeneity benefit explicitly, because real fleets rarely contain perfectly identical machines for long.</p>
-  </section>
-  <section class="section" id="s7">
-    <div class="section-label">Part 7</div>
-    <h2>More Tokens Trade Metadata For Smoother Load</h2>
-    <p>The trade is not free. More virtual nodes mean more membership metadata and more token maps to gossip or refresh.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>few tokens:
+          <p>Dynamo addresses this with virtual nodes. Section 4.2 says each node gets multiple positions, called tokens. The physical machine owns all of its token ranges.</p>
+          <pre data-lang="tokens"><code>A1---B1---C1---A2---D1---B2---C2---D2---A3</code></pre>
+          <p>Now a leaving machine gives up many small ranges, not one large range.</p>
+          <p>Virtual nodes also make capacity a dial. A larger machine can receive more tokens. A smaller machine can receive fewer.</p>
+        </section>
+
+        <section class="section" id="metadata-tradeoff">
+          <p class="section-label">07 / Metadata tradeoff</p>
+          <h2>More Tokens Trade Metadata For Smoother Load</h2>
+          <p>The trade is not free. More virtual nodes mean more membership metadata and more token maps to gossip or refresh.</p>
+          <pre data-lang="tradeoff"><code>few tokens:
 A owns one unlucky huge range
 
 many tokens:
 A owns many smaller scattered ranges</code></pre>
-    </div>
-    <p>Dynamo&#x27;s section 6.2 compares partitioning strategies on a system with 30 nodes and N=3. The paper says Strategy 3 improved efficiency and reduced membership information by three orders of magnitude compared with Strategy 1.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>Strategy 1: random tokens decide ranges
+          <p>Dynamo section 6.2 compares partitioning strategies on a system with 30 nodes and N equals 3. The paper says Strategy 3 improved efficiency and reduced membership information by three orders of magnitude compared with Strategy 1.</p>
+          <pre data-lang="strategies"><code>Strategy 1: random tokens decide ranges
 Strategy 3: fixed partitions decouple placement</code></pre>
-    </div>
-    <p>The lesson is not &quot;always add tokens.&quot; The lesson is to separate stable partitions from changing placement when the system grows up.</p>
-  </section>
-  <section class="section" id="s8">
-    <div class="section-label">Part 8</div>
-    <h2>The Local Run Makes The Failure Visible</h2>
-    <p>The repo maps 200,000 synthetic cart keys onto 10 nodes. Then it removes and adds nodes using modulo hashing and the ring.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>mode,event,nodes_before,nodes_after,virtual_nodes_per_node,
-keys,moved_keys,moved_percent,min_load_percent,
-max_load_percent,load_efficiency</code></pre>
-    </div>
-    <p>The removal contrast is the headline.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>modulo remove:          89.9740% moved
-ring remove, 200 tokens: 10.4490% moved</code></pre>
-    </div>
-    <p>The add path tells the same story.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>modulo add:             90.9350% moved
-ring add, 200 tokens:    9.3160% moved</code></pre>
-    </div>
-    <p>Those numbers come from the default <code>./gradlew bootRun</code> output.</p>
-  </section>
-  <section class="section" id="s9">
-    <div class="section-label">Part 9</div>
-    <h2>The Useful Number Is Movement, Not Hash Speed</h2>
-    <p>Hashing speed is the wrong benchmark for this idea. The system is protecting cache locality during membership changes.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>bad question:
+          <p>The lesson is not to always add tokens. The lesson is to separate stable partitions from changing placement when the system grows up.</p>
+        </section>
+
+        <section class="section" id="benchmark">
+          <p class="section-label">08 / Executable evidence</p>
+          <h2>The Local Run Makes The Failure Visible</h2>
+          <p>The repo maps 200,000 synthetic cart keys onto 10 nodes. Then it removes and adds nodes using modulo hashing and the ring.</p>
+          <div class="benchmark" aria-label="Local benchmark result">
+            <div class="metric">
+              <span>Modulo removal</span>
+              <strong>89.9740%</strong>
+              <small>keys moved after one node leaves</small>
+            </div>
+            <div class="metric">
+              <span>Ring removal</span>
+              <strong>10.4490%</strong>
+              <small>keys moved with 200 virtual nodes</small>
+            </div>
+            <div class="metric">
+              <span>Modulo add</span>
+              <strong>90.9350%</strong>
+              <small>keys moved after one node joins</small>
+            </div>
+            <div class="metric">
+              <span>Ring hottest node</span>
+              <strong>12.2955%</strong>
+              <small>load after removal with 200 tokens</small>
+            </div>
+          </div>
+          <pre data-lang="csv"><code>mode,event,nodes_before,nodes_after,virtual_nodes_per_node,keys,moved_percent,max_load_percent
+modulo,remove,10,9,0,200000,89.9740,11.1915
+consistent-ring,remove,10,9,200,200000,10.4490,12.2955
+modulo,add,10,11,0,200000,90.9350,9.2140
+consistent-ring,add,10,11,200,200000,9.3160,10.7990</code></pre>
+          <p>Those numbers come from the default local entrypoint. They are evidence for the article claim, not measurements from a production cache fleet.</p>
+        </section>
+
+        <section class="section" id="right-benchmark">
+          <p class="section-label">09 / What to measure</p>
+          <h2>The Useful Number Is Movement, Not Hash Speed</h2>
+          <p>Hashing speed is the wrong benchmark for this idea. The system is protecting cache locality during membership changes.</p>
+          <pre data-lang="questions"><code>bad question:
 how fast is the hash?
 
 better question:
 how much ownership changes?</code></pre>
-    </div>
-    <p>The benchmark also reports the hottest node after the change. With 200 virtual nodes per machine, the hottest node after removal held 12.2955 percent of keys.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>10 nodes -&gt; 9 nodes
+          <p>The benchmark also reports the hottest node after the change. With 200 virtual nodes per machine, the hottest node after removal held 12.2955 percent of keys.</p>
+          <pre data-lang="load"><code>10 nodes =&gt; 9 nodes
 ideal after removal:  11.1111%
 measured hottest:     12.2955%</code></pre>
-    </div>
-    <p>That is not perfect balance. It is a workable trade for keeping the cache warm.</p>
-    <p>The benchmark intentionally reports movement and skew together. Movement alone can make a broken ring look good. Skew alone can make modulo look fine before the first membership change. The pair tells the actual operational story.</p>
-  </section>
-  <section class="section" id="s10">
-    <div class="section-label">Part 10</div>
-    <h2>The Real Code Is Almost The Whole Trick</h2>
-    <p>The implementation is intentionally small. A sorted map stores token positions. Lookup is a ceiling search.</p>
-    <div class="code-block">
-      <div class="code-label">Java</div>
-      <pre><code>Map.Entry&lt;Long, String&gt; entry = tokens.ceilingEntry(hash);
+          <p>Movement alone can make a broken ring look good. Skew alone can make modulo look fine before the first membership change. The pair tells the actual operational story.</p>
+        </section>
+
+        <section class="section" id="real-code">
+          <p class="section-label">10 / Mechanism</p>
+          <h2>The Real Code Is Almost The Whole Trick</h2>
+          <p>The implementation is intentionally small. A sorted map stores token positions. Lookup is a ceiling search.</p>
+          <pre data-lang="java"><code>Map.Entry&lt;Long, String&gt; entry = tokens.ceilingEntry(hash);
 if (entry == null) {
     entry = tokens.firstEntry();
 }
 return entry.getValue();</code></pre>
-    </div>
-    <p>The modulo baseline stays in the repo because it is the bug in executable form.</p>
-    <div class="code-block">
-      <div class="code-label">Java</div>
-      <pre><code>int index = Math.floorMod(hash(key), nodes.size());
+          <p>The modulo baseline stays in the repo because it is the bug in executable form.</p>
+          <pre data-lang="java"><code>int index = Math.floorMod(hash(key), nodes.size());
 return nodes.get(index);</code></pre>
-    </div>
-    <p>A mechanism article is stronger when the wrong version is runnable too.</p>
-    <p>The implementation avoids networking on purpose. Adding HTTP would make the demo feel more realistic while hiding the one property under test. The useful artifact is the ownership table before and after membership changes.</p>
-  </section>
-  <section class="section" id="s11">
-    <div class="section-label">Part 11</div>
-    <h2>Membership Becomes A Thing You Operate</h2>
-    <p>Consistent hashing does not delete complexity. It moves complexity from every key lookup into membership management.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>tokens must be:
+          <p>A mechanism article is stronger when the wrong version is runnable too.</p>
+        </section>
+
+        <section class="section" id="operate-membership">
+          <p class="section-label">11 / Operational cost</p>
+          <h2>Membership Becomes A Thing You Operate</h2>
+          <p>Consistent hashing does not delete complexity. It moves complexity from every key lookup into membership management.</p>
+          <pre data-lang="membership state"><code>tokens must be:
 chosen
 persisted
 gossiped
 refreshed
 rebalanced</code></pre>
-    </div>
-    <p>Dynamo&#x27;s paper makes that cost visible. Clients may poll a random Dynamo node every 10 seconds for membership updates, according to section 6.4. Section 6.2 also says one refined strategy required coordination when membership changed.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>less key movement
+          <p>Dynamo makes that cost visible. Section 6.4 says clients may poll a random Dynamo node every 10 seconds for membership updates. Section 6.2 also says one refined strategy required coordination when membership changed.</p>
+          <pre data-lang="trade"><code>less key movement
 more explicit membership state</code></pre>
-    </div>
-    <p>That is a good trade only when warm ownership matters.</p>
-    <p>There are systems where it does not matter. If every request is cheap, stateless, and recomputable, modulo may be perfectly fine. Consistent hashing earns its keep when moving ownership has a real cost: cache warmth, disk transfer, replica repair, or downstream load.</p>
-  </section>
-  <section class="section" id="s12">
-    <div class="section-label">Part 12</div>
-    <h2>Build The Dumb Version Yourself</h2>
-    <p>Build the smallest thing that proves the property.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>1. implement modulo ownership
-2. implement ring ownership
-3. generate deterministic keys
-4. remove one node
-5. count changed owners
-6. write the CSV</code></pre>
-    </div>
-    <p>Do not start with replication, quorum reads, hinted handoff, or vector clocks. Those are Dynamo ideas too. They are not needed to see why the ring exists.</p>
-    <div class="code-block">
-      <div class="code-label">Shell</div>
-      <pre><code>./gradlew bootRun
+          <p>That is a good trade only when warm ownership matters.</p>
+        </section>
+
+        <section class="section" id="build-one">
+          <p class="section-label">12 / Build one</p>
+          <h2>Build The Dumb Version Yourself</h2>
+          <p>Build the smallest thing that proves the property.</p>
+          <pre data-lang="checklist"><code>[ ] implement modulo ownership
+[ ] implement ring ownership
+[ ] generate deterministic keys
+[ ] remove one node
+[ ] count changed owners
+[ ] write the CSV</code></pre>
+          <p>Do not start with replication, quorum reads, hinted handoff, or vector clocks. Those are Dynamo ideas too. They are not needed to see why the ring exists.</p>
+          <pre data-lang="bash"><code>./gradlew bootRun
 ./gradlew test</code></pre>
-    </div>
-    <p>The repo should make the central claim executable before it tries to look complete.</p>
-  </section>
-  <section class="section" id="s13">
-    <div class="section-label">Part 13</div>
-    <h2>Then Break It</h2>
-    <p>The adversarial tests are more important than the happy path.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>remove one server
+          <p>The repo should make the central claim executable before it tries to look complete.</p>
+        </section>
+
+        <section class="section" id="break-it">
+          <p class="section-label">13 / Adversarial proof</p>
+          <h2>Then Break It</h2>
+          <p>The adversarial tests are more important than the happy path.</p>
+          <pre data-lang="test plan"><code>remove one server
 add one server
 use one virtual node
 use many virtual nodes
 verify removed nodes own nothing
 verify the CSV is written</code></pre>
-    </div>
-    <p>The one token test is deliberately ugly. In the local run, one virtual node per machine left the hottest node with 27.4315 percent of keys after removal.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>consistent-ring remove, 1 token:
-moved:        2.7995%
-hottest node: 27.4315%</code></pre>
-    </div>
-    <p>Low movement alone can be a trap. A ring that barely moves keys but overloads one survivor is still a bad ring.</p>
-  </section>
-  <section class="section" id="s14">
-    <div class="section-label">Part 14</div>
-    <h2>The Part That Generalizes</h2>
-    <p>The larger lesson is that scalable systems often make the hidden coordinate system explicit. Modulo hashing smuggles membership into arithmetic. Consistent hashing gives membership a shape the system can change deliberately.</p>
-    <div class="code-block">
-      <div class="code-label">Trace</div>
-      <pre><code>wrong model:
+          <p>The one token test is deliberately ugly. In the local run, one virtual node per machine left the hottest node with 27.4315 percent of keys after removal.</p>
+          <pre data-lang="csv"><code>mode,event,virtual_nodes_per_node,moved_percent,max_load_percent
+consistent-ring,remove,1,2.7995,27.4315</code></pre>
+          <p>Low movement alone can be a trap. A ring that barely moves keys but overloads one survivor is still a bad ring.</p>
+        </section>
+
+        <section class="section" id="general-lesson">
+          <p class="section-label">14 / The part that generalizes</p>
+          <h2>The Larger Lesson Is To Make The Coordinate System Explicit</h2>
+          <p>The larger lesson is that scalable systems often make the hidden coordinate system explicit. Modulo hashing smuggles membership into arithmetic. Consistent hashing gives membership a shape the system can change deliberately.</p>
+          <pre data-lang="mental model"><code>wrong model:
 server = hash(key) % current_server_count
 
 better model:
 key position stays fixed
 membership moves around it</code></pre>
-    </div>
-    <p>Stable ownership is not magic. It is membership made explicit.</p>
-  </section>
-        <div class="footnote source-note">Source: Amazon Dynamo paper, SOSP 2007. Local measurements come from the Spring Boot benchmark. Code branch: <a href="https://github.com/LukeSkywalkrr/consistent-hash-ring/tree/feature/consistent-hash-ring">public GitHub branch</a>.</div>
+          <p>Stable ownership is not magic. It is membership made explicit.</p>
+          <p class="closing">You are not keeping every server alive. You are keeping the coordinate system still.</p>
+        </section>
+
+        <aside class="sources" aria-label="Sources and evidence">
+          <p class="source-label">Sources and evidence</p>
+          <p>Primary source: Amazon's Dynamo paper, <a href="https://cdn.amazon.science/ac/1d/eb50c4064c538c8ac440ce6a1d91/dynamo-amazons-highly-available-key-value-store.pdf">Dynamo: Amazon's Highly Available Key Value Store</a>.</p>
+          <p>Original evidence: the companion <a href="https://github.com/LukeSkywalkrr/consistent-hash-ring/tree/feature/consistent-hash-ring">Spring Boot implementation branch</a>, its test suite, and its generated CSV. Local measurements are not claims about Amazon production systems.</p>
+        </aside>
+
+        <footer class="article-footer">
+          <span>Daedalus Journal / Field note 17</span>
+          <button class="copy-button" type="button" data-copy-link>Copy article link</button>
+        </footer>
       </article>
     </main>
-    <footer class="site-footer"><span>Daedalus Journal</span><span>Static site hosted on Cloudflare Workers.</span></footer>
+
+    <script>
+      (() => {
+        const progress = document.querySelector('[data-progress]');
+        const copyButton = document.querySelector('[data-copy-link]');
+        let ticking = false;
+
+        function updateProgress() {
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          const value = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+          progress.style.transform = `scaleX(${value})`;
+          ticking = false;
+        }
+
+        window.addEventListener('scroll', () => {
+          if (!ticking) {
+            window.requestAnimationFrame(updateProgress);
+            ticking = true;
+          }
+        }, { passive: true });
+
+        copyButton.addEventListener('click', async () => {
+          const original = copyButton.textContent;
+          try {
+            await navigator.clipboard.writeText(window.location.href);
+            copyButton.textContent = 'Link copied';
+          } catch (error) {
+            copyButton.textContent = 'Copy failed';
+          }
+          window.setTimeout(() => { copyButton.textContent = original; }, 1600);
+        });
+
+        updateProgress();
+      })();
+    </script>
   </body>
 </html>
